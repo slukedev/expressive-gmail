@@ -130,7 +130,7 @@ export async function switchScope(scope: ScopeId) {
   hostDiag(`switching to ${scope}`);
   // Opening an account in the background can take a few seconds the first time.
   const slow = window.setTimeout(() => {
-    snack(`Opening ${name}…`, { id: 'scope-switch', timeout: 0 });
+    snack(`Opening ${name}…`, { id: 'scope-switch', state: 'loading' });
   }, 700);
   try {
     const saved = await parkComposes();
@@ -158,6 +158,7 @@ export async function switchScope(scope: ScopeId) {
     hostDiag(`switch to ${scope} failed after ${took()}: ${(err as Error)?.message ?? String(err)}`);
     const message = err instanceof BackendError || err instanceof Error ? err.message : String(err);
     snack(`Couldn't open ${name}. ${message}`, {
+      state: 'error',
       timeout: 10_000,
       action: { label: 'Try again', onClick: () => void switchScope(scope) },
     });

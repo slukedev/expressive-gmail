@@ -753,6 +753,8 @@
   grid-template-areas:
     'spark label'
     'spark preview';
+  /* A reply with nothing to preview sits in the middle of its card, not the top. */
+  align-content: center;
   column-gap: 10px;
   row-gap: 2px;
   flex: 1 1 200px;

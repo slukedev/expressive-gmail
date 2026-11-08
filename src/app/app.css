@@ -1688,13 +1688,37 @@ body:has(.app[data-compact] .offline) .m3-snackbar-viewport {
   transition:
     grid-template-rows var(--md-sys-motion-spatial-default),
     opacity var(--md-sys-motion-effects-fast),
-    margin var(--md-sys-motion-spatial-default);
+    margin var(--md-sys-motion-spatial-default),
+    transform var(--md-sys-motion-spatial-default);
 }
+/* A row that moves away slides toward the sidebar, where the places it can go are, as it folds. */
 .row-wrap[data-leaving] {
   grid-template-rows: 0fr;
   opacity: 0;
   margin-top: -2px;
+  transform: translateX(-24px);
   pointer-events: none;
+}
+/* The same, backwards, for a row an undo puts back. */
+.thread-list .seg-list > .row-context > .row-wrap[data-entering] {
+  animation: row-open var(--md-sys-motion-spatial-default) both;
+}
+.row-wrap[data-entering] > .row {
+  animation: row-open-pad var(--md-sys-motion-spatial-default) both;
+}
+@keyframes row-open {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+    margin-top: -2px;
+    transform: translateX(-24px);
+  }
+}
+@keyframes row-open-pad {
+  from {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
 }
 /* Hover actions turn pointer events back on for themselves; a leaving row's must stay dead, or a quick second click lands on Move to Inbox. */
 .row-wrap[data-leaving] * {

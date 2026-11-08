@@ -5,6 +5,15 @@ import type { LabelChange, LabelId, ThreadPage, ThreadSummary } from '../../src/
 const snacks: { message: string; onClick?: () => void }[] = [];
 vi.mock('../../src/app/ui/Snackbar', () => ({
   snack: (message: string, options: { action?: { onClick: () => void } } = {}) => snacks.push({ message, onClick: options.action?.onClick }),
+  snackProgress: (message: string) => {
+    snacks.push({ message });
+    return {
+      id: 'progress',
+      done: (text: string) => snacks.push({ message: text }),
+      fail: (text: string, options: { action?: { onClick: () => void } } = {}) => snacks.push({ message: text, onClick: options.action?.onClick }),
+      close: () => {},
+    };
+  },
   snackbarManager: { close: () => {} },
 }));
 

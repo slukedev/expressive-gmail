@@ -110,11 +110,11 @@ function GeminiReplies({ thread, last }: { thread: Thread; last: Message }) {
             type="button"
             className="reply-suggest__card"
             onClick={() => void replyWith(thread.id, r.text)}
-            aria-label={`Reply: ${r.label}. ${preview}`}
+            aria-label={preview ? `Reply: ${r.label}. ${preview}` : `Reply: ${r.label}`}
           >
             <Spark size={18} className="reply-suggest__spark" />
             <span className="reply-suggest__label md-title-small">{r.label}</span>
-            <span className="reply-suggest__preview md-body-small">{preview}</span>
+            {preview && <span className="reply-suggest__preview md-body-small">{preview}</span>}
           </button>
         );
       })}

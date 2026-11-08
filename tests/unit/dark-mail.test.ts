@@ -76,4 +76,19 @@ describe('adaptDocument', () => {
     expect(get('banner').getPropertyPriority('color')).toBe('');
     expect(get('pic').getPropertyPriority('background-color')).toBe('');
   });
+
+  it('in text-only mode lightens black text inherited from a wrapper and leaves surfaces alone', () => {
+    const frame = document.createElement('iframe');
+    document.body.append(frame);
+    const doc = frame.contentDocument!;
+    // Apple Mail wraps the whole message in rgb(0,0,0).
+    doc.body.innerHTML = `
+      <div style="color:rgb(0,0,0)"><div id="sig">Luke</div></div>
+      <div id="card" style="background-color:#ffffff;color:#222222">on white</div>`;
+    doc.documentElement.style.color = 'rgb(227, 227, 227)';
+    adaptDocument(doc, PAPER, { textOnly: true });
+    expect(doc.getElementById('sig')!.parentElement!.style.color).toBe('rgb(227, 227, 227)');
+    expect(doc.getElementById('card')!.style.getPropertyValue('background-color')).toBe('rgb(255, 255, 255)');
+    expect(doc.getElementById('card')!.style.getPropertyPriority('color')).toBe('');
+  });
 });

@@ -500,6 +500,15 @@ describe('GmailGemini: Help me write', () => {
   });
 });
 
+describe('GmailGemini: suggested replies', () => {
+  it('reads chips whose words live only in their aria-label, inside Gmail\'s current toolbar', async () => {
+    const chip = (t: string) => `<button class="Rju2Ue-aoh" aria-label="Suggested reply, ${t}"><span class="Rju2Ue-aoi"></span></button>`;
+    const g = fakeGmail({ extra: `<div role="toolbar" aria-label="Suggested replies">${chip('Got it, thanks!')}${chip('Done.')}</div>` });
+    const answer = await run(g, { kind: 'replies', threadId: CAFE }).result;
+    expect(answer).toEqual({ kind: 'replies', replies: [{ label: 'Got it, thanks!', text: 'Got it, thanks!' }, { label: 'Done.', text: 'Done.' }] });
+  });
+});
+
 describe('GmailGemini: cancel', () => {
   it('stops mid-stream: the call rejects with Stopped and the compose is gone once cancel resolves', async () => {
     const g = fakeGmail({ draft: ['One.', 'Two.', 'Three.', 'Four.', 'Five.', 'Six.'] });

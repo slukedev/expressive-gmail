@@ -1,4 +1,5 @@
-import { snack, snackbarManager } from '../ui/Snackbar';
+import { snack, snackProgress } from '../ui/Snackbar';
+import { markMoved, pulseDestination } from './moved';
 import { getRoute, navigate } from '../router/useRoute';
 import { classicGmailAt } from '../lib/host';
 import { BackendError, type MailBackend } from './backend';
@@ -10,13 +11,15 @@ import {
   keys,
   patchThreads,
   pruneAfterCollapse,
+  markArriving,
   pruneLists,
   queryClient,
   rememberChange,
   rememberGone,
   snapshotThreads,
 } from './client';
-import type { LabelChange, LabelId, Thread, ThreadSummary } from './types';
+import type { Label, LabelChange, LabelId, Thread, ThreadSummary } from './types';
+import { stillInView } from './views';
 import { useSettingsStore } from '../state/settings';
 import { showingCachedMail, untilFreshMail } from './lifecycle';
 import { useUi } from '../state/ui';
@@ -127,6 +130,8 @@ interface ModifyOptions {
   message?: string;
   /** Archive, move: auto-advance and animate out. */
   leaves?: boolean;
+  /** Where it went, as a sidebar route (`inbox`), so the row and that entry can show the move. */
+  to?: string;
   undoable?: boolean;
   /** Defaults to modifyThreads. */
   run?: (b: MailBackend) => Promise<void>;
@@ -160,7 +165,7 @@ async function afterFreshMail(reapply: () => void) {
 }
 
 async function modify(options: ModifyOptions): Promise<void> {
-  const { ids, change, message, leaves, undoable = true, run, inverseRun, patch, failed = "Couldn't update." } = options;
+  const { ids, change, message, leaves, to, undoable = true, run, inverseRun, patch, failed = "Couldn't update." } = options;
   if (!ids.length) return;
   // Undo goes to the account the action went to, even if the scope changes meanwhile.
   const b = backend();
@@ -180,6 +185,14 @@ async function modify(options: ModifyOptions): Promise<void> {
     adjustUnread(deltas, ids);
   }
   if (leaves) {
+    // Only rows that stay in this list (All mail) slide; the others fold away, and sliding them too would fight that.
+    const view = getRoute().view;
+    const labels = queryClient.getQueryData<Label[]>(keys.labels) ?? [];
+    markMoved(ids.filter((id) => {
+      const t = before.get(id);
+      return !t || stillInView(view, applyLabelChange(t, change), labels) !== false;
+    }));
+    if (to) pulseDestination(to);
     advanceFrom(ids);
     // Removing a half-collapsed row from the cache makes the list below jump.
     pruneAfterCollapse(ids, COLLAPSE_MS);
@@ -188,6 +201,7 @@ async function modify(options: ModifyOptions): Promise<void> {
   }
 
   const restore = () => {
+    markArriving(ids);
     forgetChange(ids);
     patchThreads(ids, (t) => before.get(t.id) ?? t);
     void queryClient.invalidateQueries({ queryKey: keys.labels });
@@ -210,7 +224,7 @@ async function modify(options: ModifyOptions): Promise<void> {
       snack('Action undone');
     } catch (err) {
       forgetChange(ids);
-      snack(errorMessage(err, "Couldn't undo."));
+      snack(errorMessage(err, "Couldn't undo."), { state: 'error' });
     }
     void queryClient.invalidateQueries({ queryKey: keys.allThreads });
   };
@@ -231,7 +245,7 @@ async function modify(options: ModifyOptions): Promise<void> {
     if (lastUndo === undo) lastUndo = null;
     restore();
     void queryClient.invalidateQueries({ queryKey: keys.allThreads });
-    snack(errorMessage(err, failed), retryable(err) ? { action: { label: 'Retry', onClick: () => void modify(options) } } : {});
+    snack(errorMessage(err, failed), { state: 'error', ...(retryable(err) ? { action: { label: 'Retry', onClick: () => void modify(options) } } : {}) });
     return;
   }
 
@@ -243,13 +257,14 @@ async function modify(options: ModifyOptions): Promise<void> {
 
 export const mail = {
   archive(ids: string[]) {
-    return modify({ ids, change: { remove: ['INBOX'] }, leaves: true, message: `${convo(ids.length)} archived`, failed: "Couldn't archive." });
+    return modify({ ids, change: { remove: ['INBOX'] }, leaves: true, to: 'all', message: `${convo(ids.length)} archived`, failed: "Couldn't archive." });
   },
   moveToInbox(ids: string[]) {
     return modify({
       ids,
       change: { add: ['INBOX'], remove: ['SPAM', 'TRASH'] },
       leaves: true,
+      to: 'inbox',
       message: `${convo(ids.length)} moved to Inbox`,
       failed: "Couldn't move to Inbox.",
     });
@@ -262,6 +277,7 @@ export const mail = {
       ids,
       change: { add: ['TRASH'], remove: ['INBOX'] },
       leaves: true,
+      to: 'trash',
       message: `${convo(ids.length)} moved to Trash`,
       failed: "Couldn't move to Trash.",
       run: (b) => b.trashThreads(ids),
@@ -273,6 +289,7 @@ export const mail = {
       ids,
       change: { remove: ['TRASH'], add: ['INBOX'] },
       leaves: true,
+      to: 'inbox',
       message: `${convo(ids.length)} restored`,
       failed: "Couldn't restore.",
       run: (b) => b.untrashThreads(ids),
@@ -305,7 +322,7 @@ export const mail = {
     } catch (err) {
       forgetChange(ids);
       patchThreads(ids, (t) => before.get(t.id) ?? t);
-      snack(errorMessage(err, "Couldn't discard the draft."), retryable(err) ? { action: { label: 'Retry', onClick: () => void mail.discardDrafts(ids) } } : {});
+      snack(errorMessage(err, "Couldn't discard the draft."), { state: 'error', ...(retryable(err) ? { action: { label: 'Retry', onClick: () => void mail.discardDrafts(ids) } } : {}) });
     }
     void queryClient.invalidateQueries({ queryKey: keys.allThreads });
     void queryClient.invalidateQueries({ queryKey: keys.labels });
@@ -327,20 +344,18 @@ export const mail = {
     patchThreads(ids, (t) => ({ ...t, labelIds: [] }));
     rememberGone(ids);
     pruneAfterCollapse(ids, COLLAPSE_MS);
-    const progress = snack(ids.length === 1 ? 'Deleting forever…' : `Deleting ${ids.length} conversations forever…`, { timeout: 0 });
+    const progress = snackProgress(ids.length === 1 ? 'Deleting forever…' : `Deleting ${ids.length} conversations forever…`);
     try {
       await afterFreshMail(() => {
         patchThreads(ids, (t) => ({ ...t, labelIds: [] }));
         pruneLists();
       });
       await b.deleteThreadsForever(ids);
-      snackbarManager.close(progress);
-      snack(`${convo(ids.length)} deleted forever`);
+      progress.done(`${convo(ids.length)} deleted forever`);
     } catch (err) {
-      snackbarManager.close(progress);
       forgetChange(ids);
       patchThreads(ids, (t) => before.get(t.id) ?? t);
-      snack(deleteFailure(err, "Couldn't delete forever."), { action: classic });
+      progress.fail(deleteFailure(err, "Couldn't delete forever."), { action: classic });
     }
     void queryClient.invalidateQueries({ queryKey: keys.allThreads });
     void queryClient.invalidateQueries({ queryKey: keys.labels });
@@ -355,15 +370,13 @@ export const mail = {
       return;
     }
     // Rows stay until Gmail confirms the folder is empty.
-    const progress = snack(folder === 'trash' ? 'Emptying Trash…' : 'Deleting all spam…', { timeout: 0 });
+    const progress = snackProgress(folder === 'trash' ? 'Emptying Trash…' : 'Deleting all spam…');
     try {
       const n = b.emptyFolder ? await b.emptyFolder(folder) : await deleteEveryPage(b, folder);
-      snackbarManager.close(progress);
-      if (n === 0) snack(`${name} is already empty`);
-      else snack(`${name} emptied${typeof n === 'number' ? `. ${n === 1 ? '1 conversation' : `${n.toLocaleString()} conversations`} deleted forever` : ''}`);
+      if (n === 0) progress.done(`${name} is already empty`);
+      else progress.done(`${name} emptied${typeof n === 'number' ? `. ${n === 1 ? '1 conversation' : `${n.toLocaleString()} conversations`} deleted forever` : ''}`);
     } catch (err) {
-      snackbarManager.close(progress);
-      snack(deleteFailure(err, `Couldn't empty ${name}. Open classic Gmail to finish.`), { action: classic });
+      progress.fail(deleteFailure(err, `Couldn't empty ${name}. Open classic Gmail to finish.`), { action: classic });
     }
     void queryClient.invalidateQueries({ queryKey: keys.allThreads });
     void queryClient.invalidateQueries({ queryKey: keys.labels });
@@ -473,6 +486,7 @@ export const mail = {
     } catch (err) {
       patchThreads([threadId], (t) => before.get(t.id) ?? t);
       snack(deleteFailure(err, "Couldn't cancel the send."), {
+        state: 'error',
         action: retryable(err) ? { label: 'Retry', onClick: () => void mail.cancelScheduled(threadId, opts) } : classicAction('#scheduled'),
       });
       return undefined;

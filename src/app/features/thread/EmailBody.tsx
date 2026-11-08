@@ -157,6 +157,8 @@ export function EmailBody({ message, loadImages, linksOff }: { message: Message;
 
   // Gmail on Android darkens designed emails in its dark theme; "View in light theme" undoes it per message.
   const adapt = dark && designed && darkEmails && !original;
+  // Mail a person wrote has no design to darken, but Apple Mail and others still hard-code black text that vanishes on the dark pane.
+  const fixText = dark && !designed && !original;
 
   // A theme flip restyles the open frame in place instead of reloading it, unless the email's own colors need rewriting.
   const darkNow = useRef(dark);
@@ -184,7 +186,7 @@ export function EmailBody({ message, loadImages, linksOff }: { message: Message;
     style.textContent = frameCss(designed, darkNow.current, adapt);
     doc.head.prepend(style);
     return [`<!doctype html>${doc.documentElement.outerHTML}`, key] as const;
-  }, [main, quoted, showQuoted, designed, adapt]);
+  }, [main, quoted, showQuoted, designed, adapt, fixText]);
 
   useEffect(() => {
     const doc = frameRef.current?.contentDocument;
@@ -205,7 +207,7 @@ export function EmailBody({ message, loadImages, linksOff }: { message: Message;
       setSized(true);
     };
     // Hidden until its colors are rewritten, so a dark pane never flashes a white email.
-    if (adapt) frame.dataset.adapting = '';
+    if (adapt || fixText) frame.dataset.adapting = '';
     let done = false;
     let live = true;
     let clickDoc: Document | null = null;
@@ -214,10 +216,10 @@ export function EmailBody({ message, loadImages, linksOff }: { message: Message;
       const doc = frame.contentDocument;
       if (!doc || done) return;
       done = true;
-      if (adapt && doc.body) {
+      if ((adapt || fixText) && doc.body) {
         const paper = parseColor(getComputedStyle(frame.parentElement ?? frame).backgroundColor);
         try {
-          adaptDocument(doc, paper && paper.a > 0 ? { ...paper, a: 1 } : { r: 30, g: 31, b: 32, a: 1 });
+          adaptDocument(doc, paper && paper.a > 0 ? { ...paper, a: 1 } : { r: 30, g: 31, b: 32, a: 1 }, { textOnly: !adapt });
         } catch {
           // A document the walk can't handle still shows, in its own colors.
         }
@@ -289,7 +291,7 @@ export function EmailBody({ message, loadImages, linksOff }: { message: Message;
       clickDoc?.removeEventListener('keydown', onKey);
       ro?.disconnect();
     };
-  }, [html, frameKey, linksOff, adapt, designed]);
+  }, [html, frameKey, linksOff, adapt, designed, fixText]);
 
   useEffect(() => {
     const doc = frameRef.current?.contentDocument;

@@ -64,7 +64,7 @@ const HOOKS = {
   /** [G] */
   summarize: /^summari[sz]e this email$/i,
   /** [R] Gemini's suggested replies under a conversation. */
-  replies: '.B6t8wd, .mVCoBd',
+  replies: '[role="toolbar"][aria-label="Suggested replies"], .B6t8wd, .mVCoBd',
   /** [R] Ask Gemini in Gmail's header (Workspace). Gemini's promotional callout ("gemkick-pep-icon-callout") isn't counted: Gmail shows it to accounts it is selling Gemini to. */
   askGemini: '.e5IPTd',
   /** [G] what an offer to buy Gemini says, where Gmail puts one in Gemini's place for accounts without it. */
@@ -781,23 +781,27 @@ class Job {
 
   private async replies(threadId: string): Promise<GeminiResult> {
     await this.openThread(threadId);
+    // Gmail labels each chip "Suggested reply, <words>"; the words are the chip's text when the page doesn't render them as text.
+    const SUGGESTED = /^suggested reply,\s*/i;
+    const chipText = (el: HTMLElement) => text(el) || spaced((el.getAttribute('aria-label') ?? '').replace(SUGGESTED, ''));
     const chips = () => {
       const found: HTMLElement[] = [];
       for (const hook of this.shownAll<HTMLElement>(HOOKS.replies)) {
-        const inner = [...hook.querySelectorAll<HTMLElement>('[role="button"], button')].filter((el) => this.env.shown(el) && text(el));
+        const inner = [...hook.querySelectorAll<HTMLElement>('[role="button"], button')].filter((el) => this.env.shown(el) && chipText(el));
         found.push(...(inner.length ? inner : [hook]));
       }
-      return innermost(found.filter((el) => text(el)));
+      for (const el of this.doc.querySelectorAll<HTMLElement>('[aria-label^="Suggested reply," i]')) if (this.env.shown(el)) found.push(el);
+      return innermost([...new Set(found)].filter((el) => chipText(el)));
     };
     if (!(await this.wait(() => chips().length > 0, this.env.stepTimeoutMs))) {
       throw new JobMissing("Gmail didn't suggest replies for this conversation. Gemini suggests them for some conversations only.", []);
     }
-    const read = () => chips().map((c) => text(c)).join('\n');
+    const read = () => chips().map(chipText).join('\n');
     await this.stream(read, () => false, 'suggest replies', '', false);
     const replies: { label: string; text: string }[] = [];
     for (const chip of chips()) {
-      const label = spaced(text(chip));
-      const full = spaced(chip.getAttribute('data-reply-text') ?? chip.getAttribute('title') ?? chip.getAttribute('aria-label') ?? '');
+      const label = spaced(chipText(chip));
+      const full = spaced(chip.getAttribute('data-reply-text') ?? chip.getAttribute('title') ?? chip.getAttribute('aria-label')?.replace(SUGGESTED, '') ?? '');
       if (!label || replies.some((r) => r.label === label)) continue;
       replies.push({ label, text: full.length > label.length ? full : label });
     }

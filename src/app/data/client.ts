@@ -138,6 +138,21 @@ export function patchThreads(ids: string[], fn: (t: ThreadSummary) => ThreadSumm
   }
 }
 
+/** Rows an undo or a refused write is putting back; they open up into the list instead of appearing. */
+const arriving = new Map<string, number>();
+
+export function markArriving(ids: string[], ms = 4000) {
+  const until = Date.now() + ms;
+  for (const id of ids) arriving.set(id, until);
+}
+
+export function isArriving(id: string) {
+  const until = arriving.get(id);
+  if (until === undefined) return false;
+  if (until < Date.now()) arriving.delete(id);
+  return until >= Date.now();
+}
+
 /** Rows still collapsing out of a list, kept by any prune until their own runs. */
 const collapsing = new Map<string, number>();
 
