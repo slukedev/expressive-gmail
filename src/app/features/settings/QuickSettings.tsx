@@ -10,7 +10,7 @@ import { Swatch } from '../wallpaper/Swatch';
 import { applyPictureColors, usePictureChoice } from '../wallpaper/colors';
 import { CustomSwatch, RandomSwatch } from './ColorChoices';
 import { openAllSettings } from './lazy';
-import { UiScaleChoice } from './UiScaleChoice';
+import { UiScaleSlider } from './UiScaleChoice';
 import { useUiScaleAvailable } from '../../theme/uiScale';
 
 function Radio<T extends string>({ name, value, current, onChange, children }: { name: string; value: T; current: T; onChange: (v: T) => void; children: React.ReactNode }) {
@@ -84,8 +84,7 @@ export function QuickSettings() {
 
             {scalable && (
               <section className="qs-section">
-                <h3 className="md-title-small qs-title">Interface size</h3>
-                <UiScaleChoice />
+                <UiScaleSlider title="Interface size" />
               </section>
             )}
 

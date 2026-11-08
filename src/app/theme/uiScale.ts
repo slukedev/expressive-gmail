@@ -9,7 +9,8 @@ import { snack } from '../ui/Snackbar';
 const hosted = typeof window !== 'undefined' && window.parent !== window && !isPhone(navigator.userAgent);
 
 // An engine that doesn't carry the zoom into the frame is remembered until the browser updates.
-const UNSUPPORTED_KEY = 'bg.uiScaleUnsupported';
+// Versioned: the first check, by pixel ratio, turned the setting off in engines that zoom correctly.
+const UNSUPPORTED_KEY = 'bg.uiScaleUnsupported.v2';
 let unsupported = (() => {
   try {
     return hosted && localStorage.getItem(UNSUPPORTED_KEY) === navigator.userAgent;
@@ -31,9 +32,9 @@ function giveUp() {
   listeners.forEach((fn) => fn());
 }
 
-/** The pixel ratio follows the zoom once the host's change reaches the frame, usually with a resize. */
-function verify(scale: number, hostRatio: number) {
-  const fits = () => scaleTookEffect(window.devicePixelRatio, hostRatio, scale);
+/** The frame's viewport follows the zoom once the host's change reaches it, with a resize. */
+function verify(scale: number, hostWidth: number) {
+  const fits = () => scaleTookEffect(window.innerWidth, hostWidth, scale);
   if (fits()) return;
   const stop = () => {
     window.removeEventListener('resize', onResize);
@@ -49,9 +50,9 @@ function verify(scale: number, hostRatio: number) {
 
 if (hosted) {
   window.addEventListener('message', (e) => {
-    const d = e.data as { source?: string; type?: string; scale?: unknown; ratio?: unknown };
+    const d = e.data as { source?: string; type?: string; scale?: unknown; width?: unknown };
     if (e.source !== window.parent || d?.source !== 'better-gmail/content' || d.type !== 'scale') return;
-    if (typeof d.scale === 'number' && d.scale !== 1 && typeof d.ratio === 'number' && !unsupported) verify(d.scale, d.ratio);
+    if (typeof d.scale === 'number' && d.scale !== 1 && typeof d.width === 'number' && d.width > 0 && !unsupported) verify(d.scale, d.width);
   });
 }
 

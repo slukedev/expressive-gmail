@@ -13,6 +13,7 @@ export function Slider({
   label,
   valueText,
   className,
+  stops,
 }: {
   value: number;
   onValueChange: (value: number) => void;
@@ -23,6 +24,8 @@ export function Slider({
   label: string;
   valueText?: (value: number) => string;
   className?: string;
+  /** A dot at every step, for a slider with a few set values. */
+  stops?: boolean;
 }) {
   const share = max > min ? (value - min) / (max - min) : 0;
   return (
@@ -40,6 +43,11 @@ export function Slider({
         <BaseSlider.Track className="m3-slider__track">
           <span className="m3-slider__active" />
           <span className="m3-slider__inactive" />
+          {stops &&
+            Array.from({ length: Math.round((max - min) / step) + 1 }, (_, i) => {
+              const at = (i * step) / (max - min);
+              return <span key={i} className="m3-slider__stop" data-active={at < share || undefined} data-under={Math.abs(at - share) < 1e-6 || undefined} style={{ '--stop-at': at } as CSSProperties} />;
+            })}
           <BaseSlider.Thumb className="m3-slider__handle" getAriaLabel={() => label} getAriaValueText={valueText && ((_, v) => valueText(v))} />
         </BaseSlider.Track>
       </BaseSlider.Control>

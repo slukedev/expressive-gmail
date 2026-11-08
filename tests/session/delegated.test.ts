@@ -155,6 +155,81 @@ describe('finding delegated mailboxes in Gmail’s page', () => {
   });
 });
 
+describe('delegated mailboxes in the shapes Gmail’s page data takes', () => {
+  const hex = (s: string) => s.replace(/[/"@<>=]/g, (c) => `\\x${c.charCodeAt(0).toString(16).padStart(2, '0').toUpperCase()}`);
+
+  it('finds several in hex-escaped script data, nested records and all', () => {
+    const records = [
+      `[null,"Team Inbox","team@example.com",[1,"https://lh3.googleusercontent.com/a/photo=s96-c"],"/mail/u/0/d/AEoRXRSteam00001/"]`,
+      `[null,"Billing","billing@example.net",[0],"/mail/u/0/d/AEoRXRSbill00001/"]`,
+      `[null,null,"ops@example.org",[0],"/mail/b/391/u/0/"]`,
+    ];
+    document.body.innerHTML = `<script>var GLOBALS=[null,null,1,"x",[1],null,null,null,null,"ik","${ME}",[3]];</script><script>_GM_setData({"dlg":${hex(`[${records.join(',')}]`)}});</script>`;
+    expect(delegatedFromDocument(document, [ME])).toEqual([
+      { email: 'team@example.com', name: 'Team Inbox', url: 'https://mail.google.com/mail/u/0/d/AEoRXRSteam00001/' },
+      { email: 'billing@example.net', name: 'Billing', url: 'https://mail.google.com/mail/u/0/d/AEoRXRSbill00001/' },
+      { email: 'ops@example.org', url: 'https://mail.google.com/mail/b/391/u/0/' },
+    ]);
+  });
+
+  it('reads a name written as Name <address> in escaped data, and an address alone without one', () => {
+    const js = `["Team Inbox \\x3cteam\\u0040example.com\\x3e","\\/mail\\/u\\/0\\/d\\/AEoRXRSteam00001\\/"],["solo@example.com","\\u002Fmail\\u002Fu\\u002F0\\u002Fd\\u002FAEoRXRSsolo00001\\u002F"]`;
+    expect(parseDelegated(js)).toEqual([
+      { email: 'team@example.com', name: 'Team Inbox', url: 'https://mail.google.com/mail/u/0/d/AEoRXRSteam00001/' },
+      { email: 'solo@example.com', url: 'https://mail.google.com/mail/u/0/d/AEoRXRSsolo00001/' },
+    ]);
+  });
+
+  it('keeps a name in its own sublist with its record, but never borrows the next record’s address', () => {
+    expect(parseDelegated(`[[["team@example.com",["Team Inbox"]],"/mail/u/0/d/AEoRXRSteam00001/"]]`)).toEqual([
+      { email: 'team@example.com', url: 'https://mail.google.com/mail/u/0/d/AEoRXRSteam00001/' },
+    ]);
+    expect(parseDelegated(`[["Lone","/mail/u/0/d/AEoRXRSlone00001/"],["next@example.com","Next"]]`)).toEqual([]);
+  });
+
+  it('follows a sign-in hop to the mailbox, in a drawn link or in data', () => {
+    const hop = `https://accounts.google.com/AccountChooser?continue=${encodeURIComponent('https://mail.google.com/mail/u/0/d/AEoRXRSteam00001/')}&hl=en`;
+    expect(delegatedUrl(hop)).toBe('https://mail.google.com/mail/u/0/d/AEoRXRSteam00001/');
+    expect(delegatedUrl(`https://evil.example.com/?continue=${encodeURIComponent('https://mail.google.com/mail/u/0/d/AEoRXRSteam00001/')}`)).toBeUndefined();
+    document.body.innerHTML = `<a href="${hop.replace(/&/g, '&amp;')}" aria-label="Team Inbox (team@example.com)">Team Inbox</a>`;
+    expect(delegatedFromDocument(document, [ME])).toEqual([{ email: 'team@example.com', name: 'Team Inbox', url: 'https://mail.google.com/mail/u/0/d/AEoRXRSteam00001/' }]);
+    expect(parseDelegated(`"continue=https%3A%2F%2Fmail.google.com%2Fmail%2Fu%2F0%2Fd%2FAEoRXRSteam00001&amp;x=team%40example.com"`)).toEqual([
+      { email: 'team@example.com', url: 'https://mail.google.com/mail/u/0/d/AEoRXRSteam00001/' },
+    ]);
+  });
+
+  it('finds none when only the signed-in accounts are linked', () => {
+    document.body.innerHTML = `<script>var mla=[["${ME}","/mail/u/0/"],["bo@example.com","\\x2Fmail\\x2Fu\\x2F1\\x2F"]];</script><a href="/mail/u/1/">bo@example.com</a>`;
+    expect(delegatedFromDocument(document, [ME, 'bo@example.com'])).toEqual([]);
+  });
+
+  it('survives malformed data without throwing or inventing mailboxes', () => {
+    const junk = [
+      `["Team","team@example.com","/mail/u/0/d/AEoRXRSteam0`,
+      `\\x4\\uZZZZ%zz&#99999999;&#x;&bogus; ]]]]{{{ "/mail/u/0/d/" nobody@ "/mail/b/"`,
+      `["x@example.com","/mail/u/0/d/short/"]`,
+      '\u0000'.repeat(50) + '/mail/'.repeat(500),
+    ];
+    for (const raw of junk) expect(() => parseDelegated(raw)).not.toThrow();
+    expect(junk.flatMap((raw) => parseDelegated(raw))).toEqual([]);
+    expect(parseDelegated(`[[["unclosed","team@example.com","/mail/u/0/d/AEoRXRSteam00001/"`)).toEqual([
+      { email: 'team@example.com', name: 'unclosed', url: 'https://mail.google.com/mail/u/0/d/AEoRXRSteam00001/' },
+    ]);
+  });
+
+  it('does not wait on a stalled account walk, and still skips the page’s own address', async () => {
+    vi.useFakeTimers();
+    try {
+      document.body.innerHTML = `<script>var GLOBALS=[null,null,1,"x",[1],null,null,null,null,"ik","${ME}",[3]];</script><a href="/mail/u/0/d/${TOKEN}/"><div>${ME}</div><div>team@example.com</div></a>`;
+      const found = discoverDelegated(document, new Promise(() => undefined));
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect((await found).map((d) => d.email)).toEqual(['team@example.com']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
 describe('tabs the extension manages', () => {
   it('reloads and picks only tabs that run the app', () => {
     expect(runsApp('https://mail.google.com/mail/u/0/#inbox')).toBe(true);

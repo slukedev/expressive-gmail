@@ -19,12 +19,19 @@ async function press(page: Page, el: Locator, button: 'left' | 'right' = 'left')
 
 const rect = (el: Locator) => el.evaluate((e) => e.getBoundingClientRect().toJSON() as DOMRect);
 
+const SIZES = ['80%', '90%', '100%', '110%', '125%'];
+
 async function pickSize(page: Page, app: FrameLocator, size: string) {
   // The sheet slides in, so these click the elements themselves rather than a point on screen.
   await app.getByRole('banner').getByRole('button', { name: 'Settings' }).dispatchEvent('click');
   const sheet = app.getByRole('dialog', { name: 'Quick settings' });
-  await sheet.getByRole('radiogroup', { name: 'Interface size' }).getByRole('radio', { name: size }).dispatchEvent('click');
-  await expect(sheet.getByRole('radio', { name: size })).toHaveAttribute('aria-checked', 'true');
+  // The sheet's slider steps by key, applying each step.
+  const slider = sheet.getByRole('slider', { name: 'Interface size' });
+  await slider.focus();
+  await page.keyboard.press('Home');
+  for (let i = 0; i < SIZES.indexOf(size); i++) await page.keyboard.press('ArrowRight');
+  await expect(slider).toHaveAttribute('aria-valuetext', size);
+  await expect(page.locator('iframe')).toHaveCSS('zoom', String(Number(size.replace('%', '')) / 100));
   await page.keyboard.press('Escape');
   await expect(sheet).toBeHidden();
 }
@@ -96,7 +103,22 @@ test('outside a host page there is no Interface size', async ({ mail, page }) =>
   await page.getByRole('banner').getByRole('button', { name: 'Settings' }).click();
   const sheet = page.getByRole('dialog', { name: 'Quick settings' });
   await expect(sheet.getByRole('radiogroup', { name: 'Theme' })).toBeVisible();
-  await expect(sheet.getByRole('radiogroup', { name: 'Interface size' })).toHaveCount(0);
+  await expect(sheet.getByRole('slider', { name: 'Interface size' })).toHaveCount(0);
+});
+
+test('Settings changes the size as soon as it is picked', async ({ mail, page }) => {
+  await mail.page.goto('/preview/frame.html?latency=0#inbox');
+  const app = page.frameLocator('iframe');
+  await expect(app.getByRole('list', { name: 'Conversations' }).getByRole('listitem').first()).toBeVisible();
+  await app.getByRole('banner').getByRole('button', { name: 'Settings' }).dispatchEvent('click');
+  await app.getByText('See all settings').dispatchEvent('click');
+  await app.locator('.settings').getByText('Appearance', { exact: true }).first().dispatchEvent('click');
+  const group = app.getByRole('radiogroup', { name: 'Interface size' });
+  await group.getByRole('radio', { name: '110%' }).dispatchEvent('click');
+  await expect(page.locator('iframe')).toHaveCSS('zoom', '1.1');
+  // Still open, and every option's label fits.
+  await expect(group.getByRole('radio', { name: '110%' })).toHaveAttribute('aria-checked', 'true');
+  expect(await group.evaluate((g) => [...g.querySelectorAll('.button-group__item')].every((s) => s.scrollWidth <= s.clientWidth + 0.5))).toBe(true);
 });
 
 test('the command palette makes the interface smaller and larger', async ({ mail, page }) => {
@@ -123,12 +145,12 @@ test('a browser that cannot zoom the frame goes back to 100% and drops the setti
   const app = page.frameLocator('iframe');
   await expect(app.getByRole('list', { name: 'Conversations' }).getByRole('listitem').first()).toBeVisible();
   await pickSize(page, app, '80%');
-  // Stand in for an engine that kept the frame at the host's pixel ratio.
-  await page.evaluate(() => document.querySelector('iframe')!.contentWindow!.postMessage({ source: 'better-gmail/content', type: 'scale', scale: 0.8, ratio: 2 }, location.origin));
+  // Stand in for an engine that left the frame's layout at the host's width.
+  await page.evaluate(() => document.querySelector('iframe')!.contentWindow!.postMessage({ source: 'better-gmail/content', type: 'scale', scale: 0.8, width: 2000 }, location.origin));
   await expect(page.locator('iframe')).toHaveCSS('zoom', '1');
   await expect(app.getByRole('region', { name: 'Notifications' })).toContainText("This browser can't change the interface size.");
   await app.getByRole('banner').getByRole('button', { name: 'Settings' }).dispatchEvent('click');
   const sheet = app.getByRole('dialog', { name: 'Quick settings' });
   await expect(sheet.getByRole('radiogroup', { name: 'Theme' })).toBeVisible();
-  await expect(sheet.getByRole('radiogroup', { name: 'Interface size' })).toHaveCount(0);
+  await expect(sheet.getByRole('slider', { name: 'Interface size' })).toHaveCount(0);
 });

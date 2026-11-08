@@ -1,36 +1,54 @@
 import type { DelegatedMailbox } from '../shared/accounts-rpc';
 import { delegatedPath } from '../shared/takeover';
+import { readGlobalsFromDocument } from './account';
 
 // Gmail links delegated mailboxes as /mail/u/N/d/<token>/ (or the older /mail/b/<id>/u/N/), in its
 // switcher and its page data. Any such link with an address next to it counts, wherever it sits.
 
 const ORIGIN = 'https://mail.google.com';
 // A bare path only where a URL can start, so another site's /mail/ path never counts.
-const LINK = /(?:https:\/\/mail\.google\.com|(?<=^|["'\s=]))\/mail\/(?:u\/\d{1,2}\/d\/[\w-]{8,}|b\/[\w.-]+\/u\/\d{1,2}|b\/[\w.-]{4,})(?=[/"'\s#?<\\]|$)/g;
+const LINK = /(?:https:\/\/mail\.google\.com|(?<=^|["'\s=]))\/mail\/(?:u\/\d{1,2}\/d\/[\w-]{8,}|b\/[\w.-]+\/u\/\d{1,2}|b\/[\w.-]{4,})(?=[/"'\s#?&,)<\\])/g;
 const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
-const EMAIL_CHAR = /[\w.+@-]/;
+const EMAIL_CHAR = /[\w.+@%\\-]/;
 /** One switcher entry, not the next one. */
 const NEAR = 320;
 /** Escapes make raw text longer than what it reads as, so windows are cut wider. */
 const WINDOW = 4 * (NEAR + 120);
-const CANDIDATE = /\/mail\/|\\\/mail\\\/|\\(?:x2f|u002f)mail\\(?:x2f|u002f)/gi;
-/** Data that crosses one of these belongs to another record. */
-const OTHER_RECORD = /[[\]{}]|\/mail\//;
+// A slash as markup, script data or a query string spells it.
+const SLASH = String.raw`(?:\\?\/|\\x2f|\\u002f|%2f)`;
+const CANDIDATE = new RegExp(`${SLASH}mail${SLASH}`, 'gi');
+const SCRIPT_HINT = new RegExp(`${SLASH}mail${SLASH}[ub]`, 'i');
+/** How long discovery waits to learn which addresses are the user's own. */
+const ME_MS = 6_000;
 const MAX_TEXT = 8_000_000;
 const MAX_FOUND = 50;
 
-/** Script data escapes slashes and quotes; markup escapes ampersands. */
+const NAMED: Record<string, string> = { amp: '&', quot: '"', lt: '<', gt: '>', commat: '@', sol: '/', apos: "'" };
+const fromCode = (code: number) => (code > 0 && code < 0xffff ? String.fromCharCode(code) : '');
+
+/** Script data escapes any character as \xHH or \uHHHH, markup as entities, links in query strings as %HH. */
 function unescape(text: string): string {
   return text
-    .replace(/\\(?:x2f|u002f)/gi, '/')
-    .replace(/\\(?:x40|u0040)/gi, '@')
-    .replace(/\\(?:x22|u0022)/gi, '"')
+    .replace(/\\x([0-9a-f]{2})|\\u([0-9a-f]{4})/gi, (_, x?: string, u?: string) => fromCode(parseInt(x ?? u ?? '', 16)))
     .replace(/\\\//g, '/')
-    .replace(/&(?:amp|#38);/g, '&')
-    .replace(/&(?:quot|#34);/g, '"')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&(?:#64|commat);/g, '@');
+    .replace(/&#x([0-9a-f]{1,4});|&#(\d{1,5});/gi, (_, x?: string, d?: string) => fromCode(x ? parseInt(x, 16) : Number(d)))
+    .replace(/&(amp|quot|lt|gt|commat|sol|apos);/g, (_, n: string) => NAMED[n]!)
+    .replace(/%(2f|3a|40)/gi, (_, h: string) => String.fromCharCode(parseInt(h, 16)));
+}
+
+/**
+ * Whether two values sit in one record: the text between them may enter or leave one nested list
+ * (a name in its own sublist), but not close one record and open the next.
+ */
+function sameRecord(between: string): boolean {
+  if (/\/mail\//.test(between)) return false;
+  let depth = 0;
+  let low = 0;
+  for (const c of between) {
+    if (c === '[' || c === '{') depth++;
+    else if (c === ']' || c === '}') low = Math.min(low, --depth);
+  }
+  return -low + (depth - low) <= 1;
 }
 
 /** Stretched so no window cuts an address in two. */
@@ -48,12 +66,14 @@ function windows(text: string): string[] {
   return spans.map(([from, to]) => unescape(text.slice(from, to)));
 }
 
-export function delegatedUrl(href: string): string | undefined {
+/** Also through one Google sign-in hop (`?continue=`), the way account choosers link. */
+export function delegatedUrl(href: string, follow = true): string | undefined {
   try {
     const url = new URL(href, ORIGIN);
-    if (url.origin !== ORIGIN) return undefined;
-    const path = delegatedPath(url.pathname);
-    return path ? `${ORIGIN}${path}/` : undefined;
+    const path = url.origin === ORIGIN ? delegatedPath(url.pathname) : undefined;
+    if (path) return `${ORIGIN}${path}/`;
+    const next = follow && /^https:\/\/(?:mail|accounts)\.google\.com$/.test(url.origin) ? url.searchParams.get('continue') : null;
+    return next ? delegatedUrl(next, false) : undefined;
   } catch {
     return undefined;
   }
@@ -107,7 +127,7 @@ export function parseDelegated(raw: string, me: string[] = []): DelegatedMailbox
         if (mine.has(email.toLowerCase())) continue;
         const at = from + m.index;
         const before = at < link.index;
-        if (OTHER_RECORD.test(before ? text.slice(at + email.length, link.index) : text.slice(end, at))) continue;
+        if (!sameRecord(before ? text.slice(at + email.length, link.index) : text.slice(end, at))) continue;
         const distance = before ? link.index - (at + email.length) : at - end;
         if (!best || distance < best.distance) best = { email, at, distance };
       }
@@ -147,12 +167,12 @@ function fromAnchor(a: HTMLAnchorElement, mine: Set<string>): DelegatedMailbox |
 export function delegatedFromDocument(doc: Pick<Document, 'querySelectorAll'>, me: string[] = []): DelegatedMailbox[] {
   try {
     const mine = mineSet(me);
-    const anchors = [...doc.querySelectorAll<HTMLAnchorElement>('a[href*="/mail/"]')].map((a) => fromAnchor(a, mine)).filter((d) => !!d);
+    const anchors = [...doc.querySelectorAll<HTMLAnchorElement>('a[href*="/mail/"], a[href*="%2Fmail%2F" i]')].map((a) => fromAnchor(a, mine)).filter((d) => !!d);
     let scripts = '';
     for (const s of doc.querySelectorAll('script:not([src])')) {
       const t = s.textContent ?? '';
       // Most of Gmail's inline scripts are code; only data with a delegated link is worth scanning.
-      if (/\/mail(?:\\?\/|\\x2f|\\u002f)(?:u|b)/i.test(t)) scripts += `${t}\n`;
+      if (SCRIPT_HINT.test(t)) scripts += `${t}\n`;
       if (scripts.length > MAX_TEXT) break;
     }
     return dedupe([...anchors, ...parseDelegated(scripts, me)]).slice(0, MAX_FOUND);
@@ -163,6 +183,14 @@ export function delegatedFromDocument(doc: Pick<Document, 'querySelectorAll'>, m
 
 /** Every signed-in address is `me`, so one listed beside a link is never taken for the mailbox. */
 export async function discoverDelegated(doc: Pick<Document, 'querySelectorAll'>, addresses: Promise<(string | undefined)[]>): Promise<DelegatedMailbox[]> {
-  const me = await addresses.catch((): (string | undefined)[] => []);
-  return delegatedFromDocument(doc, me.filter((e): e is string => !!e));
+  // The account walk can stall on a slow feed; the page still names its own account.
+  const timeout = new Promise<undefined>((resolve) => setTimeout(resolve, ME_MS));
+  const me = (await Promise.race([addresses, timeout]).catch(() => undefined)) ?? [];
+  let own: string | undefined;
+  try {
+    own = readGlobalsFromDocument(doc).email;
+  } catch {
+    // No GLOBALS: the addresses above are all there is.
+  }
+  return delegatedFromDocument(doc, [...me, own].filter((e): e is string => !!e));
 }

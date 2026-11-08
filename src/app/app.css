@@ -2144,11 +2144,13 @@ button.att-chip:focus-visible {
 /* Hover actions take the date's place, like Gmail web: a tonal pill on the first line, no shadow, so it reads as part of the row. */
 .row__hover {
   position: absolute;
-  right: calc(var(--row-h-pad) - 8px);
-  top: calc(var(--row-v-pad) - 5px);
+  /* The same inset from the row's corner on both edges, in every density. */
+  right: 4px;
+  top: 4px;
   display: flex;
   gap: 4px;
-  padding: 0 4px;
+  /* Even on every side, so the round buttons sit concentric in the pill. */
+  padding: 4px;
   border-radius: var(--md-sys-shape-corner-full);
   background: var(--md-sys-color-surface-container-high);
   opacity: 0;
@@ -2160,6 +2162,10 @@ button.att-chip:focus-visible {
 }
 .row--unread .row__hover {
   background: var(--md-sys-color-surface-container);
+}
+/* Inside the pill a press stays round: the square press shape reads as a block stuck on the toolbar. */
+.row__hover .m3-icon-button {
+  --pressed: var(--round);
 }
 @media (hover: hover) {
   .list-pane:not([data-selecting]) .row:not(.row--selected):hover .row__hover,
@@ -2365,6 +2371,16 @@ button.att-chip:focus-visible {
 .empty-art .m3-icon {
   position: relative;
   animation: empty-icon-in 600ms 120ms var(--md-sys-motion-easing-emphasized-decelerate) both;
+}
+.empty-art__mark {
+  position: relative;
+  display: grid;
+  animation: empty-icon-in 600ms 120ms var(--md-sys-motion-easing-emphasized-decelerate) both;
+}
+/* A mark drawn as its own SVG, not the shape behind it. */
+.empty-art .empty-art__mark svg {
+  position: static;
+  animation: none;
 }
 .empty-art--error {
   color: var(--md-sys-color-on-error-container);
@@ -4091,6 +4107,16 @@ button.att-chip:focus-visible {
   margin: 0 0 8px;
   color: var(--md-sys-color-on-surface);
 }
+.ui-scale-slider__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+.ui-scale-slider__value {
+  color: var(--md-sys-color-primary);
+  font-variant-numeric: tabular-nums;
+}
 .radio-row,
 .switch-row {
   display: flex;
@@ -5077,6 +5103,24 @@ kbd {
   min-height: 3lh;
   color: var(--md-sys-color-on-surface-variant);
   text-wrap: balance;
+}
+/* A step with a choice: one line, then the switch, in the same three lines. */
+.onboarding__text--choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.onboarding__text--choice p {
+  margin: 0;
+}
+.onboarding__choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 40px;
+  color: var(--md-sys-color-on-surface);
+  cursor: pointer;
 }
 .onboarding__dots {
   position: relative;

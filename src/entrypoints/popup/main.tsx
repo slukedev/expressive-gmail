@@ -3,8 +3,7 @@ import { createRoot } from 'react-dom/client';
 import '../../app/theme/tokens.css';
 import '../../app/ui/ui.css';
 import './popup.css';
-import { Button, IconButton } from '../../app/ui/Button';
-import { REPO_URL } from '../../shared/project';
+import { Button } from '../../app/ui/Button';
 import { Switch } from '../../app/ui/Switch';
 import { BrandMark } from '../../app/features/shell/BrandMark';
 import { GOOGLE_DARK, GOOGLE_LIGHT } from '../../app/theme/google-palette';
@@ -48,7 +47,6 @@ function Popup() {
           <h1 className="md-title-large">Expressive Gmail</h1>
           <p className="md-body-medium popup__sub">{enabled ? SOURCES[source] : 'Classic Gmail is showing'}</p>
         </div>
-        <IconButton className="popup__repo" icon="code" label="Expressive Gmail on GitHub" onClick={() => void browser.tabs.create({ url: REPO_URL })} />
       </header>
       <label className="popup__row">
         <span className="md-body-large">Use the new Gmail</span>

@@ -1543,23 +1543,23 @@
 }
 .button-group__item {
   overflow: hidden;
-  --lead-shift: 14px;
+  --lead-gap: 8px;
 }
 .button-group.m3-size--xs .button-group__item {
-  --lead-shift: 12px;
+  --lead-gap: 4px;
 }
-/* The check's slot is always there; unselected, the label slides half a slot back so it reads centred. Only transforms move. */
-.button-group__lead--grow,
-.button-group__lead--grow + span {
-  transition: transform var(--md-sys-motion-spatial-fast);
+/* Only the selected option makes room for its check, so a row of short options still fits its labels. */
+.button-group__lead--grow {
+  width: 0;
+  overflow: hidden;
+  margin-inline-end: calc(-1 * var(--lead-gap));
+  transition:
+    width var(--md-sys-motion-spatial-fast),
+    margin var(--md-sys-motion-spatial-fast);
 }
-.button-group__item:not([data-selected]) > .button-group__lead--grow,
-.button-group__item:not([data-selected]) > .button-group__lead--grow + span {
-  transform: translateX(calc(-1 * var(--lead-shift)));
-}
-.button-group__item:not([data-selected]):dir(rtl) > .button-group__lead--grow,
-.button-group__item:not([data-selected]):dir(rtl) > .button-group__lead--grow + span {
-  transform: translateX(var(--lead-shift));
+.button-group__item[data-selected] > .button-group__lead--grow {
+  width: 20px;
+  margin-inline-end: 0;
 }
 .button-group__lead--grow > .m3-icon {
   opacity: 0;
@@ -1577,8 +1577,7 @@
 @media (prefers-reduced-motion: reduce) {
   .m3-swap-icon > .m3-icon,
   .m3-swap-text > span,
-  .button-group__lead--grow,
-  .button-group__lead--grow + span {
+  .button-group__lead--grow {
     transition: none !important;
   }
   .button-group__lead--grow > .m3-icon {
@@ -1856,6 +1855,27 @@
   height: 4px;
   border-radius: 50%;
   background: var(--md-sys-color-primary);
+}
+/* Stops on a slider with set values; the ones under the handle hide in its gap. */
+.m3-slider__stop {
+  position: absolute;
+  top: 6px;
+  left: clamp(6px, calc(var(--stop-at) * 100% - 2px), calc(100% - 10px));
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--md-sys-color-on-secondary-container);
+  pointer-events: none;
+  transition: background-color var(--md-sys-motion-effects-fast);
+}
+.m3-slider__stop[data-active] {
+  background: var(--md-sys-color-on-primary);
+}
+.m3-slider__stop[data-under] {
+  opacity: 0;
+}
+.m3-slider:has(.m3-slider__stop) .m3-slider__inactive::after {
+  content: none;
 }
 .m3-slider__handle {
   width: 4px;

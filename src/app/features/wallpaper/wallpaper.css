@@ -253,11 +253,12 @@
   }
 }
 
-/* The unread count, also a toggle: tertiary at rest, primary while the inbox shows only unread, cut out of the shape in the pane's colour. */
+/* The unread count, also a toggle: tertiary at rest, primary while the inbox shows only unread, cut out of the shape in the pane's colour.
+   Anchored by its leading edge, like an M3 badge, so one digit sits on the shape's rim and more digits grow outward. */
 .glance-badge {
   position: absolute;
   top: 0;
-  right: -12px;
+  left: calc(100% - 40px);
   z-index: 2;
   display: inline-flex;
   align-items: center;
@@ -357,7 +358,7 @@
   }
 }
 .glance-picture-wrap:has(.glance-picture--mark) .glance-badge {
-  right: -10px;
+  left: calc(100% - 38px);
 }
 @media (prefers-reduced-motion: reduce) {
   .glance-badge,
