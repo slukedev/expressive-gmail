@@ -561,32 +561,30 @@
   opacity: 0;
   transition: opacity var(--md-sys-motion-effects-fast);
 }
+/* Items sit 4px in on every side, and their edge corners are the section's less that inset, so highlights stay concentric. */
 .m3-menu-section {
+  --menu-section-top: var(--md-sys-shape-corner-small);
+  --menu-section-bottom: var(--md-sys-shape-corner-small);
   display: flex;
   flex-direction: column;
   flex: none;
-  padding: 2px 4px;
-  border-radius: var(--md-sys-shape-corner-small);
+  padding: 4px;
+  border-radius: var(--menu-section-top) var(--menu-section-top) var(--menu-section-bottom) var(--menu-section-bottom);
   background: var(--app-menu-bg);
   box-shadow: var(--md-sys-elevation-2);
   transition: border-radius var(--md-sys-motion-spatial-fast);
 }
 .m3-menu-section:first-child {
-  border-top-left-radius: var(--md-sys-shape-corner-large);
-  border-top-right-radius: var(--md-sys-shape-corner-large);
+  --menu-section-top: var(--md-sys-shape-corner-large);
 }
 .m3-menu-section:last-child {
-  border-bottom-left-radius: var(--md-sys-shape-corner-large);
-  border-bottom-right-radius: var(--md-sys-shape-corner-large);
+  --menu-section-bottom: var(--md-sys-shape-corner-large);
 }
 @media (hover: hover) {
   .m3-menu:has(.m3-menu-section:hover) .m3-menu-section:not(:hover) {
-    border-radius: var(--md-sys-shape-corner-small);
+    --menu-section-top: var(--md-sys-shape-corner-small);
+    --menu-section-bottom: var(--md-sys-shape-corner-small);
   }
-}
-.m3-menu-section:first-child:only-child {
-  padding-top: 4px;
-  padding-bottom: 4px;
 }
 .m3-menu-item {
   position: relative;
@@ -608,13 +606,13 @@
 }
 .m3-menu-section > .m3-menu-item:first-child,
 .m3-menu-section > :first-child .m3-menu-item:first-child {
-  border-top-left-radius: var(--md-sys-shape-corner-medium);
-  border-top-right-radius: var(--md-sys-shape-corner-medium);
+  border-top-left-radius: calc(var(--menu-section-top) - 4px);
+  border-top-right-radius: calc(var(--menu-section-top) - 4px);
 }
 .m3-menu-section > .m3-menu-item:last-child,
 .m3-menu-section > :last-child .m3-menu-item:last-child {
-  border-bottom-left-radius: var(--md-sys-shape-corner-medium);
-  border-bottom-right-radius: var(--md-sys-shape-corner-medium);
+  border-bottom-left-radius: calc(var(--menu-section-bottom) - 4px);
+  border-bottom-right-radius: calc(var(--menu-section-bottom) - 4px);
 }
 .m3-menu-item[data-highlighted] {
   background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
