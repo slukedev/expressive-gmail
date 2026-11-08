@@ -65,8 +65,10 @@ const HOOKS = {
   summarize: /^summari[sz]e this email$/i,
   /** [R] Gemini's suggested replies under a conversation. */
   replies: '.B6t8wd, .mVCoBd',
-  /** [R] Ask Gemini in Gmail's header (Workspace), and the Gemini callout ("gemkick" is Google's internal name). */
-  askGemini: '.e5IPTd, [data-rp-placement-id="gemkick-pep-icon-callout-id"]',
+  /** [R] Ask Gemini in Gmail's header (Workspace). Gemini's promotional callout ("gemkick-pep-icon-callout") isn't counted: Gmail shows it to accounts it is selling Gemini to. */
+  askGemini: '.e5IPTd',
+  /** [G] what an offer to buy Gemini says, where Gmail puts one in Gemini's place for accounts without it. */
+  upsell: /\b(try|upgrade|unlock|subscribe|get gemini|google one|ai premium|google ai (pro|plus|ultra))\b/i,
   /** [D] Gemini's side panel: the header button that opens it, the box it takes a question in, its title. */
   panelButton: '.e5IPTd button, button[aria-label="Ask Gemini"]',
   panelInput: '[role="combobox"][aria-label="Ask Gemini"], .Pv5YRd[role="combobox"]',
@@ -246,16 +248,16 @@ export class GmailGemini {
     const ask = this.searchBoxes().some(isAskGmail);
     // Ask Gmail answers questions, chat, and the briefing when there's no AI Inbox.
     if (ask) add('search', 'chat', 'inbox');
-    if (this.doc.querySelector(HOOKS.helpMeWrite)) add('write', 'refine');
+    if (offered(this.doc, HOOKS.helpMeWrite)) add('write', 'refine');
     if (this.doc.querySelector(HOOKS.summaryCard) || this.labelled(HOOKS.summarize)) add('summary');
     if (this.doc.querySelector(HOOKS.replies)) add('replies');
-    if (this.doc.querySelector(HOOKS.aiInbox)) add('inbox');
+    if (offered(this.doc, HOOKS.aiInbox)) add('inbox');
     if (this.labelled(HOOKS.proofread)) add('proofread');
     if (this.labelled(HOOKS.helpMeSchedule)) add('schedule');
-    const gemini = ask || found.has('write') || found.has('summary') || found.has('inbox') || !!this.doc.querySelector(HOOKS.askGemini);
+    const gemini = ask || found.has('write') || found.has('summary') || found.has('inbox') || offered(this.doc, HOOKS.askGemini);
     if (gemini) add('write', 'refine', 'summary');
     // The side panel writes and refines too (draftInPanel), for accounts whose compose has no Help me write.
-    if (this.doc.querySelector(`${HOOKS.panelButton}, ${HOOKS.panelInput}`)) add('chat', 'search', 'summary', 'write', 'refine');
+    if (offered(this.doc, `${HOOKS.panelButton}, ${HOOKS.panelInput}`)) add('chat', 'search', 'summary', 'write', 'refine');
     for (const [feature, present] of this.seen) {
       if (present) found.add(feature);
       else found.delete(feature);
@@ -588,7 +590,7 @@ class Job {
   }
 
   private hasPanel(): boolean {
-    return !!this.doc.querySelector(`${HOOKS.panelButton}, ${HOOKS.panelInput}`);
+    return offered(this.doc, `${HOOKS.panelButton}, ${HOOKS.panelInput}`);
   }
 
   private panelInput(): HTMLElement | null {
@@ -606,7 +608,7 @@ class Job {
   private async openPanel(): Promise<{ root: HTMLElement; input: HTMLElement }> {
     let input = this.panelInput();
     if (!input) {
-      const button = this.shownAll<HTMLElement>(HOOKS.panelButton)[0];
+      const button = this.shownAll<HTMLElement>(HOOKS.panelButton).find((el) => !isUpsell(el));
       if (!button) throw new JobMissing(NO_PANEL, ['chat', 'search']);
       press(button);
       input = await this.until(() => this.panelInput(), 'open the Gemini panel');
@@ -1519,6 +1521,22 @@ function durationNames(minutes: number): RegExp[] {
 
 function needsEnglish(lang: string): string {
   return `Gemini here needs Gmail in English, and Gmail is set to "${lang}". Change Gmail's language in Settings > General, or use Gemini in classic Gmail.`;
+}
+
+/** Some match that isn't an offer to buy Gemini. Cheap: no layout. */
+function offered(doc: Document, selector: string): boolean {
+  for (const el of doc.querySelectorAll(selector)) if (!isUpsell(el)) return true;
+  return false;
+}
+
+/** By its own name, its tooltip, or the few words it shows (an upgrade chip reads "Try Gemini"), here or on the control holding it. Longer text is content, not a label. */
+function isUpsell(el: Element): boolean {
+  const said = (e: Element | null) => {
+    if (!e) return '';
+    const shown = (e.textContent ?? '').trim();
+    return [e.getAttribute('aria-label'), e.getAttribute('data-tooltip'), shown.length <= 40 ? shown : ''].filter(Boolean).join(' ');
+  };
+  return HOOKS.upsell.test(`${said(el)} ${said(el.closest('[role="button"], button, a'))}`);
 }
 
 function isAskGmail(box: HTMLInputElement): boolean {

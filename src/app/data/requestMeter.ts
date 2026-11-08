@@ -36,8 +36,8 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') {
   (window as unknown as { __bgRequests: RequestMeter }).__bgRequests = requestMeter;
 }
 
-/** Static fields and local bookkeeping, not requests to Google. */
-const UNCOUNTED = new Set(['kind', 'capabilities', 'subscribe', 'accountHint', 'then']);
+/** Static fields and local bookkeeping, not requests to Google (geminiStatus reads the page Gmail already loaded). */
+const UNCOUNTED = new Set(['kind', 'capabilities', 'subscribe', 'accountHint', 'geminiStatus', 'then']);
 
 export function metered<B extends MailBackend>(backend: B, meter: RequestMeter = requestMeter, now: () => number = Date.now): B {
   const wrapped = new Map<PropertyKey, unknown>();

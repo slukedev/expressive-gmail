@@ -22,9 +22,9 @@ const REQUEST: GeminiRequest = { kind: 'briefing' };
 
 /** What needs doing, then what's been going on, by topic. Checked-off to-dos are kept in this browser. */
 export function AiInboxView() {
-  const on = useSettings((s) => s.gemini);
+  const choice = useSettings((s) => s.geminiChoice);
   const status = useGeminiStatus();
-  const ready = on && status?.ready && status.features.includes('inbox');
+  const ready = status?.ready && status.features.includes('inbox');
   return (
     <section className="page ai-inbox" aria-labelledby="ai-inbox-title">
       <header className="page__head">
@@ -34,18 +34,18 @@ export function AiInboxView() {
         </h1>
         <p className="md-body-large page__lede">Ticking a to-do off here doesn’t change your inbox.</p>
       </header>
-      {!on ? (
+      {status && !status.ready ? (
+        <GeminiUnavailable status={status} />
+      ) : status && choice === false ? (
         <div className="gemini-off" role="status">
           <h3 className="md-title-medium">Gemini is off</h3>
           <p className="md-body-medium">AI Inbox needs Gemini. Turn it back on to see your to-dos and topics.</p>
           <div className="gemini-off__actions">
-            <Button variant="tonal" onClick={() => updateSettings({ gemini: true })}>
+            <Button variant="tonal" onClick={() => updateSettings({ geminiChoice: true })}>
               Turn on Gemini
             </Button>
           </div>
         </div>
-      ) : status && !status.ready ? (
-        <GeminiUnavailable status={status} />
       ) : ready ? (
         <Briefing />
       ) : status ? (

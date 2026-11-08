@@ -34,7 +34,7 @@ import { parseWhen, type WhenOptions } from './when';
 import { pickWallpaperFile } from '../wallpaper/actions';
 import { editCurrentPicture } from '../wallpaper/editor';
 import { applyPictureColors, hasPicture } from '../wallpaper/colors';
-import type { GeminiFeature, GeminiStatus } from '../../data/gemini';
+import { geminiAvailable, geminiOn, type GeminiFeature, type GeminiStatus } from '../../data/gemini';
 import { useGeminiPanel } from '../gemini/panel';
 import { geminiKeys } from '../gemini/useGemini';
 
@@ -261,7 +261,6 @@ const TOGGLES: ToggleDef[] = [
   { key: 'showSnippets', title: 'Message previews', icon: 'view_agenda', keywords: 'snippets preview line' },
   { key: 'showLabelChips', title: 'Label tags in the list', icon: 'sell', keywords: 'chips labels rows' },
   { key: 'smartFeatures', title: 'Smart chips and cards', icon: 'bolt', keywords: 'codes packages tracking invites bills' },
-  { key: 'gemini', title: 'Gemini', icon: 'forum', keywords: 'ai assistant summaries help me write suggested replies disable hide' },
   { key: 'groupByDate', title: 'Group by date', icon: 'calendar_today', keywords: 'sections today yesterday' },
   { key: 'glance', title: 'At a glance', icon: 'wb_sunny', keywords: 'greeting worth a look reading pane empty' },
   { key: 'hoverActions', title: 'Hover actions', icon: 'more_horiz', keywords: 'quick buttons row' },
@@ -313,6 +312,24 @@ export function settingItems(s: Settings): Item[] {
       alt: { label: on ? 'Turn off and close' : 'Turn on and close', run: () => updateSettings({ [t.key]: !on } as Partial<Settings>) },
     };
   });
+  // Only where Gmail offers it: a switch that can't turn anything on isn't offered.
+  const geminiStatus = queryClient.getQueryData<GeminiStatus>(geminiKeys.status);
+  if (geminiAvailable(geminiStatus)) {
+    const on = geminiOn(s.geminiChoice, geminiStatus);
+    out.splice(TOGGLES.findIndex((t) => t.key === 'smartFeatures') + 1, 0, {
+      id: 'setting:gemini',
+      title: 'Gemini',
+      group: 'Settings',
+      icon: 'forum',
+      keywords: 'setting turn on off toggle ai assistant summaries help me write suggested replies disable hide',
+      toggle: on,
+      run: (): After => {
+        updateSettings({ geminiChoice: !on });
+        return 'stay';
+      },
+      alt: { label: on ? 'Turn off and close' : 'Turn on and close', run: () => updateSettings({ geminiChoice: !on }) },
+    });
+  }
   out.push({
     id: 'setting:categories',
     title: 'Sort into categories',
@@ -488,8 +505,8 @@ export function actionItems(ctx: Context, env: Env, s: Settings): Item[] {
   if (visibleItems(useAside.getState().items).length) {
     add({ id: 'aside-start', title: 'Work through Reply later', icon: 'pending_actions', shortcut: 'g r', keywords: 'set aside reply stack start', run: aside.start });
   }
-  const gemini = s.gemini ? queryClient.getQueryData<GeminiStatus>(geminiKeys.status) : undefined;
-  const offers = (f: GeminiFeature) => !!gemini?.ready && gemini.features.includes(f);
+  const gemini = queryClient.getQueryData<GeminiStatus>(geminiKeys.status);
+  const offers = (f: GeminiFeature) => geminiOn(s.geminiChoice, gemini) && !!gemini?.ready && gemini.features.includes(f);
   if (offers('chat')) {
     add({ id: 'gemini', title: 'Ask Gemini', icon: 'forum', keywords: 'ai assistant chat question side panel', run: () => useGeminiPanel.getState().show() });
     if (ctx.route.threadId) {

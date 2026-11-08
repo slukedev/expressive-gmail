@@ -93,8 +93,8 @@ export interface Settings {
   showLabelChips: boolean;
   /** Copy-code, tracking, RSVP and deal chips plus summary cards. */
   smartFeatures: boolean;
-  /** Off hides every Gemini button, card and suggestion. */
-  gemini: boolean;
+  /** Null until the person picks, so it follows whether Gmail shows Gemini for the account (`geminiOn`). False hides every Gemini button, card and suggestion. */
+  geminiChoice: boolean | null;
   /** On its own for long conversations, or only when asked. */
   geminiSummaries: 'auto' | 'ask';
   /** Else they come from local rules. */
@@ -164,7 +164,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showSnippets: true,
   showLabelChips: true,
   smartFeatures: true,
-  gemini: true,
+  geminiChoice: null,
   geminiSummaries: 'auto',
   geminiReplies: true,
   geminiSearch: true,
@@ -209,7 +209,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 }));
 
 /** Skipping any field whose type doesn't match (an old version, a hand edit). */
-function fromStorage(stored: unknown): Settings {
+export function fromStorage(stored: unknown): Settings {
   const out = { ...DEFAULT_SETTINGS } as Record<string, unknown>;
   if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return out as unknown as Settings;
   for (const [key, value] of Object.entries(stored)) {
@@ -238,6 +238,10 @@ function fromStorage(stored: unknown): Settings {
   if (out.startView !== 'inbox' && out.startView !== 'all') out.startView = DEFAULT_SETTINGS.startView;
   if (!isUiScale(out.uiScale)) out.uiScale = 1;
   if (!PICTURE_SHAPES.some((p) => p.shape === out.pictureShape)) out.pictureShape = DEFAULT_SETTINGS.pictureShape;
+  // `gemini` was on by default, so only an off was ever a choice; an on follows Gmail.
+  if (!('geminiChoice' in stored) && (stored as { gemini?: unknown }).gemini === false) out.geminiChoice = false;
+  if (typeof out.geminiChoice !== 'boolean') out.geminiChoice = null;
+  delete out.gemini;
   return out as unknown as Settings;
 }
 

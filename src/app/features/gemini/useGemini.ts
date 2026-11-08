@@ -1,8 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
+import { queryOptions, useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { BackendError } from '../../data/backend';
-import { backend } from '../../data/client';
-import type { GeminiFeature, GeminiRequest, GeminiResult, GeminiStatus } from '../../data/gemini';
+import { backend, queryClient } from '../../data/client';
+import { geminiOn, geminiRecheckMs, type GeminiFeature, type GeminiRequest, type GeminiResult, type GeminiStatus } from '../../data/gemini';
 import { useSettings, type Settings } from '../../state/settings';
 
 export const geminiKeys = {
@@ -11,32 +11,53 @@ export const geminiKeys = {
   result: (request: GeminiRequest) => ['gemini', 'result', request] as const,
 };
 
-const STATUS_STALE_MS = 5 * 60_000;
+const NO_CONNECTION: GeminiStatus = { ready: false, block: 'connection' };
 
-/** Asked once every few minutes. Sources without Gemini say 'connection'. */
+/** What Gmail shows for this account. Asked even with Gemini off: it reads Gmail's page and sends nothing to Gemini, and the switch needs it to know its default. */
+export async function readGeminiStatus(): Promise<GeminiStatus> {
+  const b = backend();
+  if (!b.geminiStatus || !b.gemini) return NO_CONNECTION;
+  return b.geminiStatus();
+}
+
+const statusQuery = queryOptions({
+  queryKey: geminiKeys.status,
+  queryFn: readGeminiStatus,
+  // Gmail adds its Gemini hooks a while after its page loads: an early "no" mustn't stick for the tab's life, as it did with one five-minute read.
+  staleTime: (q) => geminiRecheckMs(q.state.data) || Infinity,
+  refetchInterval: (q) => geminiRecheckMs(q.state.data),
+  retry: false,
+});
+
+/** Undefined while it's first asked, or when asking failed; both read as unavailable. */
 export function useGeminiStatus(): GeminiStatus | undefined {
-  const on = useSettings((s) => s.gemini);
-  const { data } = useQuery({
-    queryKey: geminiKeys.status,
-    queryFn: async (): Promise<GeminiStatus> => {
-      const b = backend();
-      if (!b.geminiStatus || !b.gemini) return { ready: false, block: 'connection' };
-      return b.geminiStatus();
-    },
-    enabled: on,
-    staleTime: STATUS_STALE_MS,
-    retry: false,
-  });
-  return data;
+  return useQuery(statusQuery).data;
+}
+
+/** Whether the status has answered (or failed), so first-run setup knows which steps it has. */
+export function useGeminiStatusSettled(): boolean {
+  return useQuery(statusQuery).isFetched;
+}
+
+/** Gemini shows: Gmail offers it for this account, and the person hasn't turned it off. */
+export function useGeminiOn(): boolean {
+  const choice = useSettings((s) => s.geminiChoice);
+  return geminiOn(choice, useGeminiStatus());
+}
+
+/** A run found Gemini (or one feature) gone: look again now rather than leave its buttons up. */
+function recheckGemini() {
+  void queryClient.invalidateQueries({ queryKey: geminiKeys.status });
 }
 
 type FeatureSetting = { [K in keyof Settings]: Settings[K] extends boolean ? K : never }[keyof Settings];
 
-/** Switched on here, and offered by this account. */
+/** On, and offered by this account. */
 export function useGeminiFeature(feature: GeminiFeature, setting?: FeatureSetting): boolean {
-  const on = useSettings((s) => s.gemini && (setting ? s[setting] === true : true));
+  const extra = useSettings((s) => (setting ? s[setting] === true : true));
   const status = useGeminiStatus();
-  return on && !!status?.ready && status.features.includes(feature);
+  const on = useGeminiOn();
+  return on && extra && !!status?.ready && status.features.includes(feature);
 }
 
 let seq = 0;
@@ -77,7 +98,11 @@ export function runGemini(request: GeminiRequest, onText?: (text: string) => voi
     : undefined;
   let rejectStop: (err: unknown) => void = () => undefined;
   const stoppedPromise = new Promise<never>((_, reject) => (rejectStop = reject));
-  const result = Promise.race([b.gemini(request, id), stoppedPromise]).finally(() => {
+  const asked = b.gemini(request, id).catch((err: unknown) => {
+    if (err instanceof BackendError && err.code === 'unsupported') recheckGemini();
+    throw err;
+  });
+  const result = Promise.race([asked, stoppedPromise]).finally(() => {
     unsubscribe?.();
     // A frame still waiting would put the answer back to streaming.
     cancelAnimationFrame(frame);
@@ -97,10 +122,13 @@ export function runGemini(request: GeminiRequest, onText?: (text: string) => voi
 
 export const isStopped = (err: unknown) => err instanceof Error && err.message === 'Stopped';
 
-/** Backends already word theirs that way. */
+export const GEMINI_UNAVAILABLE = 'Gemini isn’t available on this account.';
+
+/** Short and plain. Gmail's own wording for a missing feature is long, and the status recheck hides the surface anyway. */
 export function geminiErrorText(err: unknown): string {
   const message = err instanceof Error ? err.message : '';
-  if (err instanceof BackendError && err.code === 'network') return message || 'Gemini couldn’t be reached. Check your connection and try again.';
+  if (err instanceof BackendError && err.code === 'unsupported') return GEMINI_UNAVAILABLE;
+  if (err instanceof BackendError && err.code === 'network') return message || 'Gemini couldn’t be reached. Try again.';
   return message || 'Gemini couldn’t answer that. Try again.';
 }
 

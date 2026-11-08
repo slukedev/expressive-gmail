@@ -1,7 +1,6 @@
 import type { GeminiStatus } from '../../data/gemini';
 import { openUrl } from '../../lib/host';
 import { useAccount } from '../../data/hooks';
-import { updateSettings } from '../../state/settings';
 import { useUi } from '../../state/ui';
 import { Button } from '../../ui/Button';
 import { EmptyArt } from '../../ui/EmptyArt';
@@ -9,7 +8,7 @@ import { EmptyArt } from '../../ui/EmptyArt';
 const PLANS_URL = 'https://support.google.com/mail/answer/16831098';
 const gmailSettingsUrl = (index = 0) => `https://mail.google.com/mail/u/${index}/#settings/general`;
 
-/** And the one thing that would fix it. */
+/** And the one thing that would fix it. Nothing else of Gemini shows on such an account, so there's nothing to hide here. */
 export function GeminiUnavailable({ status, compact }: { status: GeminiStatus | undefined; compact?: boolean }) {
   const { data: account } = useAccount();
   if (!status) return null;
@@ -53,12 +52,7 @@ export function GeminiUnavailable({ status, compact }: { status: GeminiStatus | 
       {!compact && <EmptyArt icon="block" tone="tertiary" size={112} />}
       <h3 className="md-title-medium">{copy.title}</h3>
       <p className="md-body-medium">{copy.body}</p>
-      <div className="gemini-off__actions">
-        {copy.action}
-        <Button variant="text" onClick={() => updateSettings({ gemini: false })}>
-          Hide Gemini
-        </Button>
-      </div>
+      {copy.action && <div className="gemini-off__actions">{copy.action}</div>}
     </div>
   );
 }

@@ -537,6 +537,11 @@ describe('GmailGemini: status', () => {
     ['only suggested replies (no Gemini hook to infer from)', { placeholder: 'Search mail', extra: '<div class="B6t8wd"></div>' }, { ready: true, features: ['replies'] }],
     ['Proofread and Help me schedule in a compose menu', { extra: '<div role="menuitem">Proofread</div><div aria-label="Help me schedule"></div>' }, { ready: true, features: ['chat', 'summary', 'write', 'refine', 'proofread', 'search', 'inbox', 'schedule'] }],
     ['no Gemini at all', { placeholder: 'Search mail' }, { ready: false, block: 'plan' }],
+    // Gmail sells Gemini to accounts without it from the same places; an offer isn't Gemini.
+    ['only an offer to try Gemini in the header', { placeholder: 'Search mail', extra: '<div class="e5IPTd"><button aria-label="Try Gemini">Try Gemini</button></div>' }, { ready: false, block: 'plan' }],
+    ['only the promotional callout', { placeholder: 'Search mail', extra: '<div data-rp-placement-id="gemkick-pep-icon-callout-id">Meet Gemini in Gmail</div>' }, { ready: false, block: 'plan' }],
+    ['an upgrade chip where Help me write goes', { placeholder: 'Search mail', extra: '<div data-tooltip="Help me write: upgrade to Google AI Pro"></div>' }, { ready: false, block: 'plan' }],
+    ['the real header button, with an offer elsewhere', { placeholder: 'Search mail', extra: '<div class="e5IPTd"><button aria-label="Ask Gemini"></button></div><a aria-label="Get Google One">Get Google One</a>' }, { ready: true, features: expect.arrayContaining(['chat', 'summary', 'write']) }],
     ['Gmail in French', { lang: 'fr' }, { ready: false, block: 'page', detail: expect.stringContaining('needs Gmail in English') }],
   ];
   it.each(cases)('%s', async (_name, options, want) => {

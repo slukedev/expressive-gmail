@@ -4366,6 +4366,7 @@ button.att-chip:focus-visible {
 .settings-search {
   position: relative;
   display: flex;
+  flex: none;
   align-items: center;
   gap: 4px;
   height: 48px;

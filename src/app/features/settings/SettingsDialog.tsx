@@ -32,7 +32,7 @@ import { SidebarSettings } from './SidebarSettings';
 import { UiScaleChoice } from './UiScaleChoice';
 import { useUiScaleAvailable } from '../../theme/uiScale';
 import { captureListPlace, restoreListPlace, type ListPlace } from './listPlace';
-import type { GeminiStatus } from '../../data/gemini';
+import { geminiAvailable, geminiOn, type GeminiStatus } from '../../data/gemini';
 import { useGeminiStatus } from '../gemini/useGemini';
 
 const SECTIONS: { id: string; label: string; icon: IconName }[] = [
@@ -956,8 +956,8 @@ function geminiState(status: GeminiStatus | undefined): string {
   if (!status) return 'Checking this account…';
   if (status.ready) return 'Ready on this account: summaries, Help me write, suggested replies and answers about your mail.';
   return {
-    plan: 'Not part of this account’s plan, so nothing Gemini shows.',
-    'smart-features': 'Gmail’s smart features are off for this account, so Gemini can’t run.',
+    plan: 'Not available on this account.',
+    'smart-features': 'Turn on smart features in Gmail to use it.',
     connection: 'The Gmail API connection can’t reach Gemini. It works with “Your Gmail session”.',
     page: status.detail ?? 'Gmail’s page didn’t show Gemini the way this app expects.',
   }[status.block];
@@ -966,18 +966,21 @@ function geminiState(status: GeminiStatus | undefined): string {
 function GeminiSettings() {
   const s = useSettings((x) => x);
   const status = useGeminiStatus();
+  const on = geminiOn(s.geminiChoice, status);
+  const available = geminiAvailable(status);
   return (
     <div className="settings-group">
       <Block title="Gemini in Gmail">
         <Row
           title="Gemini"
           keywords="ai assistant disable hide turn off summaries help me write"
-          description={s.gemini ? geminiState(status) : 'Off. No Gemini buttons, cards or suggestions anywhere, and nothing is sent to Gemini.'}
+          description={!available || on ? geminiState(status) : 'Off. No Gemini buttons, cards or suggestions anywhere, and nothing is sent to Gemini.'}
         >
-          <Switch checked={s.gemini} label="Gemini" onCheckedChange={(gemini) => updateSettings({ gemini })} />
+          {/* Off and fixed where Gmail has no Gemini; untouched, it follows Gmail (the same setting as first-run setup). */}
+          <Switch checked={on} disabled={!available} label="Gemini" onCheckedChange={(geminiChoice) => updateSettings({ geminiChoice })} />
         </Row>
       </Block>
-      {s.gemini && (
+      {on && (
         <Block title="Where it shows">
           <Row title="Summaries" keywords="summary card summarize tldr" description="Automatic shows one on long conversations.">
             <Select

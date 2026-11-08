@@ -104,3 +104,22 @@ export function readsAsQuestion(query: string): boolean {
   if (!q || /\b[a-z]+:\S/i.test(q) || q.split(/\s+/).length < 3) return false;
   return /\?$/.test(q) || /^(what|when|where|who|whom|whose|which|why|how|did|does|do|is|are|was|were|has|have|can|could|should|will|would|summari[sz]e|list|find me|show me|tell me|catch me up)\b/i.test(q);
 }
+
+/** Gmail shows Gemini for this account: the only time any Gemini UI may show. */
+export function geminiAvailable(status: GeminiStatus | undefined): status is Extract<GeminiStatus, { ready: true }> {
+  return !!status?.ready;
+}
+
+/**
+ * The one Gemini switch. `choice` is null until the person picks: then it follows what Gmail shows, so an account that gains or
+ * loses Gemini in Gmail follows along. A choice is kept, but never turns on what Gmail doesn't offer.
+ */
+export function geminiOn(choice: boolean | null, status: GeminiStatus | undefined): boolean {
+  return geminiAvailable(status) && choice !== false;
+}
+
+/** How soon to look again. A "no" can be Gmail's page still loading, so it's asked about often; a "yes" can go when a run finds a feature gone. */
+export function geminiRecheckMs(status: GeminiStatus | undefined): number | false {
+  if (status && !status.ready && status.block === 'connection') return false;
+  return status?.ready ? 3 * 60_000 : 30_000;
+}

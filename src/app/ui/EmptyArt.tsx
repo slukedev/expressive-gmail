@@ -1,5 +1,5 @@
 import { MaterialShapes, roundedPolygonToPath, type RoundedPolygon } from 'material-shapes-ts';
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { Icon, type IconName } from './Icon';
 
 const SHAPES: (() => RoundedPolygon)[] = [
@@ -10,8 +10,8 @@ const SHAPES: (() => RoundedPolygon)[] = [
   () => MaterialShapes.SoftBurst,
 ];
 
-/** A large tonal shape holding the icon. */
-export function EmptyArt({ icon, tone = 'primary', size = 128 }: { icon: IconName; tone?: 'primary' | 'error' | 'tertiary'; size?: number }) {
+/** A large tonal shape holding the icon, or `mark` in its place (the icon still picks the shape). */
+export function EmptyArt({ icon, tone = 'primary', size = 128, mark }: { icon: IconName; tone?: 'primary' | 'error' | 'tertiary'; size?: number; mark?: ReactNode }) {
   const d = useMemo(() => {
     let h = 0;
     for (const c of icon) h = (h * 31 + c.charCodeAt(0)) >>> 0;
@@ -22,7 +22,7 @@ export function EmptyArt({ icon, tone = 'primary', size = 128 }: { icon: IconNam
       <svg viewBox="0 0 1 1" width={size} height={size}>
         <path d={d} />
       </svg>
-      <Icon name={icon} size={48} />
+      {mark ? <span className="empty-art__mark">{mark}</span> : <Icon name={icon} size={48} />}
     </span>
   );
 }
