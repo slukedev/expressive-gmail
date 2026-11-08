@@ -637,7 +637,7 @@
   align-items: center;
   gap: 12px;
   max-width: 100%;
-  padding: 4px 8px;
+  padding: 4px;
   border-radius: var(--md-sys-shape-corner-full);
   background: var(--md-sys-color-surface-container);
   color: var(--md-sys-color-on-surface-variant);
@@ -769,10 +769,11 @@
 .emoji-picker {
   display: flex;
   flex-direction: column;
-  width: 344px;
+  /* 8 + eight 40px cells + 8; the 40px search pill and resting cells both sit concentric in the 28 corners. */
+  width: 336px;
   max-width: calc(100vw - 16px);
   max-height: min(400px, var(--available-height));
-  border-radius: var(--md-sys-shape-corner-large);
+  border-radius: var(--md-sys-shape-corner-extra-large);
   background: var(--app-menu-bg);
   box-shadow: var(--md-sys-elevation-2);
   overflow: hidden;
@@ -795,9 +796,9 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  height: 48px;
+  height: 40px;
   margin: 8px 8px 0;
-  padding: 0 16px;
+  padding: 0 16px 0 12px;
   border-radius: var(--md-sys-shape-corner-full);
   background: var(--md-sys-color-surface-container-highest);
   color: var(--md-sys-color-on-surface-variant);

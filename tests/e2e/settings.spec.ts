@@ -62,6 +62,19 @@ async function openAllSettings(page: import('@playwright/test').Page) {
   return page.getByRole('dialog', { name: 'Settings' });
 }
 
+test('on a short window the sidebar scrolls and the search bar keeps its height', async ({ mail, page }) => {
+  await page.setViewportSize({ width: 1280, height: 640 });
+  await mail.open('inbox');
+  await expect(mail.rows.first()).toBeVisible();
+  await page.getByRole('banner').getByRole('button', { name: 'Settings' }).click();
+  await page.getByRole('dialog', { name: 'Quick settings' }).getByRole('button', { name: /settings/i }).first().click();
+  const bar = page.getByRole('dialog', { name: 'Settings' }).getByRole('search');
+  await expect(bar).toBeVisible();
+  // The sidebar is taller than the dialog here, which used to squash the bar to half height.
+  expect(await page.locator('.settings__nav').evaluate((n) => n.scrollHeight > n.clientHeight)).toBe(true);
+  expect((await bar.boundingBox())!.height).toBe(48);
+});
+
 test('a dialog opened from Settings dims Settings with its own scrim', async ({ mail, page }) => {
   await mail.open('inbox');
   await expect(mail.rows.first()).toBeVisible();

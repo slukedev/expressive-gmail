@@ -614,7 +614,7 @@
   border-bottom-left-radius: calc(var(--menu-section-bottom) - 4px);
   border-bottom-right-radius: calc(var(--menu-section-bottom) - 4px);
 }
-.m3-menu-item[data-highlighted] {
+.m3-menu-item[data-highlighted]:not([data-disabled]) {
   background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
 }
 .m3-menu-item[data-checked],
@@ -844,11 +844,11 @@
   transition: opacity var(--md-sys-motion-effects-fast);
 }
 @media (hover: hover) {
-  .m3-checkbox:hover::before {
+  .m3-checkbox:not([data-disabled]):hover::before {
     opacity: var(--md-sys-state-hover);
   }
 }
-.m3-checkbox:active::before {
+.m3-checkbox:not([data-disabled]):active::before {
   opacity: var(--md-sys-state-pressed);
 }
 .m3-checkbox__box {
@@ -952,19 +952,19 @@
   margin: -12px;
   background: var(--md-sys-color-on-primary);
 }
-.m3-switch:active .m3-switch__thumb {
+.m3-switch:not([data-disabled]):active .m3-switch__thumb {
   width: 28px;
   height: 28px;
   margin: -14px;
 }
 @media (hover: hover) {
-  .m3-switch:not([data-checked]):hover .m3-switch__thumb {
+  .m3-switch:not([data-checked], [data-disabled]):hover .m3-switch__thumb {
     background: var(--md-sys-color-on-surface-variant);
   }
-  .m3-switch:hover .m3-switch__thumb {
+  .m3-switch:not([data-disabled]):hover .m3-switch__thumb {
     box-shadow: 0 0 0 8px color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
   }
-  .m3-switch[data-checked]:hover .m3-switch__thumb {
+  .m3-switch[data-checked]:not([data-disabled]):hover .m3-switch__thumb {
     background: var(--md-sys-color-primary-container);
     box-shadow: 0 0 0 8px color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
   }
@@ -1021,7 +1021,7 @@
   transform: scale(1);
 }
 @media (hover: hover) {
-  .m3-radio:hover::before {
+  .m3-radio:not(:disabled):hover::before {
     opacity: var(--md-sys-state-hover);
   }
 }
@@ -1171,8 +1171,8 @@
   max-width: 100%;
   min-height: 56px;
   padding: 4px 8px 4px 20px;
-  /* Rounder than SnackbarTokens' 4dp, to sit with the Expressive menus and cards. */
-  border-radius: var(--md-sys-shape-corner-large);
+  /* Rounder than SnackbarTokens' 4dp: the 40px close button 8px in sits concentric. */
+  border-radius: var(--md-sys-shape-corner-extra-large);
   background: var(--md-sys-color-inverse-surface);
   color: var(--md-sys-color-inverse-on-surface);
   box-shadow: var(--md-sys-elevation-3);
