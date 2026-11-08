@@ -1,0 +1,261 @@
+/* Values from androidx compose material3 tokens (spec v0_14_0) and material-web; 1dp = 1px.
+   Color roles are written at runtime by ThemeProvider. */
+
+@font-face {
+  font-family: 'Google Sans Flex';
+  src: url('/fonts/google-sans-flex-latin.woff2') format('woff2-variations');
+  font-weight: 300 800;
+  font-display: block;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Google Sans Flex';
+  src: url('/fonts/google-sans-flex-latin-ext.woff2') format('woff2-variations');
+  font-weight: 300 800;
+  font-display: block;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Material Symbols Rounded';
+  src: url('/fonts/symbols.woff2') format('woff2');
+  font-weight: 300 600;
+  font-display: block;
+}
+
+:root {
+  --md-sys-shape-corner-none: 0px;
+  --md-sys-shape-corner-extra-small: 4px;
+  --md-sys-shape-corner-small: 8px;
+  --md-sys-shape-corner-medium: 12px;
+  --md-sys-shape-corner-large: 16px;
+  --md-sys-shape-corner-large-increased: 20px;
+  --md-sys-shape-corner-extra-large: 28px;
+  --md-sys-shape-corner-extra-large-increased: 32px;
+  --md-sys-shape-corner-extra-extra-large: 48px;
+  --md-sys-shape-corner-full: 9999px;
+
+  /* Motion: expressive springs as CSS. One linear() per damping ratio; the
+     duration sets the stiffness. Points are placed where the curve bends,
+     within 0.0006 of the spring, so 120 and 144Hz frames don't land on
+     visible corners. */
+  --md-spring-0-6: linear(0, 0.0017 0.58%, 0.0076 1.25%, 0.0175 1.92%, 0.0309 2.58%, 0.0475 3.25%, 0.0696 4%, 0.0949 4.75%,
+      0.1263 5.58%, 0.1501 6.17%, 0.1788 6.83%, 0.2126 7.58%, 0.2479 8.33%, 0.3214 9.83%, 0.4685 12.75%,
+      0.5307 14%, 0.5949 15.33%, 0.6489 16.5%, 0.7074 17.83%, 0.7588 19.08%, 0.8065 20.33%, 0.8504 21.58%,
+      0.8903 22.83%, 0.924 24%, 0.9561 25.25%, 0.9845 26.5%, 1.009 27.75%, 1.0299 29%, 1.0485 30.33%,
+      1.0635 31.67%, 1.0719 32.58%, 1.0788 33.5%, 1.0843 34.42%, 1.0888 35.42%, 1.092 36.42%, 1.0941 37.5%,
+      1.0943 39.67%, 1.0901 42%, 1.081 44.75%, 1.0699 47.33%, 1.0359 54.58%, 1.0187 58.92%, 1.0064 63%,
+      0.998 67.17%, 0.9925 72.25%, 0.991 78.08%, 0.9922 83.17%, 0.9989 99.92%, 1);
+  --md-spring-0-8: linear(0, 0.0015 0.67%, 0.006 1.33%, 0.0142 2.08%, 0.0253 2.83%, 0.0391 3.58%, 0.0572 4.42%, 0.0778 5.25%,
+      0.1006 6.08%, 0.1432 7.5%, 0.1981 9.17%, 0.2562 10.83%, 0.4313 15.75%, 0.4856 17.33%, 0.535 18.83%,
+      0.5872 20.5%, 0.6338 22.08%, 0.6774 23.67%, 0.7177 25.25%, 0.753 26.75%, 0.787 28.33%, 0.8164 29.83%,
+      0.8445 31.42%, 0.8696 33%, 0.8931 34.67%, 0.9138 36.33%, 0.9327 38.08%, 0.9496 39.92%, 0.9638 41.75%,
+      0.9762 43.67%, 0.9871 45.75%, 0.9959 47.92%, 1.0029 50.17%, 1.0082 52.58%, 1.012 55.25%,
+      1.0149 59.58%, 1.0147 64.83%, 1.0053 84.58%, 1.001 99.92%, 1);
+  --md-spring-1-0: linear(0, 0.001 0.5%, 0.0047 1.08%, 0.0106 1.67%, 0.02 2.33%, 0.0318 3%, 0.0457 3.67%, 0.0613 4.33%,
+      0.0807 5.08%, 0.1164 6.33%, 0.1606 7.75%, 0.2072 9.17%, 0.364 13.83%, 0.415 15.42%, 0.4614 16.92%,
+      0.5103 18.58%, 0.5562 20.25%, 0.5969 21.83%, 0.6367 23.5%, 0.6732 25.17%, 0.7068 26.83%,
+      0.7374 28.5%, 0.7665 30.25%, 0.7928 32%, 0.8175 33.83%, 0.8396 35.67%, 0.86 37.58%, 0.8802 39.75%,
+      0.8983 42%, 0.9149 44.42%, 0.9293 46.92%, 0.9421 49.58%, 0.9533 52.42%, 0.9629 55.42%, 0.9712 58.67%,
+      0.9778 62%, 0.9832 65.58%, 0.9877 69.5%, 0.9913 73.83%, 0.9959 83.17%, 0.999 99.92%, 1);
+  /* Google's fast spatial spring overshoots about 9%. We use the 0.8-damped
+     curve for UI so presses and menus settle without a visible bounce. */
+  --md-sys-motion-spatial-fast: 300ms var(--md-spring-0-8);
+  --md-sys-motion-spatial-default: 435ms var(--md-spring-0-8);
+  --md-sys-motion-spatial-slow: 600ms var(--md-spring-0-8);
+  --md-sys-motion-effects-fast: 150ms var(--md-spring-1-0);
+  --md-sys-motion-effects-default: 230ms var(--md-spring-1-0);
+  --md-sys-motion-effects-slow: 325ms var(--md-spring-1-0);
+  --md-sys-motion-easing-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --md-sys-motion-easing-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --md-sys-motion-easing-emphasized-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --md-sys-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  --md-ref-typeface-brand: 'Google Sans Flex', 'Google Sans', 'Roboto', system-ui, sans-serif;
+  --md-ref-typeface-plain: 'Google Sans Flex', 'Google Sans Text', 'Roboto', system-ui, sans-serif;
+  --md-ref-typeface-mono: ui-monospace, 'SF Mono', 'Roboto Mono', Menlo, monospace;
+
+  --md-sys-state-hover: 0.08;
+  --md-sys-state-focus: 0.1;
+  --md-sys-state-pressed: 0.1;
+  --md-sys-state-dragged: 0.16;
+
+  --md-sys-elevation-0: none;
+  --md-sys-elevation-1: 0 1px 2px rgb(0 0 0 / 0.3), 0 1px 3px 1px rgb(0 0 0 / 0.15);
+  --md-sys-elevation-2: 0 1px 2px rgb(0 0 0 / 0.3), 0 2px 6px 2px rgb(0 0 0 / 0.15);
+  --md-sys-elevation-3: 0 1px 3px rgb(0 0 0 / 0.3), 0 4px 8px 3px rgb(0 0 0 / 0.15);
+  --md-sys-elevation-4: 0 2px 3px rgb(0 0 0 / 0.3), 0 6px 10px 4px rgb(0 0 0 / 0.15);
+  --md-sys-elevation-5: 0 4px 4px rgb(0 0 0 / 0.3), 0 8px 12px 6px rgb(0 0 0 / 0.15);
+
+  /* The gutter is the space around and between panes; floating surfaces anchored to the
+     window keep the same distance. 8px on phones. */
+  --app-gutter: 16px;
+  --app-topbar-h: 64px;
+  --app-rail-collapsed: 96px;
+  --app-rail-expanded: 272px;
+
+  color-scheme: light;
+  /* Behind modals. M3's 32% all but vanishes over a dark theme, so dark goes deeper. */
+  --app-scrim: color-mix(in srgb, var(--md-sys-color-scrim) 40%, transparent);
+  /* Behind side sheets and the palette, which leave more of the app in view. */
+  --app-scrim-light: color-mix(in srgb, var(--md-sys-color-scrim) 24%, transparent);
+}
+
+:root[data-theme-mode='dark'] {
+  color-scheme: dark;
+  --app-scrim: color-mix(in srgb, var(--md-sys-color-scrim) 64%, transparent);
+  --app-scrim-light: color-mix(in srgb, var(--md-sys-color-scrim) 48%, transparent);
+  --md-sys-elevation-1: 0 1px 2px rgb(0 0 0 / 0.5), 0 1px 3px 1px rgb(0 0 0 / 0.3);
+  --md-sys-elevation-2: 0 1px 2px rgb(0 0 0 / 0.5), 0 2px 6px 2px rgb(0 0 0 / 0.3);
+  --md-sys-elevation-3: 0 1px 3px rgb(0 0 0 / 0.5), 0 4px 8px 3px rgb(0 0 0 / 0.3);
+  --md-sys-elevation-4: 0 2px 3px rgb(0 0 0 / 0.5), 0 6px 10px 4px rgb(0 0 0 / 0.3);
+  --md-sys-elevation-5: 0 4px 4px rgb(0 0 0 / 0.5), 0 8px 12px 6px rgb(0 0 0 / 0.3);
+}
+
+.md-display-large { font: 400 57px/64px var(--md-ref-typeface-brand); letter-spacing: -0.2px; }
+.md-display-medium { font: 400 45px/52px var(--md-ref-typeface-brand); }
+.md-display-small { font: 400 36px/44px var(--md-ref-typeface-brand); }
+.md-headline-large { font: 400 32px/40px var(--md-ref-typeface-brand); }
+.md-headline-medium { font: 400 28px/36px var(--md-ref-typeface-brand); }
+.md-headline-small { font: 400 24px/32px var(--md-ref-typeface-brand); }
+.md-title-large { font: 400 22px/28px var(--md-ref-typeface-brand); }
+.md-title-medium { font: 500 16px/24px var(--md-ref-typeface-plain); letter-spacing: 0.2px; }
+.md-title-small { font: 500 14px/20px var(--md-ref-typeface-plain); letter-spacing: 0.1px; }
+.md-body-large { font: 400 16px/24px var(--md-ref-typeface-plain); letter-spacing: 0.5px; }
+.md-body-medium { font: 400 14px/20px var(--md-ref-typeface-plain); letter-spacing: 0.2px; }
+.md-body-small { font: 400 12px/16px var(--md-ref-typeface-plain); letter-spacing: 0.4px; }
+.md-label-large { font: 500 14px/20px var(--md-ref-typeface-plain); letter-spacing: 0.1px; }
+.md-label-medium { font: 500 12px/16px var(--md-ref-typeface-plain); letter-spacing: 0.5px; }
+.md-label-small { font: 500 11px/16px var(--md-ref-typeface-plain); letter-spacing: 0.5px; }
+.md-emphasized.md-display-large,
+.md-emphasized.md-display-medium,
+.md-emphasized.md-display-small,
+.md-emphasized.md-headline-large,
+.md-emphasized.md-headline-medium,
+.md-emphasized.md-headline-small,
+.md-emphasized.md-title-large { font-weight: 500; letter-spacing: 0; }
+.md-emphasized.md-title-medium { letter-spacing: 0.15px; }
+.md-emphasized.md-body-large { letter-spacing: 0.15px; }
+.md-emphasized.md-body-medium { letter-spacing: 0.25px; }
+.md-emphasized.md-title-medium,
+.md-emphasized.md-title-small,
+.md-emphasized.md-label-large,
+.md-emphasized.md-label-medium,
+.md-emphasized.md-label-small { font-weight: 700; }
+.md-emphasized.md-body-large,
+.md-emphasized.md-body-medium,
+.md-emphasized.md-body-small { font-weight: 500; }
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface);
+  font: 400 14px/20px var(--md-ref-typeface-plain);
+  letter-spacing: 0.25px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-optical-sizing: auto;
+  font-synthesis: none;
+}
+
+#root {
+  height: 100%;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 28%, transparent);
+}
+
+:where(input, textarea, [contenteditable]) {
+  caret-color: var(--md-sys-color-primary);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--md-sys-color-on-surface) 22%, transparent) transparent;
+}
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-clip: padding-box;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-color: color-mix(in srgb, var(--md-sys-color-on-surface) 22%, transparent);
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent);
+}
+
+/* Focus ring: 3px secondary, 2px outside, grows to 8px then settles (material-web).
+   No specificity, so a component that draws its own focus wins whatever order the CSS loads in. */
+:where(:focus) {
+  outline: none;
+}
+:where(:focus-visible) {
+  outline: 3px solid var(--md-sys-color-secondary);
+  outline-offset: 2px;
+  animation: md-focus-ring 600ms var(--md-sys-motion-easing-emphasized);
+}
+@keyframes md-focus-ring {
+  0% { outline-width: 0; }
+  25% { outline-width: 8px; }
+  100% { outline-width: 3px; }
+}
+
+.sr-only {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (forced-colors: active) {
+  :where(:focus-visible) {
+    outline-color: Highlight;
+  }
+}

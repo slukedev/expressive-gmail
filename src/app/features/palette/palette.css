@@ -1,0 +1,214 @@
+/* ---------- Command palette ---------- Google's search view: a 56px full-round field, results in their own surface 2px below. No motion: it opens from the keyboard all day. */
+.palette {
+  position: fixed;
+  z-index: 801;
+  left: 50%;
+  top: 12vh;
+  translate: -50% 0;
+  width: min(720px, calc(100vw - 32px));
+  max-height: 76vh;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  outline: none;
+}
+.m3-scrim:has(+ .palette) {
+  transition: none;
+}
+.palette__field {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 56px;
+  /* Glyph centred 28px in, text at 56, trailing glyph 16px from the end; the results share those lines. */
+  padding: 0 8px 0 16px;
+  flex: none;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-sys-color-surface-container-high);
+  box-shadow: var(--md-sys-elevation-3);
+}
+.palette__field:has(.palette__back) {
+  gap: 8px;
+  padding-inline-start: 8px;
+}
+.palette__icon,
+.palette__clear,
+.palette__back {
+  color: var(--md-sys-color-on-surface-variant);
+  flex: none;
+}
+/* The page you're in, as an input chip before the text. */
+.palette__chip {
+  flex: none;
+  max-width: 40%;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  border-radius: var(--md-sys-shape-corner-small);
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.palette__input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--md-sys-color-on-surface);
+  caret-color: var(--md-sys-color-primary);
+  font: 400 16px/24px var(--md-ref-typeface-plain);
+  letter-spacing: 0.5px;
+}
+.palette__input:focus-visible {
+  outline: none;
+  animation: none;
+}
+.palette__input::placeholder {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.palette__input::selection {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 24%, transparent);
+}
+.palette__list {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 4px 8px;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: var(--md-sys-color-surface-container-high);
+  box-shadow: var(--md-sys-elevation-3);
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--md-sys-color-on-surface-variant) 40%, transparent) transparent;
+}
+.palette__group {
+  padding: 12px 12px 4px;
+  color: var(--md-sys-color-on-surface-variant);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.palette__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 8px 12px 8px 8px;
+  border-radius: var(--md-sys-shape-corner-extra-small);
+  color: var(--md-sys-color-on-surface);
+  cursor: pointer;
+  transition:
+    border-radius var(--md-sys-motion-spatial-fast),
+    background-color var(--md-sys-motion-effects-fast);
+}
+.palette__item[aria-selected='true'] {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 10%, transparent);
+  border-radius: var(--md-sys-shape-corner-medium);
+}
+.palette__item[data-disabled] {
+  cursor: default;
+}
+.palette__item[data-disabled] .palette__title {
+  color: color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent);
+}
+.palette__lead {
+  flex: none;
+  width: 32px;
+  display: grid;
+  place-items: center;
+}
+.palette__item-icon {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.palette__item-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.palette__title,
+.palette__item-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Heavier, the way Google's suggestions mark what you typed. */
+.palette__hit {
+  font-weight: 600;
+}
+.palette__item-meta {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.palette__item[data-disabled] .palette__item-meta {
+  color: var(--md-sys-color-error);
+}
+/* Operator chips: from:priya has:attachment. */
+.palette__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.palette__op {
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: var(--md-sys-shape-corner-small);
+  background: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-surface-variant);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.palette__shortcut,
+.palette__alt {
+  flex: none;
+  color: var(--md-sys-color-on-surface-variant);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.palette__switch {
+  pointer-events: none;
+}
+.palette__check {
+  flex: none;
+  color: var(--md-sys-color-primary);
+}
+.palette__chevron {
+  flex: none;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.palette__empty {
+  margin: 0;
+  padding: 24px;
+  text-align: center;
+  color: var(--md-sys-color-on-surface-variant);
+}
+/* Phones: from the top so the keyboard doesn't cover results; no shortcuts to show. */
+@media (max-width: 599px) {
+  .palette {
+    top: 8px;
+    max-height: calc(100dvh - 16px);
+  }
+  .palette__shortcut,
+  .palette__alt {
+    display: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .palette__item[aria-selected='true'] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+  .palette__hit {
+    text-decoration: underline;
+  }
+}

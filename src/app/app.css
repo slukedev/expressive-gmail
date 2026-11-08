@@ -1,0 +1,6896 @@
+/* App layout and feature styles. Components live in ui/ui.css. */
+
+:root {
+  --app-frame: var(--md-sys-color-surface-container);
+  --app-pane: var(--md-sys-color-surface-container-lowest);
+  --row-unread: var(--md-sys-color-surface-container-lowest);
+  --row-read: var(--md-sys-color-surface-container-low);
+  --row-selected: var(--md-sys-color-secondary-container);
+  /* A neutral step up for the open conversation, so it never reads as checked. */
+  --row-open: var(--md-sys-color-surface-container-highest);
+  --app-menu-bg: var(--md-sys-color-surface-container-low);
+  --app-compose: var(--md-sys-color-primary-container);
+  --on-app-compose: var(--md-sys-color-on-primary-container);
+  --search-bg: var(--md-sys-color-surface-container-high);
+  --row-h-pad: 16px;
+  --row-v-pad: 12px;
+  --field-bg: var(--md-sys-color-surface-container-high);
+  /* Gmail's star and important yellow: a brand colour, kept as one token. */
+  --app-star: #f4b400;
+  /* Gmail's darker star rim; keeps the yellow at 3:1 on tinted rows. */
+  --app-star-edge: #b06000;
+}
+:root[data-theme-mode='dark'] {
+  --app-star: #fdd663;
+}
+:root[data-theme-source='google'] {
+  --app-compose: var(--md-sys-color-secondary-container);
+  --on-app-compose: var(--md-sys-color-on-secondary-container);
+}
+:root[data-theme-mode='dark'] {
+  --app-pane: var(--md-sys-color-surface);
+  --row-unread: var(--md-sys-color-surface);
+  --row-read: var(--md-sys-color-surface);
+  --search-bg: var(--md-sys-color-surface-container-high);
+}
+
+/* Google Sans Flex with its rounded axis. */
+.md-emphasized.md-headline-medium,
+.md-emphasized.md-headline-small {
+  font-variation-settings: 'ROND' 100;
+  letter-spacing: 0;
+}
+
+/* ---------- Boot ---------- */
+.boot {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background: var(--app-frame);
+  padding: 24px;
+}
+/* The indicator shows only if connecting takes a while, so a quick start isn't a flash of spinner. */
+.boot[aria-busy] > * {
+  animation: fade-in var(--md-sys-motion-effects-default) 600ms backwards;
+}
+.boot__card {
+  max-width: 440px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.boot__badge {
+  width: 72px;
+  height: 72px;
+  border-radius: 24px;
+  display: grid;
+  place-items: center;
+  background: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
+  margin-bottom: 8px;
+}
+.boot__title {
+  margin: 0;
+  font-variation-settings: 'ROND' 100;
+}
+.boot__text {
+  margin: 0 0 12px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.boot__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* ---------- Shell ---------- */
+.app {
+  height: 100%;
+  display: grid;
+  grid-template-columns: var(--app-rail-expanded) minmax(0, 1fr);
+  grid-template-rows: var(--app-topbar-h) minmax(0, 1fr);
+  /* The rail owns the full height and its header; the top bar spans only the content (WideNavigationRail). The column switches in one step and Morph.tsx moves the content with transforms. */
+  grid-template-areas:
+    'rail top'
+    'rail main';
+  background: var(--app-frame);
+  overflow: hidden;
+}
+.app[data-rail='collapsed'] {
+  grid-template-columns: var(--app-rail-collapsed) minmax(0, 1fr);
+}
+.app[data-compact] {
+  --app-gutter: 8px;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    'top'
+    'main';
+}
+.app[data-density='compact'] {
+  --row-v-pad: 6px;
+}
+.app[data-density='comfortable'] {
+  --row-v-pad: 16px;
+}
+
+/* App chrome doesn't select like page text; mail content still does. */
+.rail,
+.topbar,
+.list-bar,
+.selection-bar {
+  -webkit-user-select: none;
+  user-select: none;
+}
+.topbar input {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* The search field starts on the list's left edge. */
+.topbar {
+  grid-area: top;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px 0 0;
+  min-width: 0;
+}
+.topbar__start {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+.app[data-compact] .topbar__start {
+  width: auto;
+}
+.topbar__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px 4px 6px;
+  border-radius: 999px;
+  text-decoration: none;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.topbar__wordmark {
+  font: 400 22px/28px var(--md-ref-typeface-brand);
+  font-variation-settings: 'ROND' 60;
+  letter-spacing: 0;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.brand-mark {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  color: var(--md-sys-color-on-primary-container);
+  flex: none;
+}
+.brand-mark svg {
+  position: absolute;
+  inset: 0;
+  fill: var(--md-sys-color-primary-container);
+  transition: transform var(--md-sys-motion-spatial-slow);
+}
+@media (hover: hover) and (pointer: fine) {
+  .topbar__brand:hover .brand-mark svg {
+    transform: rotate(40deg);
+  }
+}
+.brand-mark .m3-icon {
+  position: relative;
+}
+.topbar__search {
+  flex: 1;
+  min-width: 0;
+  max-width: 720px;
+  margin-inline: auto;
+}
+.topbar__end {
+  margin-left: 0;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-left: 8px;
+}
+.account-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  padding: 0;
+  margin-left: 4px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+}
+.account-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--md-sys-color-on-surface);
+  opacity: 0;
+  transition: opacity var(--md-sys-motion-effects-fast);
+}
+.account-btn:hover::after {
+  opacity: 0.08;
+}
+.account-btn--placeholder {
+  width: 40px;
+  cursor: default;
+}
+/* Held while the account loads, so the corner isn't empty on a first run. */
+.account-btn--placeholder::before {
+  content: '';
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 10%, transparent);
+}
+.account-btn--placeholder::after {
+  display: none;
+}
+.account-tip {
+  display: flex;
+  flex-direction: column;
+}
+.account-menu {
+  min-width: min(320px, calc(100vw - 16px));
+  max-width: min(400px, calc(100vw - 16px));
+  /* Many accounts or a short window: the menu scrolls. */
+  max-height: calc(var(--available-height, 100vh) - 8px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.account-menu__name,
+.account-menu__email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-btn[data-merged] {
+  --stack-bg: var(--app-frame);
+}
+
+/* ---------- Accounts ---------- */
+.account-avatar {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  border-radius: 50%;
+}
+/* A ring with a gap, so accounts that share a photo still tell apart. */
+.account-avatar--ring > .m3-avatar {
+  outline: 2px solid var(--account-color);
+  outline-offset: 2px;
+}
+.account-stack {
+  --stack-bg: var(--app-menu-bg);
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+.account-stack__item {
+  display: inline-grid;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--stack-bg);
+}
+.account-stack__item + .account-stack__item,
+.account-stack__more {
+  margin-left: calc(var(--stack-size) * -0.4);
+}
+.account-stack__more {
+  display: inline-grid;
+  place-items: center;
+  min-width: var(--stack-size);
+  height: var(--stack-size);
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+  box-shadow: 0 0 0 2px var(--stack-bg);
+  font: 500 11px/1 var(--md-ref-typeface-plain);
+}
+/* As wide as the All inboxes stack, so every row's text starts on one line. */
+.account-row__lead {
+  display: grid;
+  place-items: center;
+  flex: none;
+  min-width: 44px;
+}
+.account-row {
+  min-height: 56px;
+}
+.account-row__supporting {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-row__count {
+  flex: none;
+  margin-left: 12px;
+  font: 500 12px/16px var(--md-ref-typeface-plain);
+  letter-spacing: 0.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.account-row__check {
+  flex: none;
+  margin-left: 12px;
+}
+.account-row__open {
+  flex: none;
+  margin-left: 12px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.account-row__busy {
+  flex: none;
+  margin-left: 8px;
+}
+.account-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 8px 0 3px;
+  border-radius: var(--md-sys-shape-corner-extra-small);
+  background: var(--account-bg);
+  color: var(--account-fg);
+  font: 500 12px/16px var(--md-ref-typeface-plain);
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  max-width: 140px;
+  flex: none;
+  vertical-align: middle;
+}
+.account-chip--medium {
+  height: 28px;
+  gap: 6px;
+  padding: 0 12px 0 4px;
+  border-radius: var(--md-sys-shape-corner-small);
+  font: 500 14px/20px var(--md-ref-typeface-plain);
+  letter-spacing: 0.1px;
+  max-width: 220px;
+}
+.account-chip__photo {
+  font-size: 9px !important;
+}
+.account-chip__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.account-chip__dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--account-color);
+}
+/* The account's photo on the sender's, ringed in its color and cut out of the sender's photo. */
+.account-badge {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--account-color);
+  box-shadow: 0 0 0 2px var(--row-read);
+  pointer-events: none;
+}
+.row--unread .account-badge {
+  box-shadow: 0 0 0 2px var(--row-unread);
+}
+.row--active .account-badge {
+  box-shadow: 0 0 0 2px var(--row-open);
+}
+.row--selected .account-badge {
+  box-shadow: 0 0 0 2px var(--row-selected);
+}
+.account-badge__initial {
+  font: 700 11px/1 var(--md-ref-typeface-brand);
+  color: var(--md-sys-color-surface-container-lowest);
+}
+.account-badge > .m3-avatar {
+  font-size: 9px !important;
+  box-shadow: 0 0 0 1.5px var(--row-read);
+}
+@media (forced-colors: active) {
+  .account-chip__dot {
+    background: CanvasText;
+  }
+  .account-avatar--ring > .m3-avatar {
+    outline-color: CanvasText;
+  }
+}
+.account-menu__header {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 16px 12px 16px;
+}
+.account-menu__who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.account-menu__email {
+  color: var(--md-sys-color-on-surface-variant);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.account-menu__source {
+  margin-top: 4px;
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+
+/* ---------- Search ---------- M3 Expressive search app bar (SearchBarTokens): a 56px pill, 360-720 wide; results open in their own surface 2px below, over a scrim. */
+.search {
+  position: relative;
+  z-index: 50;
+}
+.search__bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  height: 56px;
+  /* Leading glyph 16px in and text at 56; suggestions line up under both. */
+  padding: 0 8px;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--search-bg);
+  transition: background-color var(--md-sys-motion-effects-default);
+}
+@media (hover: hover) {
+  .search__bar:hover {
+    background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, var(--search-bg));
+  }
+}
+.search__bar:focus-within {
+  background: var(--search-bg);
+}
+.search__bar > .m3-icon-button:first-child {
+  color: var(--md-sys-color-on-surface);
+}
+.search__input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: 400 16px/24px var(--md-ref-typeface-plain);
+  letter-spacing: 0.5px;
+  padding: 0 8px;
+  color: var(--md-sys-color-on-surface);
+  caret-color: var(--md-sys-color-primary);
+}
+.search__input::placeholder {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.search--compact .search__input::placeholder {
+  text-align: center;
+}
+.search__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: var(--app-scrim-light);
+  animation: fade-in var(--md-sys-motion-effects-default);
+}
+.search__panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 58px;
+  padding: 8px 4px;
+  max-height: min(70vh, 560px);
+  overflow-y: auto;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: var(--md-sys-color-surface-container-high);
+  /* Unrolls down from the field (DefaultSpatial) without squashing its text. */
+  animation:
+    search-panel var(--md-sys-motion-spatial-default),
+    fade-in var(--md-sys-motion-effects-fast);
+}
+@keyframes search-panel {
+  from {
+    clip-path: inset(0 0 85% 0 round 12px);
+    transform: translateY(-4px);
+  }
+  to {
+    clip-path: inset(0 0 0 0 round 12px);
+  }
+}
+.search__quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  /* With the panel's own 8px, 16 above and below the chips. */
+  padding: 8px 16px;
+}
+.search__group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px 4px 12px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+/* List items (ListTokens): 56 one line, 72 two line; icons, text and dates line up under the bar's glyphs and text. */
+.search__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 8px 12px 8px 8px;
+  border-radius: var(--md-sys-shape-corner-extra-small);
+  font: 400 16px/24px var(--md-ref-typeface-plain);
+  letter-spacing: 0.5px;
+  color: var(--md-sys-color-on-surface);
+  cursor: pointer;
+  transition: border-radius var(--md-sys-motion-spatial-fast), background-color var(--md-sys-motion-effects-fast);
+}
+.search__item:has(.search__item-support) {
+  min-height: 72px;
+}
+.search__item[aria-selected='true'] {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+  border-radius: var(--md-sys-shape-corner-medium);
+}
+.search__item-icon {
+  width: 32px;
+  display: grid;
+  place-items: center;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.search__item-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.search__item-text > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search__item--unread {
+  font-weight: 700;
+}
+.search__match {
+  font-weight: 700;
+}
+.search__item-support,
+.search__item-date {
+  font: 400 14px/20px var(--md-ref-typeface-plain);
+  letter-spacing: 0.2px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.text-toggle {
+  border: none;
+  background: transparent;
+  color: var(--md-sys-color-primary);
+  font: 500 14px/20px var(--md-ref-typeface-plain);
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.text-toggle:hover {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
+}
+
+/* As wide as the search bar it drops from. */
+.advanced-search {
+  --field-bg: var(--md-sys-color-surface-container-high);
+  position: absolute;
+  top: 58px;
+  left: 0;
+  right: 0;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  padding: 16px 24px 20px;
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-surface-container-high);
+  box-shadow: var(--md-sys-elevation-3);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  animation: m3-pop 260ms var(--md-sys-motion-easing-emphasized-decelerate);
+  transform-origin: top center;
+}
+.advanced-search > .advanced-search__head,
+.advanced-search > .adv-inline,
+.advanced-search > .adv-span {
+  grid-column: 1 / -1;
+}
+@container (max-width: 560px) {
+  .advanced-search {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@keyframes m3-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(-6px);
+  }
+}
+.advanced-search__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.advanced-search__head h2 {
+  margin: 0;
+}
+.adv-inline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+.adv-check {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  color: var(--md-sys-color-on-surface);
+}
+
+.advanced-search__actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ---------- Navigation rail ---------- M3 Expressive wide navigation rail (WideNavigationRail.kt, NavigationRail*Tokens). Only the menu button changes it: the column switches in one step and Morph.tsx carries everything across with transforms, so the list and reading pane are never laid out per frame. */
+.rail {
+  --rail-item-start: 20px;
+  --rail-item-h: 56px;
+  --rail-content-w: var(--app-rail-expanded);
+  grid-area: rail;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-height: 0;
+  min-width: 0;
+  padding-bottom: 12px;
+  /* No surface of its own, so it never hides the brand moving through the header row. */
+  background: none;
+}
+.app[data-density='compact'] .rail {
+  --rail-item-h: 44px;
+}
+.rail--collapsed {
+  --rail-content-w: var(--app-rail-collapsed);
+}
+/* The menu button level with the top app bar, Compose under it, then 40px to the destinations, all on the 48px icon line. */
+.rail__header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  width: var(--rail-content-w);
+  padding: 12px 12px 40px var(--rail-item-start);
+  flex: none;
+  pointer-events: none;
+}
+.rail__header > * {
+  pointer-events: auto;
+}
+.rail__top {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 40px;
+}
+.rail__menu {
+  margin-left: 8px;
+}
+/* menu and menu_open share one cell: one turns and shrinks out as the other turns in (FastSpatial; opacity on FastEffects). */
+.rail__menu-icons {
+  display: grid;
+  width: 24px;
+  height: 24px;
+}
+.rail__menu-glyph {
+  grid-area: 1 / 1;
+  transition:
+    transform var(--md-sys-motion-spatial-fast),
+    opacity var(--md-sys-motion-effects-fast);
+}
+.rail__menu-glyph--open,
+.rail__menu[data-open] .rail__menu-glyph--closed {
+  opacity: 0;
+  transform: rotate(-45deg) scale(0.6);
+}
+.rail__menu[data-open] .rail__menu-glyph--open {
+  opacity: 1;
+  transform: none;
+}
+.rail__menu:not([data-open]) .rail__menu-glyph--open {
+  transform: rotate(45deg) scale(0.6);
+}
+/* Menu button above the FAB, both on the icon line. */
+.rail--modal .rail__header {
+  padding-top: 0;
+}
+.rail--modal .rail__header > .m3-icon-button {
+  margin-left: 8px;
+}
+.app[data-compact] .rail--modal .rail__fab {
+  display: none;
+}
+.app[data-compact] .rail--modal .rail__header {
+  padding-bottom: 16px;
+}
+/* A FAB in a rail sits flat and lifts on hover, sized by its content so its width animates on its own. */
+.rail__fab {
+  width: max-content;
+  background: var(--app-compose);
+  color: var(--on-app-compose);
+}
+.rail__fab.m3-fab[data-lowered] {
+  box-shadow: none;
+}
+@media (hover: hover) {
+  .rail__fab.m3-fab[data-lowered]:hover {
+    box-shadow: var(--md-sys-elevation-1);
+  }
+}
+.rail__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  width: 100%;
+  scrollbar-width: thin;
+  scrollbar-color: var(--md-sys-color-outline-variant) transparent;
+}
+.rail__body {
+  width: var(--rail-content-w);
+}
+.rail--collapsed .rail__scroll {
+  padding: 2px 0 0;
+  scrollbar-width: none;
+}
+.rail__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.rail--collapsed .rail__primary {
+  align-items: center;
+  gap: 4px;
+}
+
+/* The whole row is the target; the pill is what shows. */
+.rail-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: var(--rail-item-h);
+  padding: 0 24px 0 var(--rail-item-start);
+  border: none;
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  font: 500 14px/20px var(--md-ref-typeface-plain);
+  letter-spacing: 0.1px;
+  text-decoration: none;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+}
+.rail-item__pill {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: var(--rail-item-h);
+  padding: 0 16px;
+  border-radius: var(--md-sys-shape-corner-full);
+}
+.rail-item__pill > :not(.m3-ripple) {
+  position: relative;
+  z-index: 1;
+}
+/* Expanded it hugs the pill and grows from the start edge; collapsed it is the 56x32 pill over the label, growing from the centre. Morph.tsx sizes it between the two. */
+.rail-item__pill > .rail-item__active {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-sys-color-secondary-container);
+  clip-path: inset(0 100% 0 0 round 999px);
+  transition: clip-path var(--md-sys-motion-spatial-default);
+}
+.rail-item[data-active] .rail-item__active {
+  clip-path: inset(0 0 0 0 round 999px);
+}
+/* Hidden indicators change their resting clip while the rail switches layout; animating them would start a dozen invisible transitions. */
+.app[data-morphing] .rail-item__active {
+  transition: none;
+}
+.rail-item[data-active] {
+  color: var(--md-sys-color-on-secondary-container);
+}
+.rail-item .m3-ripple {
+  color: var(--md-sys-color-on-secondary-container);
+}
+@media (hover: hover) {
+  .rail-item:hover .rail-item__pill > .m3-ripple::before {
+    opacity: 0.08;
+  }
+}
+.rail-item:focus-visible .rail-item__pill {
+  outline: 3px solid var(--md-sys-color-secondary);
+  outline-offset: 2px;
+}
+/* The options button shows on hover, focus or while its menu is open (Gmail web). */
+.rail-label {
+  position: relative;
+}
+.rail-label__more {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  translate: 0 -50%;
+  color: var(--md-sys-color-on-surface-variant);
+  opacity: 0;
+  transition: opacity var(--md-sys-motion-effects-fast);
+}
+.rail-label:hover .rail-label__more,
+.rail-label:focus-within .rail-label__more,
+.rail-label[data-options] .rail-label__more {
+  opacity: 1;
+}
+@media (hover: none) {
+  .rail-label__more {
+    opacity: 1;
+  }
+}
+.rail-item__indicator {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+}
+.rail-item__text {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.rail-item__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color var(--md-sys-motion-effects-default);
+}
+/* Until the first labels are in, counts and unread weight snap in. */
+.rail[data-pending] .rail-item__label {
+  transition: none;
+}
+/* LabelLarge, quiet, inside the pill. */
+.rail-item__count {
+  flex: none;
+  font: 500 14px/20px var(--md-ref-typeface-plain);
+  letter-spacing: 0.1px;
+  font-variant-numeric: tabular-nums;
+  color: var(--md-sys-color-on-surface-variant);
+  transition:
+    opacity var(--md-sys-motion-effects-default),
+    visibility 0s;
+}
+.rail-item[data-active] .rail-item__count {
+  color: var(--md-sys-color-on-secondary-container);
+}
+.rail-item--unread .rail-item__label {
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface);
+}
+.rail-item[data-active] .rail-item__label {
+  color: var(--md-sys-color-on-secondary-container);
+}
+.rail-item__chevron {
+  transition: transform var(--md-sys-motion-spatial-default);
+}
+.rail-item--toggle[aria-expanded='true'] .rail-item__chevron {
+  transform: rotate(180deg);
+}
+
+/* Collapsed: icon in a 56x32 indicator over its label. Only primary destinations collapse; Splits, Labels and More fade out in their expanded layout. */
+.rail--collapsed .rail__primary > li > .rail-item {
+  justify-content: center;
+  width: 96px;
+  min-height: 64px;
+  padding: 0;
+}
+.rail--collapsed .rail__primary .rail-item__pill {
+  flex-direction: column;
+  gap: 4px;
+  height: auto;
+  padding: 0;
+  border-radius: 0;
+}
+.rail--collapsed .rail__primary .rail-item__active {
+  inset: 0 auto auto calc(50% - 28px);
+  width: 56px;
+  height: 32px;
+  clip-path: inset(0 50% 0 50% round 999px);
+}
+.rail--collapsed .rail__primary .rail-item[data-active] .rail-item__active {
+  clip-path: inset(0 0 0 0 round 999px);
+}
+.rail--collapsed .rail__primary .m3-ripple {
+  display: none;
+}
+.rail--collapsed .rail__primary .rail-item__indicator {
+  width: 56px;
+  height: 32px;
+  border-radius: var(--md-sys-shape-corner-full);
+  transition: background-color var(--md-sys-motion-effects-default);
+}
+@media (hover: hover) {
+  .rail--collapsed .rail__primary .rail-item:hover .rail-item__indicator {
+    background: color-mix(in srgb, var(--md-sys-color-on-secondary-container) 8%, transparent);
+  }
+}
+.rail--collapsed .rail__primary .rail-item:focus-visible .rail-item__pill {
+  outline: none;
+}
+.rail--collapsed .rail__primary .rail-item:focus-visible .rail-item__indicator {
+  outline: 3px solid var(--md-sys-color-secondary);
+  outline-offset: 2px;
+}
+.rail--collapsed .rail__primary .rail-item__text {
+  font: 500 12px/16px var(--md-ref-typeface-plain);
+  letter-spacing: 0.5px;
+  max-width: 88px;
+}
+.rail--collapsed .rail__primary .rail-item__label {
+  text-align: center;
+}
+.rail--collapsed .rail__primary .rail-item[data-active] .rail-item__label {
+  color: var(--md-sys-color-secondary);
+}
+/* The badge says there's unread mail; labels keep one weight like M3 rails. */
+.rail--collapsed .rail__primary .rail-item--unread .rail-item__label {
+  font-weight: 500;
+  color: inherit;
+}
+/* The count fades out where the label lands; the badge takes over. */
+.rail--collapsed .rail__primary .rail-item__count {
+  position: absolute;
+  left: 100%;
+  margin-left: 12px;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--md-sys-motion-effects-fast),
+    visibility 0s 150ms;
+}
+/* M3 large badge (BadgeTokens): 16 tall, LabelSmall, overlapping the icon. At most "999+". */
+.rail-badge {
+  position: absolute;
+  top: -2px;
+  left: 12px;
+  min-width: 16px;
+  max-width: 40px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-sys-color-error);
+  color: var(--md-sys-color-on-error);
+  font: 500 11px/16px var(--md-ref-typeface-plain);
+  letter-spacing: 0.5px;
+  text-align: center;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  box-sizing: border-box;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--md-sys-motion-effects-fast),
+    visibility 0s 150ms;
+}
+.rail--collapsed .rail__primary .rail-badge {
+  top: 2px;
+  left: 28px;
+  opacity: 1;
+  visibility: visible;
+  /* A beat late, so it doesn't land on the label still fading out under it. */
+  transition:
+    opacity var(--md-sys-motion-effects-default) 60ms,
+    visibility 0s;
+}
+
+/* More / Less: opening grows the list on DefaultSpatial while items fade and rise 8px in a 20ms stagger, each as its slot opens; closing fades them together on FastEffects and folds on FastSpatial. */
+.rail__more {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition:
+    grid-template-rows var(--md-sys-motion-spatial-fast),
+    opacity var(--md-sys-motion-effects-fast);
+}
+.rail__more[data-open] {
+  grid-template-rows: 1fr;
+  transition:
+    grid-template-rows var(--md-sys-motion-spatial-default),
+    opacity var(--md-sys-motion-effects-fast);
+}
+.rail__more-inner {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.rail__more-inner > li {
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity var(--md-sys-motion-effects-fast),
+    transform var(--md-sys-motion-spatial-fast);
+}
+.rail__more[data-open] .rail__more-inner > li {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity var(--md-sys-motion-effects-default),
+    transform var(--md-sys-motion-spatial-default);
+  transition-delay: calc(var(--rail-order, 0) * 20ms);
+}
+/* The modal rail mounts with More open: the same entrance, as an animation. */
+.rail--modal .rail__more[data-open] .rail__more-inner > li {
+  animation:
+    rail-more-in var(--md-sys-motion-spatial-default) backwards,
+    rail-more-fade var(--md-sys-motion-effects-default) backwards;
+  animation-delay: calc(60ms + var(--rail-order, 0) * 20ms);
+}
+@keyframes rail-more-in {
+  from {
+    transform: translateY(8px);
+  }
+}
+@keyframes rail-more-fade {
+  from {
+    opacity: 0;
+  }
+}
+.rail__more:not([data-open]) .rail-item {
+  visibility: hidden;
+  transition: visibility 0s 300ms;
+}
+.rail-item__swap {
+  display: grid;
+}
+.rail-item__swap > span {
+  grid-area: 1 / 1;
+  transition:
+    opacity var(--md-sys-motion-effects-fast),
+    transform var(--md-sys-motion-spatial-fast);
+}
+.rail-item__swap > span:not([data-on]) {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.rail-item__swap > span:first-child:not([data-on]) {
+  transform: translateY(-6px);
+}
+.rail-item__swap > span[data-on] {
+  transition-delay: 50ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rail__more-inner > li,
+  .rail-item__swap > span {
+    transition-delay: 0s !important;
+    animation-delay: 0s !important;
+  }
+}
+/* Morph.tsx's cover and underlay, always mounted and hidden, placed in viewport pixels for one move. */
+.main-move {
+  position: fixed;
+  visibility: hidden;
+  pointer-events: none;
+}
+.rail__extras {
+  transition: opacity var(--md-sys-motion-effects-fast);
+}
+/* Copies of labels fading out while the rail changes layout, placed by Morph.tsx and clipped with the rail. */
+.rail__ghosts {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+/* Collapsing: the expanded-only sections keep their layout and fade out. */
+.rail__more[data-leaving],
+.rail__extras[data-leaving] {
+  width: var(--app-rail-expanded);
+  align-self: flex-start;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* TitleSmall, lined up with the icons. */
+.rail__section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  margin-top: 16px;
+  padding: 0 16px 0 calc(var(--rail-item-start) + 16px);
+}
+.rail__section-title {
+  margin: 0;
+  font: 500 14px/20px var(--md-ref-typeface-plain);
+  letter-spacing: 0.1px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.rail__hint {
+  padding: 0 24px 8px calc(var(--rail-item-start) + 16px);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* Beside a collapsed rail the modal rail unfolds from its edge; the clip runs 24px past so the shadow shows. */
+@keyframes rail-unfold {
+  from {
+    clip-path: inset(0 calc(100% - var(--app-rail-collapsed)) 0 0 round 0 16px 16px 0);
+  }
+  to {
+    clip-path: inset(0 -24px 0 0 round 0 16px 16px 0);
+  }
+}
+@keyframes rail-fold {
+  from {
+    clip-path: inset(0 -24px 0 0 round 0 16px 16px 0);
+  }
+  to {
+    clip-path: inset(0 calc(100% - var(--app-rail-collapsed)) 0 0 round 0 16px 16px 0);
+  }
+}
+.rail-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 700;
+}
+.rail-modal__scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--app-scrim);
+  animation: fade-in var(--md-sys-motion-effects-default);
+}
+.rail-modal[data-closing] {
+  pointer-events: none;
+}
+.rail-modal[data-closing] .rail-modal__scrim {
+  animation: fade-out var(--md-sys-motion-effects-default) forwards;
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+.rail--modal {
+  --rail-content-w: 100%;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(360px, calc(100vw - 56px));
+  padding-top: 12px;
+  background: var(--md-sys-color-surface-container);
+  border-radius: 0 var(--md-sys-shape-corner-large) var(--md-sys-shape-corner-large) 0;
+  box-shadow: var(--md-sys-elevation-2);
+  animation: rail-modal-in var(--md-sys-motion-spatial-fast);
+}
+.rail-modal[data-closing] .rail--modal {
+  animation: rail-modal-out var(--md-sys-motion-effects-default) forwards;
+}
+/* As wide as the docked expanded rail (ModalWideNavigationRail). */
+.app:not([data-compact]) .rail--modal {
+  width: var(--app-rail-expanded);
+  animation-name: rail-unfold;
+}
+/* Closing folds back toward the collapsed rail while fading, so the docked rail takes over gradually. */
+.app:not([data-compact]) .rail-modal[data-closing] .rail--modal {
+  animation:
+    rail-fold var(--md-sys-motion-effects-default) forwards,
+    rail-hand-back 150ms var(--md-sys-motion-easing-standard) forwards;
+}
+@keyframes rail-hand-back {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes rail-modal-in {
+  from {
+    transform: translateX(-100%);
+  }
+}
+@keyframes rail-modal-out {
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+/* ---------- Offline ---------- a standing snackbar at the bottom start, never over the app bars. Snackbars stack above it. */
+.offline {
+  position: fixed;
+  z-index: 500;
+  left: 16px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  /* A snackbar's 56px, so one stacked above lines up. */
+  min-height: 56px;
+  max-width: min(600px, calc(100vw - 32px));
+  padding: 8px 20px 8px 16px;
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-inverse-surface);
+  color: var(--md-sys-color-inverse-on-surface);
+  box-shadow: var(--md-sys-elevation-3);
+  animation: offline-in var(--md-sys-motion-spatial-default), fade-in var(--md-sys-motion-effects-fast);
+}
+@keyframes offline-in {
+  from {
+    transform: translateY(24px);
+  }
+}
+.app[data-compact] .offline {
+  left: 16px;
+  right: 16px;
+  bottom: 88px;
+  max-width: none;
+}
+body:has(.offline) .m3-snackbar-viewport {
+  bottom: 80px;
+}
+body:has(.app[data-compact] .offline) .m3-snackbar-viewport {
+  bottom: 152px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .offline {
+    animation: fade-in 150ms linear;
+  }
+}
+
+/* ---------- Main area ---------- */
+.main {
+  grid-area: main;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  gap: 0;
+  padding: 0 var(--app-gutter) var(--app-gutter) 0;
+}
+.app[data-compact] .main {
+  padding: 0 var(--app-gutter) var(--app-gutter);
+}
+.main--split .list-pane {
+  width: var(--list-w);
+  flex: none;
+}
+.main--single .list-pane,
+.main--single .detail-pane {
+  flex: 1;
+}
+/* The search pill ends 4px above the pane's row. */
+.app:not([data-compact]) .detail-pane {
+  margin-top: calc(var(--app-gutter) - 4px);
+}
+/* The handle is the gutter between the list and the pane. */
+.pane-handle {
+  flex: none;
+  width: var(--app-gutter);
+  cursor: col-resize;
+  position: relative;
+  outline: none;
+}
+.pane-handle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: calc(50% - 2px);
+  width: 4px;
+  height: 48px;
+  margin-top: -24px;
+  border-radius: 2px;
+  background: var(--md-sys-color-on-surface-variant);
+  opacity: 0;
+  transition:
+    opacity var(--md-sys-motion-effects-fast),
+    width var(--md-sys-motion-spatial-fast),
+    height var(--md-sys-motion-spatial-fast),
+    left var(--md-sys-motion-spatial-fast),
+    margin var(--md-sys-motion-spatial-fast),
+    border-radius var(--md-sys-motion-spatial-fast);
+}
+.pane-handle:hover::after,
+.pane-handle:focus-visible::after {
+  opacity: 0.6;
+}
+/* Pressed: 12 x 52 with 12 corners (DragHandleTokens). */
+.pane-handle:active::after {
+  opacity: 1;
+  left: calc(50% - 6px);
+  width: 12px;
+  height: 52px;
+  margin-top: -26px;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: var(--md-sys-color-on-surface-variant);
+}
+
+/* ---------- List pane ---------- */
+.list-pane {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  container: list / inline-size;
+}
+/* Title leading, actions trailing; a container tint once the list scrolls under it (AppBarTokens). */
+.list-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 80px;
+  padding: 12px 8px 12px 12px;
+  flex: none;
+  border-radius: var(--md-sys-shape-corner-large);
+  transition: background-color var(--md-sys-motion-effects-default);
+  animation: fade-in var(--md-sys-motion-effects-fast);
+}
+/* App bar and selection toolbar share one cell: the taller sets the height either way. */
+.list-head {
+  display: grid;
+  flex: none;
+}
+.list-head > * {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+.list-head > .selection-bar {
+  align-self: center;
+}
+.list-head__bar {
+  display: flex;
+  flex-direction: column;
+  transition: opacity var(--md-sys-motion-effects-fast);
+}
+.list-head[data-selecting] > .list-head__bar {
+  visibility: hidden;
+  opacity: 0;
+}
+.list-bar[data-scrolled] {
+  background: var(--md-sys-color-surface-container-high);
+}
+.list-bar > .m3-icon-button {
+  margin-left: -4px;
+}
+.list-bar__titles {
+  flex: 1;
+  min-width: 0;
+}
+.list-bar__title {
+  margin: 0;
+  font: 500 28px/36px var(--md-ref-typeface-brand);
+  font-variation-settings: 'ROND' 100;
+  letter-spacing: 0;
+  color: var(--md-sys-color-on-surface);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Centres on the rows' 40px avatar column, so the title starts where the rows' text does. */
+.list-bar__mark {
+  margin-right: 8px;
+}
+.list-bar__meta {
+  margin: 4px 0 0;
+  font: 500 14px/20px var(--md-ref-typeface-plain);
+  letter-spacing: 0.1px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-variant-numeric: tabular-nums;
+}
+/* Holds the line's 20px while counts load, so the title doesn't move. */
+.list-bar__meta:has(> .list-bar__meta-sk) {
+  display: flow-root;
+}
+.list-bar__meta-sk {
+  width: 72px;
+  height: 12px;
+  margin: 4px 0;
+}
+.list-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+/* Selection: a vibrant floating toolbar (FloatingToolbarTokens): 64 tall, fully round, primary container. */
+.selection-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 64px;
+  margin: 4px 0;
+  padding: 8px;
+  flex: none;
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  border-radius: var(--md-sys-shape-corner-full);
+  /* Grows out from its leading close button (FloatingToolbar.kt, FastSpatial), no squash. */
+  animation:
+    selection-in var(--md-sys-motion-spatial-fast),
+    fade-in var(--md-sys-motion-effects-fast);
+}
+.selection-bar .m3-icon-button {
+  color: var(--md-sys-color-on-primary-container);
+}
+@keyframes selection-in {
+  from {
+    clip-path: inset(0 calc(100% - 64px) 0 0 round 32px);
+  }
+  to {
+    clip-path: inset(0 0 0 0 round 32px);
+  }
+}
+.selection-bar__count {
+  margin: 0 8px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.selection-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+/* M3 Expressive toolbars group actions with space, not rules. */
+.toolbar-divider {
+  width: 12px;
+  height: 24px;
+  flex: none;
+}
+.list-progress {
+  height: 0;
+  position: relative;
+  z-index: 2;
+}
+.list-progress .m3-linear-progress {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  top: -6px;
+}
+.list-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  padding: 0 0 96px;
+  scrollbar-gutter: stable;
+}
+.app[data-compact] .list-scroll {
+  scrollbar-gutter: auto;
+}
+/* Like Android's grouped lists: primary, LabelLarge emphasized. */
+.list-section {
+  margin: 16px 16px 8px;
+  color: var(--md-sys-color-primary);
+  font-weight: 600;
+}
+/* A header whose rows are all leaving folds with them, on the rows' timing. */
+.list-section:has(> .list-section__text) {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition:
+    grid-template-rows var(--md-sys-motion-spatial-default),
+    margin var(--md-sys-motion-spatial-default),
+    opacity var(--md-sys-motion-effects-fast);
+}
+.list-section__text {
+  min-height: 0;
+  overflow: hidden;
+}
+.list-section[data-leaving] {
+  grid-template-rows: 0fr;
+  margin-top: 0;
+  margin-bottom: 0;
+  opacity: 0;
+}
+.thread-list > .list-section:first-child,
+.thread-list > .list-group:first-child > .list-section {
+  margin-top: 4px;
+}
+.list-sentinel {
+  height: 1px;
+}
+.list-more {
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+.list-end {
+  text-align: center;
+  color: var(--md-sys-color-on-surface-variant);
+  padding: 20px 0 0;
+}
+
+/* Category tabs */
+.category-tabs {
+  margin-bottom: 8px;
+}
+.category-tabs .m3-tabs {
+  border-radius: var(--md-sys-shape-corner-large);
+}
+.category-tabs .m3-tab {
+  max-width: 240px;
+  height: 48px;
+}
+.category-tabs .m3-tab:has(.m3-tab__supporting) {
+  height: 64px;
+}
+.tab-badge {
+  margin-left: auto;
+  padding: 1px 8px;
+  border-radius: var(--md-sys-shape-corner-full);
+  font: 500 11px/16px var(--md-ref-typeface-plain);
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+@container list (max-width: 560px) {
+  .category-tabs .m3-tab__label {
+    display: none;
+  }
+  .category-tabs .m3-tab {
+    justify-content: center;
+    flex: 1 1 0;
+  }
+  .category-tabs .m3-tab__content {
+    justify-content: center;
+    width: auto;
+  }
+  .category-tabs .m3-tab__supporting {
+    display: none;
+  }
+  .category-tabs .tab-badge {
+    margin-left: 0;
+  }
+}
+
+/* Category bundles (narrow list) */
+.bundles {
+  margin-bottom: 12px;
+}
+.row.bundle {
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  grid-template-areas: 'lead main trail';
+  border: none;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  min-height: 64px;
+}
+.bundle__icon {
+  grid-area: lead;
+  display: grid;
+  place-items: center;
+}
+.bundle__text {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+/* Keeps its two-line height without the senders line, so rows don't resize as peeks load (outranks .row-wrap > .row). */
+.row-wrap > .row.bundle {
+  min-height: calc(44px + 2 * var(--row-v-pad));
+  align-items: center;
+}
+.bundle__title {
+  font: 500 16px/24px var(--md-ref-typeface-plain);
+  color: var(--md-sys-color-on-surface);
+  letter-spacing: 0.2px;
+}
+.row--unread .bundle__title {
+  font-weight: 700;
+}
+.bundle__senders {
+  font: 400 14px/20px var(--md-ref-typeface-plain);
+  color: var(--md-sys-color-on-surface-variant);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bundle__badge {
+  grid-area: trail;
+  font-size: 12px;
+  line-height: 24px;
+  padding: 0 8px;
+}
+
+/* Search chips */
+.search-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 4px 12px;
+  align-items: center;
+}
+/* Over a list: one row that scrolls sideways, fading at the edges. */
+.search-chips--scroll {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  padding: 4px 16px 12px;
+  scroll-padding-inline: 16px;
+  mask-image: linear-gradient(to right, transparent, #000 16px, #000 calc(100% - 16px), transparent);
+}
+.search-chips--scroll::-webkit-scrollbar {
+  display: none;
+}
+.search-chips--scroll > * {
+  flex: none;
+}
+
+/* ---------- Segmented list (M3 Expressive) ---------- */
+.seg-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.row-context {
+  display: contents;
+}
+.row-wrap {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition:
+    grid-template-rows var(--md-sys-motion-spatial-default),
+    opacity var(--md-sys-motion-effects-fast),
+    margin var(--md-sys-motion-spatial-default);
+}
+.row-wrap[data-leaving] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  margin-top: -2px;
+  pointer-events: none;
+}
+/* Hover actions turn pointer events back on for themselves; a leaving row's must stay dead, or a quick second click lands on Move to Inbox. */
+.row-wrap[data-leaving] * {
+  pointer-events: none !important;
+}
+/* The track can't shrink past the row's padding, so the padding goes too, or the last 20px vanish in one frame. */
+.row-wrap[data-leaving] > .row {
+  padding-top: 0;
+  padding-bottom: 0;
+  transition:
+    padding var(--md-sys-motion-spatial-default),
+    background-color var(--md-sys-motion-effects-default),
+    border-radius var(--md-sys-motion-spatial-fast);
+}
+.row-wrap {
+  position: relative;
+}
+.row-wrap > .row {
+  min-height: 0;
+  overflow: hidden;
+}
+.row-wrap > .row,
+.row-wrap > .row-swipe {
+  grid-area: 1 / 1;
+}
+/* Swipe backdrops: a pill that grows with the drag, like Gmail Android. */
+.row-swipe {
+  display: none;
+  align-items: center;
+  padding: 0 24px;
+  border-radius: var(--md-sys-shape-corner-large);
+  min-height: 0;
+  overflow: hidden;
+}
+.row-swipe .m3-icon {
+  transform: scale(calc(0.6 + var(--swipe-progress, 0) * 0.4));
+  transition: transform var(--md-sys-motion-spatial-fast);
+}
+.row-wrap[data-swipe='right'] .row-swipe--right {
+  display: flex;
+  justify-content: flex-start;
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+}
+.row-wrap[data-swipe='left'] .row-swipe--left {
+  display: flex;
+  justify-content: flex-end;
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+.row-wrap[data-swipe] > .row {
+  border-radius: var(--md-sys-shape-corner-large);
+  z-index: 1;
+}
+.row {
+  touch-action: pan-y;
+  /* A long press is a swipe or a context menu, never a text selection or the iOS callout. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+/* Rows arrive with a short stagger when a view opens. */
+.thread-list .seg-list > .row-context > .row-wrap {
+  animation: row-in 300ms var(--md-sys-motion-easing-emphasized-decelerate) backwards;
+}
+/* Views open tens of times a day: 20ms apart, done within 400ms. */
+.thread-list .seg-list > .row-context:nth-child(1) > .row-wrap { animation-delay: 0ms; }
+.thread-list .seg-list > .row-context:nth-child(2) > .row-wrap { animation-delay: 20ms; }
+.thread-list .seg-list > .row-context:nth-child(3) > .row-wrap { animation-delay: 40ms; }
+.thread-list .seg-list > .row-context:nth-child(4) > .row-wrap { animation-delay: 60ms; }
+.thread-list .seg-list > .row-context:nth-child(5) > .row-wrap { animation-delay: 80ms; }
+.thread-list .seg-list > .row-context:nth-child(n + 6) > .row-wrap { animation-delay: 100ms; }
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.row {
+  --r-top: var(--md-sys-shape-corner-extra-small);
+  --r-bottom: var(--md-sys-shape-corner-extra-small);
+  position: relative;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  grid-template-areas:
+    'lead sender trail'
+    'lead main trail'
+    'lead atts atts';
+  column-gap: 16px;
+  row-gap: 0;
+  align-items: center;
+  padding: var(--row-v-pad) var(--row-h-pad) var(--row-v-pad) var(--row-h-pad);
+  background: var(--row-read);
+  color: var(--md-sys-color-on-surface-variant);
+  border-radius: var(--r-top) var(--r-top) var(--r-bottom) var(--r-bottom);
+  cursor: pointer;
+  outline: none;
+  isolation: isolate;
+  transition:
+    background-color var(--md-sys-motion-effects-default),
+    border-radius var(--md-sys-motion-spatial-fast),
+    transform var(--md-sys-motion-spatial-fast),
+    box-shadow var(--md-sys-motion-effects-default);
+}
+.seg-list > .row-context:first-child .row,
+.seg-list > .row-wrap:first-child .row,
+.seg-list > :first-child .row {
+  --r-top: var(--md-sys-shape-corner-large);
+}
+.seg-list > :last-child .row {
+  --r-bottom: var(--md-sys-shape-corner-large);
+}
+.row::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--md-sys-color-on-surface);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--md-sys-motion-effects-fast);
+  z-index: -1;
+}
+/* data-hover is :hover kept by rowHover.ts, for a row that slides in under a still pointer. */
+@media (hover: hover) {
+  .row:hover,
+  .row[data-hover] {
+    border-radius: var(--md-sys-shape-corner-medium);
+  }
+  .row:hover::before,
+  .row[data-hover]::before {
+    opacity: var(--md-sys-state-hover);
+  }
+}
+/* Shift held: the rows a click would select show it, half way to the selected colour so they never read as checked. */
+.row[data-range]::before {
+  opacity: 0.5;
+  transition: none;
+}
+.row[data-range='add']::before {
+  background: var(--row-selected);
+}
+.row[data-range='remove']::before {
+  background: var(--row-read);
+}
+/* Hover 12, pressed and focused 16 (ListTokens). */
+.row:active {
+  border-radius: var(--md-sys-shape-corner-large);
+}
+.row--unread {
+  background: var(--row-unread);
+  color: var(--md-sys-color-on-surface);
+}
+.row--active {
+  background: var(--row-open);
+  color: var(--md-sys-color-on-surface);
+  border-radius: var(--md-sys-shape-corner-large);
+}
+.row--selected {
+  background: var(--row-selected);
+  color: var(--md-sys-color-on-secondary-container);
+  border-radius: var(--md-sys-shape-corner-large);
+}
+.row--active::before {
+  opacity: 0;
+}
+.row > .m3-ripple {
+  z-index: -1;
+}
+.row > .m3-ripple::before {
+  content: none;
+}
+.row:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--md-sys-color-secondary);
+  border-radius: var(--md-sys-shape-corner-large);
+  animation: none;
+}
+.row__lead {
+  grid-area: lead;
+  align-self: start;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  perspective: 300px;
+  margin-top: 2px;
+}
+.row__lead-flip {
+  position: relative;
+  display: block;
+  width: 40px;
+  height: 40px;
+}
+.row__lead-front,
+.row__lead-back {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  transition:
+    transform var(--md-sys-motion-spatial-fast),
+    opacity var(--md-sys-motion-effects-fast),
+    border-radius var(--md-sys-motion-spatial-fast);
+}
+.row__lead-back {
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  opacity: 0;
+  transform: scale(0.5) rotate(-45deg);
+}
+.row__lead-flip[data-flipped] .row__lead-back {
+  opacity: 1;
+  transform: none;
+}
+.row__lead-flip[data-flipped] .row__lead-front {
+  opacity: 0;
+  transform: scale(0.6);
+}
+/* The check draws in from the start once the disc has turned. */
+.row__lead-back .m3-icon {
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path var(--md-sys-motion-effects-fast);
+}
+.row__lead-flip[data-flipped] .row__lead-back .m3-icon {
+  clip-path: inset(0 0 0 0);
+  transition: clip-path var(--md-sys-motion-spatial-default) 60ms;
+}
+@media (hover: hover) {
+  .row__lead:hover .row__lead-front {
+    transform: scale(0.92);
+  }
+}
+.row__lead:not([data-avatars]) .row__lead-front {
+  border-radius: 4px;
+}
+.row__checkbox {
+  width: 18px;
+  height: 18px;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 2px var(--md-sys-color-on-surface-variant);
+}
+.row__sender {
+  grid-area: sender;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font: 400 16px/24px var(--md-ref-typeface-plain);
+  letter-spacing: 0.5px;
+  color: var(--md-sys-color-on-surface);
+}
+.row--unread .row__sender {
+  letter-spacing: 0.15px;
+}
+.row--unread .row__sender,
+.row--unread .row__subject,
+.row--unread .row__date {
+  font-weight: 700;
+}
+/* Google Sans Flex is variable, so read and unread ease between weights. */
+.row__sender,
+.row__subject,
+.row__date {
+  transition:
+    font-weight var(--md-sys-motion-effects-default),
+    color var(--md-sys-motion-effects-default);
+}
+.row__from {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.row:not(.row--unread) .row__from {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.row--selected .row__from,
+.row--active .row__from {
+  color: inherit;
+}
+.row__count {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--md-sys-color-on-surface-variant);
+  flex: none;
+}
+.row__draft {
+  color: var(--md-sys-color-error);
+  font-weight: 400;
+  flex: none;
+}
+.row__draft-to {
+  color: var(--md-sys-color-on-surface);
+}
+/* A draft with nobody on it yet: a pen where the avatar would be. */
+.row__draft-tile {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-surface-variant);
+}
+.row__important {
+  display: inline-grid;
+  color: var(--app-star);
+  flex: none;
+}
+.row__main {
+  grid-area: main;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font: 400 14px/20px var(--md-ref-typeface-plain);
+  letter-spacing: 0.2px;
+}
+.row__subject {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--md-sys-color-on-surface);
+}
+.row:not(.row--unread) .row__subject {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.row--selected .row__subject,
+.row--active .row__subject {
+  color: inherit;
+}
+.row__subject-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.row__pin {
+  color: var(--md-sys-color-primary);
+  flex: none;
+}
+.row__labels {
+  display: inline-flex;
+  gap: 4px;
+  flex: none;
+}
+.row__snippet {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--md-sys-color-on-surface-variant);
+  font-weight: 400;
+}
+.row__dash {
+  display: none;
+  padding: 0 6px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-weight: 400;
+}
+.row__attachments {
+  grid-area: atts;
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+.app[data-density='compact'] .row__attachments {
+  display: none;
+}
+.att-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 200px;
+  height: 32px;
+  padding: 0 16px 0 8px;
+  border-radius: var(--md-sys-shape-corner-small);
+  box-shadow: inset 0 0 0 1px var(--md-sys-color-outline-variant);
+  font: 500 14px/20px var(--md-ref-typeface-plain);
+  letter-spacing: 0.1px;
+  color: var(--md-sys-color-on-surface-variant);
+  flex: none;
+}
+.att-chip__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.att-chip__icon[data-kind='image'] {
+  color: #d93025;
+}
+.att-chip--more {
+  padding: 0 12px;
+}
+button.att-chip {
+  position: relative;
+  overflow: hidden;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  outline: none;
+}
+button.att-chip:focus-visible {
+  outline: 3px solid var(--md-sys-color-secondary);
+  outline-offset: 2px;
+}
+.row__trail {
+  grid-area: trail;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 2px;
+  min-width: 48px;
+}
+.row__date {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font: 400 12px/24px var(--md-ref-typeface-plain);
+  letter-spacing: 0.3px;
+  color: var(--md-sys-color-on-surface-variant);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.row--unread .row__date {
+  color: var(--md-sys-color-on-surface);
+}
+.row__date[data-meta] {
+  color: var(--md-sys-color-tertiary);
+}
+.row__clip {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.row__star {
+  margin: -4px -6px -4px 0;
+}
+.row__star[data-starred] {
+  color: var(--app-star);
+}
+:root:not([data-theme-mode='dark']) :is(.row--selected, .row--active) :is(.row__star[data-starred] .m3-icon, .row__important .m3-icon) {
+  -webkit-text-stroke: 1.5px var(--app-star-edge);
+}
+/* Hover actions take the date's place, like Gmail web: a tonal pill on the first line, no shadow, so it reads as part of the row. */
+.row__hover {
+  position: absolute;
+  right: calc(var(--row-h-pad) - 8px);
+  top: calc(var(--row-v-pad) - 5px);
+  display: flex;
+  gap: 4px;
+  padding: 0 4px;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-sys-color-surface-container-high);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(8px);
+  transition:
+    opacity var(--md-sys-motion-effects-fast),
+    transform var(--md-sys-motion-spatial-fast);
+}
+.row--unread .row__hover {
+  background: var(--md-sys-color-surface-container);
+}
+@media (hover: hover) {
+  .list-pane:not([data-selecting]) .row:not(.row--selected):hover .row__hover,
+  .list-pane:not([data-selecting]) .row:not(.row--selected)[data-hover] .row__hover,
+  .list-pane:not([data-selecting]) .row:not(.row--selected):focus-within .row__hover {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+  }
+  /* Hover actions mount on the first hover; they still slide in. */
+  @starting-style {
+    .list-pane:not([data-selecting]) .row:not(.row--selected):hover .row__hover,
+    .list-pane:not([data-selecting]) .row:not(.row--selected)[data-hover] .row__hover,
+    .list-pane:not([data-selecting]) .row:not(.row--selected):focus-within .row__hover {
+      opacity: 0;
+      transform: translateX(8px);
+    }
+  }
+  .list-pane:not([data-selecting]) .row:not(.row--selected):hover .row__date,
+  .list-pane:not([data-selecting]) .row:not(.row--selected)[data-hover] .row__date,
+  .list-pane:not([data-selecting]) .row:not(.row--selected):focus-within .row__date {
+    opacity: 0;
+  }
+  /* The pill reaches into the subject line; fade the subject out before it rather than slicing its letters. */
+  .list-pane:not([data-selecting]) .row:not(.row--selected):is(:hover, [data-hover], :focus-within):has(.row__hover > :nth-child(3)) .row__subject {
+    mask-image: linear-gradient(to left, transparent 112px, #000 136px);
+  }
+}
+.row__date {
+  transition: opacity var(--md-sys-motion-effects-fast);
+}
+.label-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--md-sys-shape-corner-extra-small);
+  background: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-surface-variant);
+  font: 500 12px/16px var(--md-ref-typeface-plain);
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  max-width: 160px;
+  flex: none;
+  vertical-align: middle;
+}
+.label-chip__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.label-chip[data-removable] {
+  padding-right: 2px;
+}
+.label-chip__remove {
+  border: none;
+  padding: 0;
+  margin-left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.7;
+}
+.label-chip__remove:hover {
+  opacity: 1;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+
+/* Wide list: Gmail web's one-line rows. */
+@container list (min-width: 820px) {
+  .row {
+    grid-template-columns: 32px minmax(120px, 200px) minmax(0, 1fr) auto;
+    grid-template-areas:
+      'lead sender main trail'
+      '. . atts atts';
+    column-gap: 16px;
+    padding-top: calc(var(--row-v-pad) - 2px);
+    padding-bottom: calc(var(--row-v-pad) - 2px);
+  }
+  .row__lead,
+  .row__lead-flip {
+    width: 32px;
+    height: 32px;
+    margin: 0;
+    align-self: center;
+  }
+  .row__lead .m3-avatar {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 14px !important;
+  }
+  .row__sender {
+    font-size: 14px;
+    line-height: 20px;
+  }
+  .row__main {
+    flex-direction: row;
+    align-items: center;
+  }
+  .row__subject {
+    flex: 0 1 auto;
+    max-width: 100%;
+  }
+  .row__snippet {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .row__dash {
+    display: inline;
+  }
+  .row__trail {
+    flex-direction: row-reverse;
+    align-items: center;
+    align-self: center;
+    gap: 8px;
+  }
+  /* A fixed date column keeps the stars in line. */
+  .row__date {
+    min-width: 64px;
+    justify-content: flex-end;
+  }
+  .row__star {
+    margin: 0;
+  }
+  .row__attachments {
+    margin-top: 6px;
+  }
+}
+
+/* Skeleton */
+.skeleton .row {
+  cursor: default;
+}
+.row--skeleton {
+  animation: sk-pulse 1.6s ease-in-out infinite;
+}
+@keyframes sk-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+.sk {
+  display: block;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 10%, transparent);
+}
+.sk--circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+.sk--line {
+  height: 12px;
+  margin: 6px 0;
+}
+.sk--faint {
+  opacity: 0.6;
+}
+.sk--short {
+  width: 40px;
+}
+
+/* Empty and error states */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 72px 24px;
+  gap: 8px;
+}
+.empty--quiet {
+  padding: 16px 24px;
+  gap: 4px;
+}
+.empty__title {
+  margin: 16px 0 0;
+  font-variation-settings: 'ROND' 100;
+  color: var(--md-sys-color-on-surface);
+}
+.empty__text {
+  margin: 0 0 12px;
+  max-width: 400px;
+  color: var(--md-sys-color-on-surface-variant);
+  text-wrap: balance;
+}
+.empty-art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  color: var(--md-sys-color-on-primary-container);
+}
+.empty-art svg {
+  position: absolute;
+  inset: 0;
+  fill: var(--md-sys-color-primary-container);
+  animation: empty-art-in 700ms var(--md-spring-0-8) both;
+}
+.empty-art .m3-icon {
+  position: relative;
+  animation: empty-icon-in 600ms 120ms var(--md-sys-motion-easing-emphasized-decelerate) both;
+}
+.empty-art--error {
+  color: var(--md-sys-color-on-error-container);
+}
+.empty-art--error svg {
+  fill: var(--md-sys-color-error-container);
+}
+.empty-art--tertiary svg {
+  fill: var(--md-sys-color-tertiary-container);
+}
+@keyframes empty-art-in {
+  from {
+    transform: scale(0.4) rotate(-60deg);
+    opacity: 0;
+  }
+}
+@keyframes empty-icon-in {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+}
+
+/* ---------- Reading pane ---------- */
+.detail-pane {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--app-pane);
+  border-radius: var(--md-sys-shape-corner-extra-large);
+  overflow: hidden;
+  animation: pane-in var(--md-sys-motion-effects-default);
+  /* Wide panes get the larger subject, narrow ones the short date. */
+  container: pane / inline-size;
+}
+.main--single .detail-pane {
+  animation: pane-in-single 300ms var(--md-sys-motion-easing-emphasized-decelerate);
+}
+@keyframes pane-in {
+  from {
+    opacity: 0.4;
+  }
+}
+@keyframes pane-in-single {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.99);
+  }
+}
+/* The pane keeps its surface when empty so the layout never looks half built. */
+.detail-pane--empty {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 8px;
+  padding: 24px;
+  animation: none;
+}
+.empty-detail__mark {
+  margin-bottom: 8px;
+}
+.thread-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 64px;
+  /* The thread column is centred at 1040. */
+  padding: 0 max(16px, calc((100% - 1040px) / 2 + 16px));
+  flex: none;
+}
+.thread-toolbar {
+  position: relative;
+  z-index: 2;
+  transition: background-color var(--md-sys-motion-effects-default);
+  /* Narrow panes scroll the actions sideways instead of squeezing them (useScrollRow). */
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  --fade-start: 0px;
+  --fade-end: 0px;
+}
+.thread-toolbar:is([data-more-start], [data-more-end]) {
+  mask-image: linear-gradient(to right, transparent, #000 var(--fade-start), #000 calc(100% - var(--fade-end)), transparent);
+}
+.thread-toolbar:is([data-more-start], [data-more-end]):dir(rtl) {
+  mask-image: linear-gradient(to left, transparent, #000 var(--fade-start), #000 calc(100% - var(--fade-end)), transparent);
+}
+.thread-toolbar::-webkit-scrollbar {
+  display: none;
+}
+.thread-toolbar > * {
+  flex: none;
+}
+.thread-toolbar > .thread-toolbar__spacer {
+  flex: 1 1 0;
+}
+.thread-toolbar[data-more-start] {
+  --fade-start: 32px;
+}
+.thread-toolbar[data-more-end] {
+  --fade-end: 32px;
+}
+.thread-toolbar[data-scrolled] {
+  background: var(--md-sys-color-surface-container);
+}
+.thread-toolbar__spacer {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+  padding-inline: 12px;
+}
+/* Always laid out, so showing it never moves the actions. */
+.thread-toolbar__title {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--md-sys-color-on-surface);
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+  transition:
+    opacity var(--md-sys-motion-effects-fast),
+    transform var(--md-sys-motion-spatial-fast);
+}
+.thread-toolbar__title[data-shown] {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity var(--md-sys-motion-effects-default),
+    transform var(--md-sys-motion-spatial-default);
+}
+@container pane (max-width: 959px) {
+  .thread-toolbar__title {
+    display: none;
+  }
+}
+/* A 1280 window's pane: drop the dividers and the count so Newer and Older stay in reach. */
+@container pane (max-width: 719px) {
+  .thread-toolbar {
+    gap: 0;
+  }
+  .thread-toolbar .toolbar-divider,
+  .thread-toolbar__pos {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .thread-toolbar__title {
+    transform: none;
+  }
+}
+.thread-toolbar__pos {
+  color: var(--md-sys-color-on-surface-variant);
+  margin-right: 4px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.thread-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.thread-loading {
+  display: grid;
+  place-items: center;
+  padding: 120px 0;
+}
+.thread {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 4px 24px 40px;
+  /* j / k move through threads all day: a short settle, not an entrance. */
+  animation: thread-in 200ms var(--md-sys-motion-easing-emphasized-decelerate);
+}
+@keyframes thread-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+/* Messages wait until their emails know their height, then settle in together. */
+.thread-settle {
+  position: relative;
+}
+.thread-settle__content {
+  opacity: 0;
+  pointer-events: none;
+}
+.thread-settle__content[data-settled] {
+  opacity: 1;
+  pointer-events: auto;
+  animation: thread-in 200ms var(--md-sys-motion-easing-emphasized-decelerate);
+}
+.thread-settle__content[data-after-wait] {
+  animation: fade-in var(--md-sys-motion-effects-default);
+}
+.thread-settle__placeholder {
+  animation: fade-in var(--md-sys-motion-effects-default);
+}
+/* The placeholder lies over the laid-out messages for the crossfade. */
+.thread-settle__content + .thread-settle__placeholder {
+  position: absolute;
+  inset: 0 0 auto;
+  pointer-events: none;
+}
+.thread-settle__placeholder[data-leaving] {
+  animation: fade-out var(--md-sys-motion-effects-fast) forwards;
+}
+.thread-sk__cards {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 16px;
+}
+.thread-sk__card {
+  padding: 20px 20px 24px;
+  background: var(--md-sys-color-surface-container-low);
+  border-radius: var(--md-sys-shape-corner-extra-small);
+}
+.thread-sk__card:first-child {
+  border-top-left-radius: var(--md-sys-shape-corner-large);
+  border-top-right-radius: var(--md-sys-shape-corner-large);
+}
+.thread-sk__card:last-child {
+  border-bottom-left-radius: var(--md-sys-shape-corner-large);
+  border-bottom-right-radius: var(--md-sys-shape-corner-large);
+}
+.thread-sk__card--collapsed {
+  display: grid;
+  grid-template-columns: 44px 160px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 8px 20px;
+}
+.thread-sk__card--collapsed > .sk--circle {
+  width: 32px;
+  height: 32px;
+  margin-left: 4px;
+}
+.thread-sk__name {
+  width: 112px;
+}
+.thread-sk__snippet {
+  width: 72%;
+}
+.thread-sk__head {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.thread-sk__who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.thread-sk__from {
+  width: 160px;
+  height: 14px;
+}
+.thread-sk__to {
+  width: 96px;
+}
+.thread-sk__body {
+  margin: 20px 0 0;
+}
+.thread-sk .sk {
+  animation: sk-pulse 1.6s ease-in-out infinite;
+}
+.thread-loading {
+  animation: fade-in var(--md-sys-motion-effects-default) 200ms backwards;
+}
+.thread__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  /* The subject starts on the cards' edge, under the toolbar's first glyph. */
+  padding: 8px 12px 20px 0;
+}
+.thread__subject {
+  flex: 1;
+  margin: 0;
+  font: 500 28px/36px var(--md-ref-typeface-brand);
+  font-variation-settings: 'ROND' 100;
+  letter-spacing: 0;
+  color: var(--md-sys-color-on-surface);
+  overflow-wrap: anywhere;
+}
+.thread__subject-text {
+  display: inline;
+  margin: 0 12px 0 0;
+  font: inherit;
+}
+/* HeadlineLarge, emphasized, once there's room. */
+@container pane (min-width: 840px) {
+  .thread__subject {
+    font-size: 32px;
+    line-height: 40px;
+  }
+  .thread__subject .label-chip {
+    vertical-align: 6px;
+  }
+  .thread__head-actions {
+    margin-top: 0;
+  }
+}
+/* Input chips (InputChipTokens): 32 tall, 8 corners, LabelLarge, 18px remove icon. */
+.thread__subject .label-chip {
+  height: 32px;
+  max-width: 220px;
+  padding: 0 12px;
+  border-radius: var(--md-sys-shape-corner-small);
+  font: 500 14px/20px var(--md-ref-typeface-plain);
+  letter-spacing: 0.1px;
+  margin: 0 8px 4px 0;
+  vertical-align: 4px;
+}
+.thread__subject .label-chip[data-removable] {
+  padding-right: 4px;
+}
+.thread__subject .label-chip__remove {
+  width: 24px;
+  height: 24px;
+  margin-left: 4px;
+}
+.thread__head-actions {
+  display: flex;
+  align-items: center;
+  /* Centres the star on the subject's first 36px line. */
+  margin-top: -2px;
+}
+.thread__star[aria-pressed='true'] {
+  color: var(--app-star);
+}
+.thread-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: -4px 0 16px;
+  padding: 12px 8px 12px 16px;
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+  animation: m3-pop 300ms var(--md-sys-motion-easing-emphasized-decelerate);
+}
+.thread-note__icon {
+  margin-top: 2px;
+}
+.thread-note__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.thread-note textarea {
+  border: none;
+  background: transparent;
+  outline: none;
+  resize: none;
+  color: inherit;
+  font: 400 14px/20px var(--md-ref-typeface-plain);
+  padding: 2px 0;
+  overflow: hidden;
+}
+.thread-note textarea::placeholder {
+  color: inherit;
+  opacity: 0.7;
+}
+.thread-note__meta {
+  opacity: 0.75;
+}
+.thread-note .m3-icon-button {
+  color: inherit;
+}
+
+/* Revealed from the folded middle, one after another. */
+.msg[data-reveal] {
+  animation: msg-reveal 300ms var(--md-sys-motion-easing-emphasized-decelerate) backwards;
+  animation-delay: min(calc(var(--reveal-i, 0) * 25ms), 200ms);
+}
+@keyframes msg-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .msg[data-reveal] {
+    animation-name: fade-in;
+    animation-delay: 0ms;
+  }
+}
+.messages {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.msg {
+  --r-top: var(--md-sys-shape-corner-extra-small);
+  --r-bottom: var(--md-sys-shape-corner-extra-small);
+  background: var(--md-sys-color-surface-container-low);
+  border-radius: var(--r-top) var(--r-top) var(--r-bottom) var(--r-bottom);
+  transition: border-radius var(--md-sys-motion-spatial-fast), background-color var(--md-sys-motion-effects-default);
+}
+:root[data-theme-mode='dark'] .msg {
+  background: var(--md-sys-color-surface-container-low);
+}
+.messages > :first-child {
+  --r-top: var(--md-sys-shape-corner-large);
+}
+.messages > :last-child {
+  --r-bottom: var(--md-sys-shape-corner-large);
+}
+.msg--collapsed {
+  display: grid;
+  /* The paperclip keeps its column even when absent, so dates line up; the 32px photo centres on an open message's 40px one. */
+  grid-template-columns: 44px 160px minmax(0, 1fr) 16px auto;
+  /* One 40px row pinned to the top, so it stays put while the card resizes. */
+  grid-template-rows: 40px;
+  align-content: start;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 8px 20px 8px 20px;
+  cursor: pointer;
+  outline: none;
+}
+@media (hover: hover) {
+  .msg--collapsed:hover {
+    background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, var(--md-sys-color-surface-container-low));
+    border-radius: var(--md-sys-shape-corner-medium);
+  }
+}
+.msg--collapsed > .m3-avatar {
+  margin-left: 4px;
+}
+.msg--collapsed:active {
+  border-radius: var(--md-sys-shape-corner-large);
+}
+.msg--collapsed:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--md-sys-color-secondary);
+  border-radius: var(--md-sys-shape-corner-large);
+}
+.msg__name {
+  font: 500 14px/20px var(--md-ref-typeface-plain);
+  color: var(--md-sys-color-on-surface);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.msg--unread .msg__name {
+  font-weight: 700;
+}
+.msg__snippet {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.msg--collapsed > .msg__date {
+  grid-column: -2;
+}
+.msg__date {
+  font: 400 12px/16px var(--md-ref-typeface-plain);
+  color: var(--md-sys-color-on-surface-variant);
+  white-space: nowrap;
+}
+.msg__clip {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.msg__draft {
+  color: var(--md-sys-color-error);
+}
+.msg--expanded {
+  padding: 20px 20px 24px;
+  background: var(--md-sys-color-surface-container-low);
+}
+.msg__head {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: start;
+  cursor: pointer;
+}
+.msg__who {
+  min-width: 0;
+}
+.msg__line {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+  column-gap: 8px;
+}
+/* One line whatever the name: the address gives way first, then the name truncates. */
+.msg__from {
+  flex: none;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 500 16px/24px var(--md-ref-typeface-plain);
+  letter-spacing: 0.15px;
+  color: var(--md-sys-color-on-surface);
+  border-radius: var(--md-sys-shape-corner-extra-small);
+  outline: none;
+}
+.msg__from:focus-visible {
+  box-shadow: 0 0 0 2px var(--md-sys-color-secondary);
+}
+.msg__email {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 12px/16px var(--md-ref-typeface-plain);
+  letter-spacing: 0.4px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+@media (hover: hover) {
+  .msg__email {
+    opacity: 0;
+    transition: opacity var(--md-sys-motion-effects-fast);
+  }
+  .msg__head:hover .msg__email,
+  .msg__head:focus-within .msg__email {
+    opacity: 1;
+    transition-duration: 230ms;
+  }
+}
+.msg__when {
+  font: 400 12px/16px var(--md-ref-typeface-plain);
+  letter-spacing: 0.4px;
+  color: var(--md-sys-color-on-surface-variant);
+  white-space: nowrap;
+  margin-right: 4px;
+}
+.msg__when-short {
+  display: none;
+}
+/* A narrow pane keeps the header on one row: the short date, and Unsubscribe moves to More. */
+@container pane (max-width: 699px) {
+  .msg__when-full {
+    display: none;
+  }
+  .msg__when-short {
+    display: inline;
+  }
+  .msg__unsubscribe {
+    display: none;
+  }
+}
+.msg__to {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: none;
+  /* Room for the hover tint; the negative margin keeps the words on the sender's edge. */
+  padding: 2px 4px 2px 6px;
+  margin: -2px 0 -2px -6px;
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  font: 400 12px/16px var(--md-ref-typeface-plain);
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  border-radius: var(--md-sys-shape-corner-small);
+  max-width: calc(100% + 6px);
+}
+.msg__to span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.msg__to:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+}
+.msg__actions {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  /* Centres the 40px buttons on the sender's 24px line. */
+  margin: -8px -8px 0 0;
+}
+/* People with their photos, then the date and subject. */
+.details-popover {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: min(400px, calc(100vw - 32px));
+  max-height: min(560px, var(--available-height, 560px));
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 8px;
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+  box-shadow: var(--md-sys-elevation-2);
+  outline: none;
+  transform-origin: var(--transform-origin);
+  transition:
+    opacity var(--md-sys-motion-effects-fast),
+    transform var(--md-sys-motion-spatial-fast);
+}
+.details-popover[data-starting-style],
+.details-popover[data-ending-style] {
+  opacity: 0;
+  transform: scale(0.92);
+}
+.details-popover__group {
+  display: flex;
+  flex-direction: column;
+}
+.details-popover__label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 8px 12px 4px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.details-popover__count {
+  padding: 0 6px;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-sys-color-surface-container-highest);
+}
+.details-popover__none {
+  margin: 0;
+  padding: 4px 12px 8px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.details-popover__person {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 4px 4px 4px 12px;
+  border-radius: var(--md-sys-shape-corner-medium);
+  transition: background-color var(--md-sys-motion-effects-fast);
+}
+.details-popover__person:hover,
+.details-popover__person:focus-within {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+}
+.details-popover__names {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.details-popover__names > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.details-popover__names,
+.details-popover__fact dd {
+  user-select: text;
+}
+.details-popover__you,
+.details-popover__email {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.details-popover__you {
+  font-weight: 400;
+}
+/* The copy button waits for the pointer, but stays reachable by keyboard and touch. */
+@media (hover: hover) {
+  .details-popover__copy {
+    opacity: 0;
+    transition: opacity var(--md-sys-motion-effects-fast);
+  }
+  .details-popover__person:hover .details-popover__copy,
+  .details-popover__copy:focus-visible,
+  .details-popover__copy[data-confirmed] {
+    opacity: 1;
+  }
+}
+.details-popover__facts {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 4px 0 0;
+  padding: 12px 16px;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: var(--md-sys-color-surface-container);
+}
+.details-popover__fact {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  column-gap: 16px;
+  align-items: start;
+}
+.details-popover__fact > .m3-icon {
+  grid-row: span 2;
+  margin-top: 2px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.details-popover__fact dt {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.details-popover__fact dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.sender-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: min(340px, calc(100vw - 32px));
+  padding: 20px 16px 16px;
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+  box-shadow: var(--md-sys-elevation-2);
+  outline: none;
+  transform-origin: var(--transform-origin);
+  transition:
+    opacity var(--md-sys-motion-effects-fast),
+    transform var(--md-sys-motion-spatial-fast);
+}
+.sender-card[data-starting-style],
+.sender-card[data-ending-style] {
+  opacity: 0;
+  transform: scale(0.92);
+}
+.sender-card__who {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding-inline: 4px;
+}
+.sender-card__names {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  user-select: text;
+}
+.sender-card__names > :not(.sender-card__blocked) {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sender-card__email {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.sender-card__blocked {
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: var(--md-sys-shape-corner-small);
+  background: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
+}
+.sender-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.msg__banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 16px 0 0;
+  padding: 4px 8px 4px 16px;
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface-variant);
+}
+/* A message's parts start at the avatar's edge and take the card's width. */
+.msg__body {
+  margin: 12px 0 0;
+  position: relative;
+}
+.msg__body[data-designed] {
+  background: #ffffff;
+  border-radius: var(--md-sys-shape-corner-large);
+  overflow: hidden;
+}
+:root[data-theme-mode='light'] .msg__body[data-designed] {
+  box-shadow: inset 0 0 0 1px var(--md-sys-color-outline-variant);
+}
+.msg__frame {
+  display: block;
+  width: 100%;
+  border: none;
+  min-height: 24px;
+  background: transparent;
+  color-scheme: normal;
+}
+/* Out of sight until the frame has measured itself; afterwards size changes ease. */
+.msg__frame[data-sizing] {
+  opacity: 0;
+}
+.msg__frame[data-sized] {
+  transition:
+    opacity var(--md-sys-motion-effects-fast),
+    height var(--md-sys-motion-spatial-default);
+}
+.msg__trimmed {
+  display: inline-grid;
+  place-items: center;
+  height: 24px;
+  min-width: 36px;
+  margin: 4px 0 0;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-surface-variant);
+  font: 500 11px/16px var(--md-ref-typeface-plain);
+  letter-spacing: 0.5px;
+  cursor: pointer;
+}
+.msg__body[data-designed] .msg__trimmed {
+  margin: 0 16px 12px;
+}
+.msg__trimmed:hover {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+.messages__fold {
+  --fold-card: var(--md-sys-color-surface-container-low);
+  position: relative;
+  display: block;
+  height: 64px;
+  padding: 0 0 12px;
+  border: none;
+  background: transparent;
+  color: var(--md-sys-color-primary);
+  cursor: pointer;
+  text-align: start;
+  outline: none;
+}
+/* Two more sheets peek out under the top one, as in the Reply later stack. */
+.messages__fold::before,
+.messages__fold::after {
+  content: '';
+  position: absolute;
+  height: 12px;
+  border-radius: 0 0 var(--md-sys-shape-corner-small) var(--md-sys-shape-corner-small);
+  transition: transform var(--md-sys-motion-spatial-fast);
+}
+.messages__fold::before {
+  inset: auto 12px 6px;
+  background: var(--md-sys-color-surface-container-high);
+  z-index: 1;
+}
+.messages__fold::after {
+  inset: auto 28px 0;
+  background: var(--md-sys-color-surface-container);
+}
+.messages__fold-card {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 52px;
+  padding: 0 20px;
+  border-radius: var(--r-top, var(--md-sys-shape-corner-extra-small)) var(--r-top, var(--md-sys-shape-corner-extra-small))
+    var(--md-sys-shape-corner-small) var(--md-sys-shape-corner-small);
+  background: var(--fold-card);
+  transition:
+    background-color var(--md-sys-motion-effects-fast),
+    border-radius var(--md-sys-motion-spatial-fast);
+}
+@media (hover: hover) {
+  .messages__fold:hover {
+    --fold-card: color-mix(in srgb, var(--md-sys-color-primary) 8%, var(--md-sys-color-surface-container-low));
+  }
+  /* The sheets fan out a little, saying they open. */
+  .messages__fold:hover::before {
+    transform: translateY(2px);
+  }
+  .messages__fold:hover::after {
+    transform: translateY(4px);
+  }
+}
+.messages__fold:active .messages__fold-card {
+  --fold-card: color-mix(in srgb, var(--md-sys-color-primary) 12%, var(--md-sys-color-surface-container-low));
+  border-radius: var(--md-sys-shape-corner-medium);
+}
+.messages__fold:focus-visible .messages__fold-card {
+  box-shadow: inset 0 0 0 2px var(--md-sys-color-secondary);
+}
+.messages > .messages__fold:first-child {
+  --r-top: var(--md-sys-shape-corner-large);
+}
+@media (prefers-reduced-motion: reduce) {
+  .messages__fold:hover::before,
+  .messages__fold:hover::after {
+    transform: none;
+  }
+}
+.thread-sk__fold {
+  cursor: default;
+}
+.thread-sk__fold .messages__fold-card > .sk--circle {
+  width: 32px;
+  height: 32px;
+  margin-left: 4px;
+}
+.messages__fold-count {
+  margin-inline: 4px 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  font: 500 14px/20px var(--md-ref-typeface-plain);
+  letter-spacing: 0.1px;
+}
+
+/* Attachments */
+.attachments {
+  margin: 16px 0 0;
+}
+.attachments__head {
+  margin: 0 0 12px;
+  color: var(--md-sys-color-on-surface);
+}
+.attachments__size {
+  color: var(--md-sys-color-on-surface-variant);
+  font-weight: 400;
+}
+.attachments__grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
+  gap: 12px;
+  max-width: 760px;
+}
+.attachments__grid--gallery {
+  max-width: none;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+.att-card {
+  position: relative;
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-surface-container);
+  overflow: hidden;
+  transition:
+    border-radius var(--md-sys-motion-spatial-fast),
+    transform var(--md-sys-motion-spatial-fast),
+    box-shadow var(--md-sys-motion-effects-default);
+}
+.att-card:hover {
+  border-radius: var(--md-sys-shape-corner-extra-large);
+  box-shadow: var(--md-sys-elevation-1);
+}
+.att-card__open {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border: none;
+  padding: 0 0 12px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.att-card__thumb {
+  display: grid;
+  place-items: center;
+  height: 112px;
+  /* 4px inside the card's 16px corners, so 12px keeps them parallel. */
+  margin: 4px 4px 12px;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-surface-variant);
+  overflow: hidden;
+}
+.att-card__thumb > * {
+  grid-area: 1 / 1;
+}
+.att-card__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity var(--md-sys-motion-effects-default);
+}
+.att-card__thumb[data-loaded] img {
+  opacity: 1;
+}
+.att-card__thumb-icon {
+  transition: opacity var(--md-sys-motion-effects-default);
+}
+.att-card__thumb[data-loaded] .att-card__thumb-icon {
+  opacity: 0;
+}
+/* A preview decoded before is just there. */
+.att-card__thumb img[data-instant],
+.att-card__thumb:has(img[data-instant]) .att-card__thumb-icon {
+  transition: none;
+}
+.att-card__thumb[data-preview='text'] {
+  place-items: stretch;
+}
+/* A page of the file: first lines, small, on a paper-like surface. */
+.att-card__text {
+  margin: 0;
+  padding: 10px 12px;
+  overflow: hidden;
+  font: 400 10px/1.4 var(--md-ref-typeface-mono);
+  color: var(--md-sys-color-on-surface-variant);
+  background: var(--md-sys-color-surface-container-low);
+  white-space: pre;
+  text-align: start;
+  mask-image: linear-gradient(to bottom, #000 65%, transparent);
+  animation: fade-in var(--md-sys-motion-effects-default);
+}
+.att-card[data-kind='pdf'] .att-card__thumb,
+.att-card[data-kind='pdf'] .att-card__type {
+  color: #d93025;
+}
+.att-card[data-kind='sheet'] .att-card__thumb,
+.att-card[data-kind='sheet'] .att-card__type {
+  color: #188038;
+}
+.att-card[data-kind='doc'] .att-card__thumb,
+.att-card[data-kind='doc'] .att-card__type {
+  color: #1a73e8;
+}
+.att-card[data-kind='event'] .att-card__thumb,
+.att-card[data-kind='event'] .att-card__type {
+  color: #9334e6;
+}
+:root[data-theme-mode='dark'] .att-card[data-kind='pdf'] .att-card__thumb,
+:root[data-theme-mode='dark'] .att-card[data-kind='pdf'] .att-card__type {
+  color: #f28b82;
+}
+:root[data-theme-mode='dark'] .att-card[data-kind='sheet'] .att-card__thumb,
+:root[data-theme-mode='dark'] .att-card[data-kind='sheet'] .att-card__type {
+  color: #81c995;
+}
+:root[data-theme-mode='dark'] .att-card[data-kind='doc'] .att-card__thumb,
+:root[data-theme-mode='dark'] .att-card[data-kind='doc'] .att-card__type {
+  color: #8ab4f8;
+}
+:root[data-theme-mode='dark'] .att-card[data-kind='event'] .att-card__thumb,
+:root[data-theme-mode='dark'] .att-card[data-kind='event'] .att-card__type {
+  color: #c58af9;
+}
+.att-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  min-width: 0;
+}
+.att-card__name {
+  font: 500 14px/20px var(--md-ref-typeface-plain);
+  letter-spacing: 0.1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.att-card__size {
+  padding: 2px 12px 0 40px;
+  color: var(--md-sys-color-on-surface-variant);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.att-card__dl {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  opacity: 0;
+  transform: scale(0.8);
+  transition:
+    opacity var(--md-sys-motion-effects-fast),
+    transform var(--md-sys-motion-spatial-fast);
+}
+.att-card:hover .att-card__dl,
+.att-card:focus-within .att-card__dl {
+  opacity: 1;
+  transform: none;
+}
+.att-card__thread {
+  margin: 0 12px 12px 40px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--md-sys-color-primary);
+  cursor: pointer;
+}
+.att-group {
+  margin-bottom: 24px;
+}
+.att-group__title {
+  margin: 0 16px 8px;
+}
+
+/* Reply, Reply all and Forward follow the last message and stick to the pane's bottom once it scrolls; suggestions trail them and wrap above when narrow. Phones pin them outright, as Gmail Android does. */
+.thread {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.reply-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 4px 0 -40px;
+  /* Starts on the cards' edge, under the subject. */
+  padding: 16px 0 24px;
+  background: var(--app-pane);
+}
+/* The fade shows only while the conversation is behind the bar (ReplyBar sets data-over). */
+.reply-bar::before {
+  content: '';
+  position: absolute;
+  inset: auto 0 100% 0;
+  height: 24px;
+  background: linear-gradient(to bottom, transparent, var(--app-pane));
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--md-sys-motion-effects-fast);
+}
+.reply-bar[data-over]::before {
+  opacity: 1;
+}
+.reply-bar__buttons {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+/* M3 Expressive medium buttons: 56px, fully round, squaring off on press. */
+.reply-bar__buttons .m3-button {
+  height: 56px;
+  border-radius: 28px;
+  padding: 0 24px 0 20px;
+  font: 500 16px/24px var(--md-ref-typeface-plain);
+  transition:
+    border-radius var(--md-sys-motion-spatial-fast),
+    flex-grow var(--md-sys-motion-spatial-fast),
+    background-color var(--md-sys-motion-effects-fast);
+}
+.reply-bar__buttons .m3-button:active {
+  border-radius: 12px;
+}
+/* A narrow pane (Gemini docked beside it) steps down to small buttons. */
+@container pane (max-width: 479px) {
+  .reply-bar__buttons {
+    gap: 6px;
+    max-width: 100%;
+  }
+  .reply-bar__buttons .m3-button {
+    height: 48px;
+    padding: 0 16px 0 12px;
+    font-size: 14px;
+  }
+}
+/* ButtonGroup.kt: the pressed button widens about 15% and its neighbours give that room back. */
+@media (pointer: fine) {
+  .reply-bar__buttons .m3-button {
+    transition:
+      border-radius var(--md-sys-motion-spatial-fast),
+      padding var(--md-sys-motion-spatial-fast),
+      background-color var(--md-sys-motion-effects-fast);
+  }
+  .reply-bar__buttons:has(.m3-button:active:not(:disabled)) .m3-button:not(:active) {
+    padding-inline: 14px 18px;
+  }
+  .reply-bar__buttons .m3-button:active:not(:disabled) {
+    padding-inline: 32px 36px;
+  }
+  .reply-bar__buttons:has(> .m3-button:only-child) .m3-button:active {
+    padding-inline: 20px 24px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reply-bar__buttons .m3-button {
+    transition: background-color var(--md-sys-motion-effects-fast);
+  }
+}
+
+/* The app underneath all but disappears, as in Google's full-screen viewers. */
+.viewer-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 880;
+  background: color-mix(in srgb, var(--md-sys-color-scrim) 97%, transparent);
+  transition: opacity var(--md-sys-motion-effects-default);
+}
+.viewer-scrim[data-starting-style],
+.viewer-scrim[data-ending-style] {
+  opacity: 0;
+}
+.viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 881;
+  display: flex;
+  flex-direction: column;
+  color: #fff;
+  outline: none;
+  transition: opacity var(--md-sys-motion-effects-default);
+}
+.viewer[data-starting-style],
+.viewer[data-ending-style] {
+  opacity: 0;
+}
+.viewer__bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 64px;
+  padding: 0 8px;
+  flex: none;
+  background: var(--md-sys-color-scrim);
+}
+.viewer__btn,
+.viewer__bar .m3-icon-button {
+  color: #fff;
+}
+.viewer__title {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.viewer__size {
+  color: rgb(255 255 255 / 0.72);
+  font-variant-numeric: tabular-nums;
+}
+.viewer__stage {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px 88px 32px;
+}
+/* The frame takes its final size at once: the stage's room at the image's shape, never past its pixels. */
+.viewer__stage:has(> .viewer__frame) {
+  container-type: size;
+}
+.viewer__frame {
+  position: relative;
+  aspect-ratio: var(--ratio);
+  width: min(100cqw, calc(100cqh * var(--ratio)), var(--natural-width, 100cqw));
+  overflow: hidden;
+  border-radius: 12px;
+  transition: width var(--md-sys-motion-spatial-default);
+}
+.viewer__frame > img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+/* Stretched to the frame and softened while the original loads. */
+.viewer__standin {
+  filter: blur(6px) brightness(0.85);
+  transform: scale(1.04);
+}
+.viewer__img {
+  animation: fade-in var(--md-sys-motion-effects-default) both;
+}
+/* Gone once covered, so a transparent image doesn't show it through. */
+.viewer__frame[data-loaded] .viewer__standin {
+  visibility: hidden;
+  transition: visibility 0s 230ms;
+}
+.viewer__frame[data-instant] .viewer__img {
+  animation: none;
+}
+.viewer__loader {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+}
+.viewer__video {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 12px;
+  background: #000;
+}
+.viewer__pdf {
+  align-self: stretch;
+  width: min(960px, 100%);
+  height: 100%;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-radius: 16px;
+  outline: none;
+}
+.viewer__page {
+  flex: none;
+  width: 100%;
+  border-radius: 4px;
+  background: #fff;
+}
+.viewer__text {
+  width: min(880px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  margin: 0;
+  padding: 24px;
+  border-radius: 16px;
+  background: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+  font: 400 14px/20px var(--md-ref-typeface-mono);
+  white-space: pre-wrap;
+}
+.viewer__none {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 40px 48px;
+  border-radius: var(--md-sys-shape-corner-extra-large);
+  background: rgb(255 255 255 / 0.08);
+  text-align: center;
+}
+/* An invite as the event: a dialog-like card. */
+.viewer__event {
+  width: min(480px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  padding: 24px;
+  border-radius: var(--md-sys-shape-corner-extra-large);
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+  animation: m3-pop 320ms var(--md-sys-motion-easing-emphasized-decelerate);
+}
+.viewer__event-icon {
+  color: var(--md-sys-color-secondary);
+}
+.viewer__event-title {
+  margin: 16px 0 16px;
+  overflow-wrap: anywhere;
+}
+.viewer__event-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.viewer__event-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.viewer__event-row > .m3-icon {
+  flex: none;
+  margin-top: 2px;
+}
+.viewer__event-row > span {
+  color: var(--md-sys-color-on-surface);
+  overflow-wrap: anywhere;
+}
+.viewer__event-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.viewer__event-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 24px;
+}
+.viewer__nav {
+  position: fixed;
+  top: 50%;
+  translate: 0 -50%;
+}
+.viewer__nav--prev {
+  left: 16px;
+}
+.viewer__nav--next {
+  right: 16px;
+}
+@media (max-width: 599px) {
+  .viewer__stage {
+    padding: 8px 16px 96px;
+  }
+  .viewer__nav {
+    top: auto;
+    bottom: 24px;
+    translate: none;
+  }
+}
+
+/* ---------- Compose recipients (the rest of compose is in features/compose/compose.css) ---------- */
+.recipients {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 4px 0;
+  cursor: text;
+}
+.recipients {
+  background-image: linear-gradient(var(--md-sys-color-outline), var(--md-sys-color-outline));
+  background-size: 100% 1px;
+  background-position: bottom;
+  background-repeat: no-repeat;
+}
+/* Chips wrap; the label and Cc/Bcc stay on the first line. */
+.recipients {
+  align-items: flex-start;
+  padding: 6px 0;
+}
+.recipients > .recipients__label {
+  line-height: 32px;
+}
+/* Compose fields read as text fields: BodyLarge (16/24). */
+.recipients__label {
+  color: var(--md-sys-color-on-surface-variant);
+  font: 400 16px/24px var(--md-ref-typeface-plain);
+  letter-spacing: 0.5px;
+  min-width: 28px;
+}
+.recipients__chips {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  min-width: 0;
+}
+.recipients__input {
+  flex: 1 1 48px;
+  min-width: 48px;
+  height: 32px;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: 400 16px/24px var(--md-ref-typeface-plain);
+  letter-spacing: 0.5px;
+  color: var(--md-sys-color-on-surface);
+}
+.recipients__toggles {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  gap: 0;
+}
+.recipient-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 4px;
+  border-radius: var(--md-sys-shape-corner-small);
+  box-shadow: inset 0 0 0 1px var(--md-sys-color-outline-variant);
+  font: 500 14px/20px var(--md-ref-typeface-plain);
+  letter-spacing: 0.1px;
+  color: var(--md-sys-color-on-surface);
+  max-width: 260px;
+  animation: m3-pop 220ms var(--md-sys-motion-easing-emphasized-decelerate);
+}
+.recipient-chip__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recipient-chip--invalid {
+  background: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
+  box-shadow: none;
+}
+.recipient-chip__remove {
+  width: 24px;
+  height: 24px;
+  border: none;
+  padding: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.recipient-chip__remove:hover {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+.recipients__menu {
+  position: absolute;
+  z-index: 20;
+  top: 100%;
+  left: 24px;
+  width: min(380px, calc(100% - 24px));
+  margin: 4px 0 0;
+  padding: 4px;
+  list-style: none;
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--app-menu-bg);
+  box-shadow: var(--md-sys-elevation-2);
+  animation: m3-pop 200ms var(--md-sys-motion-easing-emphasized-decelerate);
+}
+.recipients__option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.recipients__option[aria-selected='true'] {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+}
+.recipients__option-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.recipients__option-email {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.recipients__option-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recipients__match {
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface);
+}
+.menu-time {
+  font: 400 12px/16px var(--md-ref-typeface-plain);
+  color: var(--md-sys-color-on-surface-variant);
+  margin-left: 16px;
+  white-space: nowrap;
+}
+/* The preset names and their times both stay whole. */
+.schedule-menu {
+  min-width: min(340px, calc(100vw - 16px));
+}
+.schedule-menu .menu-time {
+  flex: none;
+}
+.menu-note {
+  margin: 4px 12px 8px;
+  max-width: 260px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+/* ---------- Menus extras ---------- */
+.label-menu {
+  min-width: 280px;
+}
+/* Title, search icon and label icons share one column, as do the search text and labels. */
+.label-menu__head {
+  padding: 12px 0 8px;
+}
+.label-menu__title {
+  display: block;
+  padding: 0 12px 8px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.label-menu__search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 20px;
+  background: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-surface-variant);
+}
+.label-menu__search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--md-sys-color-on-surface);
+}
+.label-menu__list {
+  max-height: 320px;
+  overflow-y: auto;
+}
+.label-menu__empty {
+  padding: 12px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* ---------- Forms in dialogs ---------- */
+.form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+/* Room below for the selected and focus rings: the swatches are often last in a dialog's scrolling content, which clips. */
+.swatches {
+  border: none;
+  margin: 0;
+  padding: 0 0 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.swatches legend {
+  width: 100%;
+  margin-bottom: 8px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.swatch {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 0 0 0 var(--md-sys-color-surface-container-high), 0 0 0 0 var(--md-sys-color-primary);
+  transition:
+    border-radius var(--md-sys-motion-spatial-fast),
+    box-shadow var(--md-sys-motion-effects-fast);
+}
+.swatch[aria-pressed='true'] {
+  border-radius: var(--md-sys-shape-corner-medium);
+  box-shadow: 0 0 0 2px var(--md-sys-color-surface-container-high), 0 0 0 4px var(--md-sys-color-primary);
+}
+.swatch--none {
+  background: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-surface-variant);
+}
+.idea-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ---------- Side sheet (quick settings) ---------- */
+.m3-scrim--light {
+  background: var(--app-scrim-light);
+}
+.side-sheet {
+  position: fixed;
+  z-index: 801;
+  top: var(--app-gutter);
+  right: var(--app-gutter);
+  bottom: var(--app-gutter);
+  width: min(360px, calc(100vw - 2 * var(--app-gutter)));
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--md-sys-shape-corner-extra-large);
+  background: var(--md-sys-color-surface-container-low);
+  box-shadow: var(--md-sys-elevation-3);
+  outline: none;
+  overflow: hidden;
+  transition:
+    transform var(--md-sys-motion-spatial-default),
+    opacity var(--md-sys-motion-effects-default);
+}
+.side-sheet[data-starting-style],
+.side-sheet[data-ending-style] {
+  transform: translateX(calc(100% + 24px));
+}
+.side-sheet[data-ending-style] {
+  transition: transform var(--md-sys-motion-effects-default);
+}
+.side-sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* The close glyph ends on the body's 24px edge. */
+  padding: 12px 16px 12px 24px;
+}
+.side-sheet__title {
+  margin: 0;
+  font-variation-settings: 'ROND' 100;
+}
+.side-sheet__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.side-sheet__body > * {
+  flex-shrink: 0;
+}
+.side-sheet__all {
+  align-self: stretch;
+  margin-bottom: 8px;
+}
+.qs-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 0 12px;
+}
+.qs-title {
+  margin: 0 0 8px;
+  color: var(--md-sys-color-on-surface);
+}
+.radio-row,
+.switch-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 44px;
+  cursor: pointer;
+  color: var(--md-sys-color-on-surface);
+}
+.switch-row {
+  justify-content: space-between;
+}
+/* The ring sits on the section's edge; its state layer spills into the padding. */
+.radio-row > .m3-radio {
+  margin-inline-start: 0;
+}
+.swatches-wallpaper {
+  /* Six across: your picture, Google, 14 presets, random and your own colour make three even rows. */
+  display: grid;
+  --swatch: 48px;
+  grid-template-columns: repeat(6, var(--swatch));
+  justify-content: space-between;
+  row-gap: 10px;
+  margin-top: 16px;
+}
+.swatch-wallpaper {
+  position: relative;
+  /* A fixed size: Safari stretches a grid item's aspect-ratio box to its row, which made ovals. */
+  width: var(--swatch);
+  height: var(--swatch);
+  padding: 4px;
+  border: none;
+  border-radius: 50%;
+  background: var(--md-sys-color-surface-container-highest);
+  cursor: pointer;
+  transition: background-color var(--md-sys-motion-effects-fast);
+}
+/* Six 48px swatches need about 290px; the narrowest phones get smaller ones. */
+@media (max-width: 370px) {
+  .swatches-wallpaper {
+    --swatch: 38px;
+  }
+}
+.swatch-wallpaper[aria-pressed='true'],
+.swatch-wallpaper[data-selected] {
+  background: var(--md-sys-color-primary);
+}
+.swatch-wallpaper__disc {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+}
+.swatch-wallpaper__disc > :first-child {
+  grid-row: 1 / span 2;
+}
+/* The shuffle mark on a plain tonal disc, apart from the colour wheel beside it. */
+.swatch-wallpaper__disc--shuffle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+/* The colour wheel, with a hole for the palette. */
+.swatch-wallpaper__disc--any {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle, var(--md-sys-color-surface-container-highest) 52%, transparent 53%),
+    conic-gradient(#ea4335, #fbbc04, #34a853, #00acc1, #4285f4, #a142f4, #ea4335);
+  color: var(--md-sys-color-on-surface-variant);
+}
+.swatch-wallpaper--custom input,
+.seed-dot input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.swatch-wallpaper--custom:has(input:focus-visible),
+.seed-dot:has(input:focus-visible) {
+  outline: 3px solid var(--md-sys-color-secondary);
+  outline-offset: 2px;
+}
+.swatch-wallpaper__check {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  /* Cut out of the ring it sits on. */
+  box-shadow: 0 0 0 2px var(--md-sys-color-surface-container-low);
+  animation: m3-pop 260ms var(--md-spring-0-8);
+}
+
+/* ConnectedButtonGroup tokens: 2px apart, outer corners full, inner 8 (pressed 4), the selected segment a full pill; the pressed segment widens 15%. */
+.button-group {
+  display: inline-flex;
+  gap: 2px;
+  flex-wrap: nowrap;
+  --bg-outer: 20px;
+}
+.button-group.m3-size--xs {
+  --bg-outer: 16px;
+}
+.button-group__item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  border: none;
+  background: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface-variant);
+  font: 500 14px/20px var(--md-ref-typeface-plain);
+  letter-spacing: 0.1px;
+  cursor: pointer;
+  border-radius: 8px;
+  isolation: isolate;
+  flex: 1 1 auto;
+  white-space: nowrap;
+  transition:
+    border-radius var(--md-sys-motion-spatial-fast),
+    background-color var(--md-sys-motion-effects-default),
+    color var(--md-sys-motion-effects-default),
+    flex-grow var(--md-sys-motion-spatial-fast);
+}
+.button-group__item > :not(.m3-ripple) {
+  position: relative;
+  z-index: 1;
+}
+.button-group__item:first-child {
+  border-radius: var(--bg-outer) 8px 8px var(--bg-outer);
+}
+.button-group__item:last-child {
+  border-radius: 8px var(--bg-outer) var(--bg-outer) 8px;
+}
+.button-group__item:active {
+  border-radius: 4px;
+  flex-grow: 1.15;
+}
+.button-group__item:first-child:active {
+  border-radius: var(--bg-outer) 4px 4px var(--bg-outer);
+}
+.button-group__item:last-child:active {
+  border-radius: 4px var(--bg-outer) var(--bg-outer) 4px;
+}
+.button-group__item[data-selected],
+.button-group__item[data-selected]:active {
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  border-radius: var(--bg-outer);
+}
+.button-group.m3-size--xs .button-group__item {
+  height: 32px;
+  padding: 0 12px;
+  gap: 4px;
+}
+
+/* ---------- Settings ---------- */
+.settings {
+  position: fixed;
+  z-index: 801;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  width: min(1000px, calc(100vw - 48px));
+  height: min(760px, calc(100vh - 48px));
+  display: grid;
+  grid-template-columns: 268px minmax(0, 1fr);
+  border-radius: var(--md-sys-shape-corner-extra-large);
+  background: var(--md-sys-color-surface-container);
+  box-shadow: var(--md-sys-elevation-3);
+  overflow: hidden;
+  outline: none;
+  transition:
+    opacity var(--md-sys-motion-effects-default),
+    transform var(--md-sys-motion-spatial-default);
+}
+.settings[data-starting-style] {
+  opacity: 0;
+  transform: scale(0.92) translateY(16px);
+}
+.settings[data-ending-style] {
+  opacity: 0;
+  transform: scale(0.97);
+  transition:
+    opacity var(--md-sys-motion-effects-fast),
+    transform var(--md-sys-motion-effects-fast);
+}
+.settings__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  padding: 20px 12px 12px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+/* Pinned to the bottom of the sidebar. */
+.settings__footer {
+  margin-top: auto;
+  padding-top: 16px;
+}
+.settings-nav-item--footer {
+  width: 100%;
+  padding-right: 16px;
+}
+.settings-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.settings-block:first-child > .settings-subhead {
+  margin-top: 4px;
+}
+.settings-block > .settings-subhead + .setting-row {
+  margin-top: 0;
+}
+/* Search shows matches under their section's name; run titles inside would repeat it. */
+.settings-results .settings-block:has(.setting-row) ~ .settings-block:has(.setting-row) {
+  margin-top: 12px;
+}
+.settings-results .settings-block__head,
+.settings-block:not(:has(.setting-row)) {
+  display: none;
+}
+.settings__title {
+  margin: 4px 16px 20px;
+  font-variation-settings: 'ROND' 100;
+}
+/* The M3 search bar at 48px, on the nav's frame. */
+.settings-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 48px;
+  margin: 0 0 12px;
+  padding: 0 4px 0 16px;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-surface-variant);
+  transition: background-color var(--md-sys-motion-effects-fast);
+}
+.settings-search:focus-within {
+  outline: 3px solid var(--md-sys-color-secondary);
+  outline-offset: 2px;
+}
+.settings-search__icon {
+  flex: none;
+}
+.settings-search__input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 8px;
+  border: none;
+  background: none;
+  color: var(--md-sys-color-on-surface);
+  font: 400 16px/24px var(--md-ref-typeface-plain);
+  letter-spacing: 0.5px;
+  outline: none;
+}
+.settings-search__input::placeholder {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.settings-search__input::-webkit-search-cancel-button {
+  appearance: none;
+}
+.settings-search__clear {
+  flex: none;
+  animation: fade-in var(--md-sys-motion-effects-fast);
+}
+.settings__sections {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.settings-hit {
+  background: none;
+  color: inherit;
+  font-weight: 700;
+}
+.settings-results__group {
+  margin-bottom: 20px;
+}
+.settings-results__group:not(:has(.setting-row)) {
+  display: none;
+}
+.settings-results__head {
+  margin: 4px 16px 8px;
+  color: var(--md-sys-color-primary);
+  font-weight: 600;
+}
+.settings-results .settings-subhead {
+  margin-top: 14px;
+}
+.settings-jump {
+  position: relative;
+  width: 100%;
+  border: none;
+  color: var(--md-sys-color-on-surface);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  outline: none;
+}
+.settings-jump::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity var(--md-sys-motion-effects-fast);
+}
+.settings-jump:hover::before {
+  opacity: 0.08;
+}
+.settings-jump:active::before {
+  opacity: 0.1;
+}
+.settings-jump:focus-visible {
+  outline: 3px solid var(--md-sys-color-secondary);
+  outline-offset: 2px;
+}
+.settings-jump__icon {
+  flex: none;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.settings-results__empty {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 64px 24px;
+  color: var(--md-sys-color-on-surface-variant);
+  text-align: center;
+}
+.settings-results__empty p {
+  margin: 0;
+}
+.settings-results__empty .md-body-large {
+  margin-top: 8px;
+  color: var(--md-sys-color-on-surface);
+}
+.settings-results:not(:has(.setting-row)) .settings-results__empty {
+  display: flex;
+  animation: fade-in var(--md-sys-motion-effects-default);
+}
+/* M3 Expressive navigation list: 56px full-round items, the active one on a secondary-container pill. */
+.settings-nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 56px;
+  padding: 0 24px 0 16px;
+  border: none;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  font: 500 14px/20px var(--md-ref-typeface-plain);
+  letter-spacing: 0.1px;
+  text-align: start;
+  cursor: pointer;
+  outline: none;
+  transition:
+    background-color var(--md-sys-motion-effects-fast),
+    color var(--md-sys-motion-effects-fast);
+}
+.settings-nav-item::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity var(--md-sys-motion-effects-fast);
+}
+.settings-nav-item:hover::before {
+  opacity: 0.08;
+}
+.settings-nav-item:active::before {
+  opacity: 0.1;
+}
+.settings-nav-item:focus-visible {
+  outline: 3px solid var(--md-sys-color-secondary);
+  outline-offset: 2px;
+}
+.settings-nav-item[data-active] {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+  font-weight: 700;
+}
+.settings-nav-item__icon {
+  flex: none;
+}
+.settings-nav-item__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.settings__content {
+  --field-bg: var(--app-pane);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin: 12px 12px 12px 0;
+  /* Nested 12px inside the 28px dialog, so the corners run parallel. */
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--app-pane);
+}
+.settings__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* The close glyph ends on the rows' trailing edge. */
+  padding: 16px 20px 8px 28px;
+}
+.settings__bar h2 {
+  margin: 0;
+}
+.settings__appbar {
+  display: none;
+}
+.settings__appbar-title {
+  flex: 1;
+}
+.settings__scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 28px 28px;
+}
+/* A new section settles in; the list beside it stays put. */
+.settings__section {
+  animation: settings-section-in 250ms var(--md-sys-motion-easing-emphasized-decelerate);
+}
+@keyframes settings-section-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .settings__section {
+    animation-name: fade-in;
+  }
+}
+/* An M3 Expressive segmented list: tonal cards 2px apart, 16px corners outside each run and 4px between. */
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: stretch;
+}
+.settings-group > .m3-button {
+  align-self: flex-start;
+  margin-top: 12px;
+}
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  min-height: 72px;
+  padding: 12px 16px;
+  border-radius: var(--md-sys-shape-corner-extra-small);
+  background: var(--md-sys-color-surface-container-low);
+  --field-bg: var(--md-sys-color-surface-container-low);
+}
+:root[data-theme-mode='dark'] .setting-row {
+  background: var(--md-sys-color-surface-container);
+  --field-bg: var(--md-sys-color-surface-container);
+}
+.setting-row:nth-child(1 of .setting-row),
+:not(.setting-row) + .setting-row {
+  border-top-left-radius: var(--md-sys-shape-corner-large);
+  border-top-right-radius: var(--md-sys-shape-corner-large);
+}
+.setting-row:nth-last-child(1 of .setting-row),
+.setting-row:has(+ :not(.setting-row)) {
+  border-bottom-left-radius: var(--md-sys-shape-corner-large);
+  border-bottom-right-radius: var(--md-sys-shape-corner-large);
+}
+:not(.setting-row) + .setting-row {
+  margin-top: 14px;
+}
+.setting-row__text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.setting-row__desc {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.setting-row__control {
+  flex: none;
+}
+.settings-note {
+  margin: 0 0 12px;
+  color: var(--md-sys-color-on-surface-variant);
+  max-width: 560px;
+}
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.settings-list__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 4px 8px 4px 16px;
+  background: var(--md-sys-color-surface-container-low);
+  border-radius: 4px;
+}
+.settings-list__item:first-child {
+  border-radius: 16px 16px 4px 4px;
+}
+.settings-list__item:last-child {
+  border-radius: 4px 4px 16px 16px;
+}
+.settings-list__item:only-child {
+  border-radius: 16px;
+}
+.settings-list__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Nested labels indent under their parent, as in the rail. */
+.label-setting {
+  padding-left: calc(16px + var(--depth, 0) * 24px);
+}
+.label-setting__icon {
+  flex: none;
+}
+.label-setting__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 0;
+}
+.label-setting__name,
+.label-setting__meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.label-setting__meta {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.settings-list__meta {
+  color: var(--md-sys-color-on-surface-variant);
+  font: 400 12px/16px var(--md-ref-typeface-plain);
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* One segmented run per place, headings between. */
+.arrange-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.arrange-list__head {
+  margin-top: 20px;
+}
+.arrange-list__head:first-child {
+  margin-top: 4px;
+}
+.arrange-row,
+.arrange-list__empty {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  margin: 0;
+  padding: 4px 12px 4px 4px;
+  border-radius: var(--md-sys-shape-corner-extra-small);
+  background: var(--md-sys-color-surface-container-low);
+}
+:root[data-theme-mode='dark'] :is(.arrange-row, .arrange-list__empty) {
+  background: var(--md-sys-color-surface-container);
+}
+.arrange-list__empty {
+  padding-inline: 16px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+:is(.arrange-row, .arrange-list__empty):first-child,
+:not(.arrange-row, .arrange-list__empty) + :is(.arrange-row, .arrange-list__empty) {
+  border-top-left-radius: var(--md-sys-shape-corner-large);
+  border-top-right-radius: var(--md-sys-shape-corner-large);
+}
+:is(.arrange-row, .arrange-list__empty):last-child,
+:is(.arrange-row, .arrange-list__empty):has(+ :not(.arrange-row, .arrange-list__empty)) {
+  border-bottom-left-radius: var(--md-sys-shape-corner-large);
+  border-bottom-right-radius: var(--md-sys-shape-corner-large);
+}
+.arrange-row[data-dragging] {
+  position: relative;
+  z-index: 1;
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-surface-container-highest);
+  box-shadow: var(--md-sys-elevation-3);
+}
+.arrange-row__handle {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 48px;
+  padding: 0;
+  border: none;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: none;
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: grab;
+  touch-action: none;
+}
+.arrange-row__handle:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+}
+.arrange-row__handle:focus-visible {
+  outline: 2px solid var(--md-sys-color-secondary);
+  outline-offset: -2px;
+}
+.arrange-list[data-dragging],
+.arrange-list[data-dragging] .arrange-row__handle {
+  cursor: grabbing;
+  user-select: none;
+}
+.arrange-row__icon {
+  flex: none;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.arrange-row__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 0;
+}
+.arrange-row__text > :first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.arrange-row__desc {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.arrange-row__control {
+  flex: none;
+  display: flex;
+  align-items: center;
+}
+.settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.template-editor {
+  border-radius: 16px;
+  padding: 12px 16px;
+  box-shadow: inset 0 0 0 1px var(--md-sys-color-outline);
+}
+/* Two even rows of eight, beside the title while there's room and under it when not. */
+.setting-row:has(.seed-row) {
+  flex-wrap: wrap;
+  row-gap: 12px;
+}
+.seed-row {
+  display: grid;
+  grid-template-columns: repeat(8, 32px);
+  gap: 8px;
+}
+@media (max-width: 420px) {
+  .seed-row {
+    grid-template-columns: repeat(4, 40px);
+    gap: 12px;
+  }
+  .seed-row .seed-dot {
+    width: 40px;
+    height: 40px;
+  }
+}
+.seed-dot {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  cursor: pointer;
+  transition: box-shadow var(--md-sys-motion-effects-fast);
+}
+.seed-dot[aria-pressed='true'],
+.seed-dot[data-selected] {
+  /* A ring a gap away, in the row's own colour first so it reads on any seed. */
+  box-shadow: 0 0 0 2px var(--field-bg), 0 0 0 4px var(--md-sys-color-on-surface);
+}
+.seed-dot--custom {
+  background: conic-gradient(#ea4335, #fbbc04, #34a853, #4285f4, #a142f4, #ea4335);
+  overflow: hidden;
+}
+.seed-dot--shuffle {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+/* Each roll turns the mark once, so a click landing on a similar colour still answers. */
+.shuffle-turn {
+  animation: shuffle-turn var(--md-sys-motion-spatial-default);
+}
+@keyframes shuffle-turn {
+  from { transform: rotate(-180deg); }
+}
+.seed-dot[data-light] {
+  color: #1f1f1f;
+}
+.choice-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.choice-card {
+  display: flex;
+  gap: 16px;
+  padding: 16px 20px;
+  border: none;
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-surface-container-low);
+  color: var(--md-sys-color-on-surface);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-radius var(--md-sys-motion-spatial-fast),
+    background-color var(--md-sys-motion-effects-default);
+}
+.choice-card:hover {
+  background: var(--md-sys-color-surface-container);
+}
+.choice-card--selected {
+  background: var(--md-sys-color-secondary-container) !important;
+  color: var(--md-sys-color-on-secondary-container);
+  border-radius: var(--md-sys-shape-corner-extra-large);
+}
+.choice-card__icon {
+  margin-top: 2px;
+}
+.choice-card__text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.choice-card__desc {
+  opacity: 0.85;
+}
+.choice-card__badge {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  vertical-align: 2px;
+}
+.api-setup {
+  --field-bg: var(--md-sys-color-surface-container-low);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-surface-container-low);
+}
+:root[data-theme-mode='dark'] .api-setup {
+  --field-bg: var(--md-sys-color-surface-container);
+  background: var(--md-sys-color-surface-container);
+}
+.api-setup__text {
+  margin: 0;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.settings-group > .diagnostics {
+  margin-top: 16px;
+}
+.settings-group > .diagnostics summary {
+  margin: 0;
+}
+
+/* Shortcuts help */
+.shortcuts__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  margin-bottom: 16px;
+  border-radius: 16px;
+  background: var(--md-sys-color-surface-container);
+}
+.shortcuts {
+  columns: 2 320px;
+  column-gap: 32px;
+}
+.shortcuts__group {
+  break-inside: avoid;
+  margin-bottom: 24px;
+}
+.shortcuts__title {
+  margin: 0 0 8px;
+  color: var(--md-sys-color-primary);
+}
+.shortcuts dl {
+  margin: 0;
+}
+.shortcuts__row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 36px;
+}
+.shortcuts__row dt {
+  width: 140px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.shortcuts__row dd {
+  margin: 0;
+  color: var(--md-sys-color-on-surface-variant);
+}
+kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-surface);
+  font: 500 12px/1 var(--md-ref-typeface-plain);
+}
+.shortcuts__sep {
+  font: 400 12px/16px var(--md-ref-typeface-plain);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* ---------- Pages (subscriptions, attachments, follow-ups) ---------- */
+.main--page {
+  overflow: hidden;
+}
+.page {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  /* Rows run edge to edge like the list's; content starts a gutter under the search bar. */
+  padding: calc(var(--app-gutter) - 4px) 0 96px;
+  /* Same short settle as a thread. */
+  animation: thread-in 200ms var(--md-sys-motion-easing-emphasized-decelerate);
+}
+.page-split {
+  flex: 1;
+  display: flex;
+  gap: var(--app-gutter);
+  min-width: 0;
+}
+.page-split .page {
+  width: 440px;
+  flex: none;
+}
+.page__head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 0 16px 24px;
+  max-width: 760px;
+}
+.page__head > .search-chips {
+  padding: 4px 0 0;
+}
+.page__head h1 {
+  margin: 0;
+}
+.page__lede {
+  margin: 0;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.page__loading {
+  display: grid;
+  place-items: center;
+  padding: 80px 0;
+}
+.sub-row,
+.followup {
+  grid-template-columns: 40px minmax(0, 1fr) auto auto;
+  grid-template-areas: none;
+  cursor: default;
+  background: var(--row-unread);
+  color: var(--md-sys-color-on-surface);
+}
+.followup {
+  cursor: pointer;
+}
+.sub-row__text,
+.followup__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.sub-row__text > *,
+.followup__text > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sub-row__text > :first-child,
+.followup__text > :first-child {
+  font: 400 16px/24px var(--md-ref-typeface-plain);
+  letter-spacing: 0.5px;
+}
+.sub-row__meta,
+.followup__meta {
+  color: var(--md-sys-color-on-surface-variant);
+  font-variant-numeric: tabular-nums;
+}
+.followup__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+}
+.followup[data-overdue] .followup__icon {
+  background: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
+  border-radius: 14px;
+}
+
+/* ---------- Onboarding ---------- */
+.onboarding .m3-dialog__content {
+  padding-top: 32px;
+}
+.onboarding__slide {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  animation: thread-in 420ms var(--md-sys-motion-easing-emphasized-decelerate);
+}
+.onboarding__title {
+  margin: 20px 0 0;
+}
+.onboarding__text {
+  margin: 0;
+  /* Room for three lines on every step, so the dialog holds still between steps. */
+  min-height: 3lh;
+  color: var(--md-sys-color-on-surface-variant);
+  text-wrap: balance;
+}
+.onboarding__dots {
+  position: relative;
+  display: flex;
+  gap: 4px;
+  margin-right: auto;
+  align-self: center;
+}
+/* Each step has a 20px slot; the active pill slides between them, so only a transform moves. */
+.onboarding__dot {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 8px;
+}
+.onboarding__dot::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--md-sys-color-outline-variant);
+}
+.onboarding__dot-active {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 20px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--md-sys-color-primary);
+  transition: transform var(--md-sys-motion-spatial-fast);
+}
+@media (prefers-reduced-motion: reduce) {
+  .onboarding__dot-active {
+    transition: none;
+  }
+}
+
+/* ---------- Compact (phone-width) layout: Gmail Android ---------- */
+.app[data-compact] .thread-toolbar [aria-label='Report spam'],
+.app[data-compact] .thread-toolbar [aria-label='Move to'],
+.app[data-compact] .thread-toolbar [aria-label='Labels'],
+.app[data-compact] .thread-toolbar [aria-label^='Remind me'],
+.app[data-compact] .thread-toolbar [aria-label^='Follow-up'],
+.app[data-compact] .thread-toolbar .toolbar-divider {
+  display: none;
+}
+.app[data-compact] .msg__head {
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+}
+.app[data-compact] .msg__when {
+  display: none;
+}
+.app[data-compact] .msg__from {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.app[data-compact] .msg__line::after {
+  content: attr(data-when);
+  flex: none;
+  white-space: nowrap;
+  font: 400 12px/16px var(--md-ref-typeface-plain);
+  color: var(--md-sys-color-on-surface-variant);
+}
+.app[data-compact] .msg__actions [aria-label='Reply'] {
+  display: none;
+}
+.app[data-compact] .list-bar__refresh {
+  display: none;
+}
+/* Menu and avatar sit outside a 56px field, as on Gmail Android. */
+.app[data-compact] .topbar {
+  padding: 0 4px 0 4px;
+  gap: 4px;
+}
+.app[data-compact] .topbar__start {
+  width: auto;
+}
+.app[data-compact] .topbar__end {
+  gap: 0;
+}
+.app[data-compact] .search__bar {
+  height: 56px;
+}
+.app[data-compact] .search {
+  width: 100%;
+}
+.app[data-compact] .topbar__search {
+  max-width: none;
+}
+.app[data-compact] .row {
+  --row-h-pad: 16px;
+}
+.app[data-compact] .detail-pane {
+  border-radius: var(--md-sys-shape-corner-extra-large) var(--md-sys-shape-corner-extra-large) 0 0;
+  margin: 0 -8px -8px;
+}
+/* An open conversation owns the screen: its toolbar is the only app bar. */
+.app[data-reading] {
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: 'main';
+}
+.app[data-reading] > .topbar {
+  display: none;
+}
+.app[data-reading] .detail-pane {
+  border-radius: 0;
+}
+.app[data-reading] .thread-toolbar {
+  padding: 0 4px;
+  gap: 0;
+}
+/* Back leads; the actions sit at the trailing edge. */
+.app[data-reading] .thread-toolbar__back {
+  margin-inline-end: auto;
+}
+.app[data-reading] .thread-toolbar__spacer {
+  display: none;
+}
+.app[data-compact] .thread {
+  padding: 4px 16px 32px;
+}
+.app[data-compact] .thread__head,
+.app[data-compact] .thread-note {
+  padding-left: 0;
+  margin-left: 0;
+}
+.app[data-compact] .thread__subject {
+  font-size: 22px;
+  line-height: 28px;
+}
+.app[data-compact] .msg--collapsed {
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+}
+.app[data-compact] .msg--collapsed > .msg__date {
+  grid-column: auto;
+}
+.app[data-compact] .msg--collapsed .msg__snippet,
+.app[data-compact] .msg--collapsed .msg__clip {
+  display: none;
+}
+.app[data-compact] .msg__email {
+  display: none;
+}
+/* Designed mail gets the card's width back on a phone: 8px from its edge. */
+.app[data-compact] .msg__body[data-designed] {
+  margin-inline: -12px;
+  border-radius: var(--md-sys-shape-corner-medium);
+}
+.app[data-compact] .thread-toolbar__pos {
+  display: none;
+}
+.compact-fab {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 400;
+  background: var(--app-compose);
+  color: var(--on-app-compose);
+}
+/* The snackbar viewport is portalled to body. */
+body:has(.app[data-compact]) .m3-snackbar-viewport {
+  left: 16px;
+  bottom: 88px;
+}
+
+/* Phone list chrome (phoneChrome.ts): the title bar scrolls away and the search bar leaves while scrolling down, by transforms only. The pane's extra height is added before it moves up and taken back once settled, so no gap opens. */
+.app[data-compact] .topbar {
+  position: relative;
+  z-index: 2;
+  background: var(--app-frame);
+  transition: transform var(--md-sys-motion-spatial-default);
+}
+.app[data-compact]:not([data-reading]) .main,
+.app[data-compact]:not([data-reading]) .list-pane {
+  transition:
+    transform var(--md-sys-motion-spatial-default),
+    margin-bottom 0s linear 435ms;
+}
+.app[data-compact][data-chrome] .main {
+  overflow: clip;
+}
+.app[data-compact][data-chrome] .list-pane {
+  transform: translateY(calc(-1 * var(--chrome-bar, 84px)));
+  margin-bottom: calc(-1 * var(--chrome-bar, 84px));
+  transition:
+    transform var(--md-sys-motion-spatial-default),
+    margin-bottom 0s;
+}
+.app[data-compact][data-chrome='hidden'] .topbar {
+  transform: translateY(-100%);
+}
+/* The selection toolbar takes the title bar's place and always shows. */
+.app[data-compact][data-chrome] .list-pane[data-selecting] {
+  transform: none;
+  margin-bottom: 0;
+}
+.app[data-compact][data-chrome='hidden'] .main {
+  transform: translateY(-64px);
+  margin-bottom: -64px;
+  transition:
+    transform var(--md-sys-motion-spatial-default),
+    margin-bottom 0s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .app[data-compact] .topbar,
+  .app[data-compact]:not([data-reading]) .main,
+  .app[data-compact]:not([data-reading]) .list-pane,
+  .app[data-compact][data-chrome] .list-pane,
+  .app[data-compact][data-chrome='hidden'] .main {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .row--selected,
+  .row--active,
+  .rail-item[data-active],
+  .settings-nav-item[data-active] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+  .row[data-range='add'] {
+    outline: 2px dashed Highlight;
+  }
+  .row[data-range='remove'] {
+    outline: 2px dashed CanvasText;
+  }
+}
+
+/* Inline choices (settings rows): an outlined small button with a trailing arrow, 40 tall, full round; it squares off a step when open. */
+.m3-select-field {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 40px;
+  min-width: 120px;
+  padding: 0 8px 0 16px;
+  border: none;
+  /* Half the height, not the "full" token, so the press below eases instead of snapping. */
+  border-radius: 20px;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--md-sys-color-outline-variant);
+  color: var(--md-sys-color-on-surface-variant);
+  font: 500 14px/20px var(--md-ref-typeface-plain);
+  letter-spacing: 0.1px;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    box-shadow var(--md-sys-motion-effects-fast),
+    background-color var(--md-sys-motion-effects-fast),
+    border-radius var(--md-sys-motion-spatial-fast);
+}
+@media (hover: hover) {
+  .m3-select-field:hover {
+    background: color-mix(in srgb, var(--md-sys-color-on-surface-variant) 8%, transparent);
+  }
+}
+/* A press squeezes the corners; once open it's a pill again. */
+.m3-select-field:active:not([data-popup-open]) {
+  border-radius: var(--md-sys-shape-corner-medium);
+}
+.m3-select-field:focus-visible {
+  outline: 3px solid var(--md-sys-color-secondary);
+  outline-offset: 2px;
+}
+.m3-select-field__value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.m3-select-field__icon {
+  display: inline-flex;
+  color: var(--md-sys-color-on-surface-variant);
+  transition: transform var(--md-sys-motion-spatial-fast);
+}
+.m3-select-field[data-popup-open] .m3-select-field__icon {
+  transform: rotate(180deg);
+}
+/* In forms it's an exposed dropdown: an outlined text field (56, 4 corners, floating label). */
+.m3-select-field--labelled,
+.m3-select-field--labelled:active,
+.m3-select-field--labelled[data-popup-open] {
+  height: 56px;
+  width: 100%;
+  padding: 0 12px 0 16px;
+  border-radius: var(--md-sys-shape-corner-extra-small);
+  box-shadow: inset 0 0 0 1px var(--md-sys-color-outline);
+  color: var(--md-sys-color-on-surface);
+  font: 400 16px/24px var(--md-ref-typeface-plain);
+  letter-spacing: 0.5px;
+}
+.m3-select-field--labelled[data-popup-open],
+.m3-select-field--labelled:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--md-sys-color-primary);
+  outline: none;
+}
+.m3-select-field__label {
+  position: absolute;
+  left: 10px;
+  top: -8px;
+  padding: 0 4px;
+  background: var(--field-bg);
+  color: var(--md-sys-color-on-surface-variant);
+  font: 400 12px/16px var(--md-ref-typeface-plain);
+}
+.m3-select-popup {
+  min-width: max(var(--anchor-width), 160px);
+}
+
+
+/* As the list narrows the sender preview goes first, then "new", then the names. */
+.category-tabs .m3-tab {
+  max-width: 320px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.category-tabs .m3-tab__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.category-tabs .tab-badge {
+  flex: none;
+  margin-left: 0;
+}
+@container list (max-width: 960px) {
+  .category-tabs .m3-tab__supporting {
+    display: none;
+  }
+}
+@container list (max-width: 760px) {
+  .category-tabs .tab-badge__suffix {
+    display: none;
+  }
+  .category-tabs .m3-tab {
+    padding-inline: 12px;
+  }
+}
+
+/* Phone rows: one label chip on the preview line, a full-size star. */
+.row__labels--compact {
+  display: none;
+}
+.label-chip--more {
+  padding: 0 8px;
+}
+.app[data-compact] .row__labels--inline {
+  display: none;
+}
+.app[data-compact] .row__labels--compact {
+  display: inline-flex;
+  margin: 2px 0;
+}
+.app[data-compact] .row__main {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 8px;
+  align-items: center;
+}
+.app[data-compact] .row__subject {
+  grid-column: 1 / -1;
+}
+.app[data-compact] .row__labels--compact + .row__snippet,
+.app[data-compact] .row__snippet {
+  grid-column: auto;
+}
+.app[data-compact] .row__labels--compact ~ .row__snippet {
+  grid-column: 2;
+}
+.app[data-compact] .row__main:not(:has(.row__labels--compact)) .row__snippet {
+  grid-column: 1 / -1;
+}
+.app[data-compact] .row__star {
+  width: 48px;
+  height: 48px;
+  margin: -12px -14px -12px 0;
+}
+.app[data-compact] .row__star .m3-icon {
+  --icon-size: 24px !important;
+}
+
+/* Phone thread: Reply and Forward pinned to the bottom, as in Gmail Android. */
+.app[data-compact] .reply-bar {
+  align-items: stretch;
+  gap: 12px;
+  z-index: 5;
+  margin: auto -16px -32px;
+  padding: 12px 16px 16px;
+  background: var(--md-sys-color-surface-container);
+  border-radius: var(--md-sys-shape-corner-extra-large) var(--md-sys-shape-corner-extra-large) 0 0;
+}
+.app[data-compact] .reply-bar::before {
+  content: none;
+}
+.app[data-compact] .reply-bar__buttons .m3-button {
+  flex: 1 1 0;
+  padding: 0 16px;
+}
+.app[data-compact] .reply-bar__buttons .m3-button:active {
+  /* The pressed button takes 15% from its neighbours. */
+  flex-grow: 1.15;
+}
+.app[data-compact] .reply-suggest {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  /* Edge to edge of the sheet, fading under its gutters; the padding keeps focus rings unclipped. */
+  margin: -4px -16px;
+  padding: 4px 16px;
+  scroll-padding-inline: 16px;
+  scroll-snap-type: x proximity;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 16px, #000 calc(100% - 24px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 16px, #000 calc(100% - 24px), transparent);
+}
+.app[data-compact] .reply-suggest > * {
+  scroll-snap-align: start;
+  flex: none;
+}
+.app[data-compact] .reply-suggest__card {
+  width: min(260px, 78vw);
+}
+.app[data-compact] .reply-suggest::-webkit-scrollbar {
+  display: none;
+}
+
+/* The date never gets cut. */
+.att-card__byline {
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+}
+.att-card__byline-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.att-card__byline-date {
+  flex: none;
+}
+.adv-check {
+  gap: 2px;
+}
+.adv-check .m3-checkbox {
+  margin-left: -11px;
+}
+.adv-check > span {
+  cursor: pointer;
+}
+
+/* ---------- Smart annotations (codes, packages, invites, deals) ---------- */
+.row__smart {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font: 500 14px/20px var(--md-ref-typeface-plain);
+  color: var(--md-sys-color-on-surface-variant);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.row__smart[data-tone='delivered'] {
+  color: var(--md-sys-color-tertiary);
+}
+.row__smart[data-tone='out-for-delivery'],
+.row__smart[data-tone='shipped'] {
+  color: var(--md-sys-color-primary);
+}
+.row__smart[data-tone='problem'] {
+  color: var(--md-sys-color-error);
+}
+.row__nudge {
+  color: #b06000;
+  font-weight: 500;
+}
+:root[data-theme-mode='dark'] .row__nudge {
+  color: #fcc934;
+}
+.smart-chips {
+  display: inline-flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.smart-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  /* AssistChipTokens: 8 leading, 18px icon, 8 between, 16 trailing. */
+  gap: 8px;
+  height: 32px;
+  padding: 0 16px 0 8px;
+  border: none;
+  border-radius: var(--md-sys-shape-corner-small);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--md-sys-color-outline-variant);
+  color: var(--md-sys-color-on-surface);
+  font: 500 14px/20px var(--md-ref-typeface-plain);
+  letter-spacing: 0.1px;
+  white-space: nowrap;
+  cursor: pointer;
+  flex: none;
+  transition:
+    border-radius var(--md-sys-motion-spatial-fast),
+    background-color var(--md-sys-motion-effects-fast);
+}
+.smart-chip .m3-icon {
+  color: var(--md-sys-color-primary);
+}
+@media (hover: hover) {
+  .smart-chip:not(.smart-chip--static):hover {
+    background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+  }
+}
+.smart-chip:not(.smart-chip--static):active {
+  border-radius: 4px;
+}
+.smart-chip--static {
+  cursor: default;
+}
+.smart-chip--deal {
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+  box-shadow: none;
+}
+.smart-chip--deal .m3-icon {
+  color: inherit;
+}
+.smart-chip--code {
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+  box-shadow: none;
+  padding-right: 16px;
+}
+.smart-chip--code .m3-icon {
+  color: inherit;
+}
+.smart-chip--code:active {
+  border-radius: 8px;
+}
+/* Copied: tertiary and a pill until it settles back. */
+.smart-chip {
+  transition:
+    border-radius var(--md-sys-motion-spatial-fast),
+    background-color var(--md-sys-motion-effects-default),
+    color var(--md-sys-motion-effects-default),
+    box-shadow var(--md-sys-motion-effects-default);
+}
+.smart-chip[data-confirmed],
+.smart-chip[data-confirmed]:hover {
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+  box-shadow: none;
+  border-radius: var(--md-sys-shape-corner-full);
+}
+.smart-chip[data-confirmed] .m3-icon {
+  color: inherit;
+}
+.smart-chip[data-confirmed]:active {
+  border-radius: var(--md-sys-shape-corner-small);
+}
+.smart-chip__code {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 1px;
+  margin-right: 4px;
+}
+
+/* Summary cards at the top of a thread */
+.smart-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 16px;
+  max-width: 640px;
+}
+.app[data-compact] .smart-cards {
+  margin-left: 0;
+}
+.smart-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 20px 20px 16px;
+  border-radius: var(--md-sys-shape-corner-extra-large);
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+  animation: m3-pop 360ms var(--md-sys-motion-easing-emphasized-decelerate);
+}
+.smart-card__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+.smart-card__badge {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+.smart-card[data-kind='package'] .smart-card__badge,
+.smart-card[data-kind='deal'] .smart-card__badge {
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+}
+.smart-card[data-kind='code'] .smart-card__badge,
+.smart-card[data-kind='event'] .smart-card__badge {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+.smart-card__titles {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.smart-card__supporting {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.smart-card__big {
+  margin: 8px 0 4px;
+  font: 400 36px/44px var(--md-ref-typeface-brand);
+  font-variation-settings: 'ROND' 100;
+  letter-spacing: -0.3px;
+  font-variant-numeric: tabular-nums;
+}
+.smart-card__big[data-tone='delivered'] {
+  color: var(--md-sys-color-tertiary);
+}
+.smart-card__big[data-tone='problem'] {
+  color: var(--md-sys-color-error);
+}
+.smart-card__code {
+  margin: 12px 0 4px;
+  font: 500 44px/52px var(--md-ref-typeface-brand);
+  font-variation-settings: 'ROND' 100;
+  letter-spacing: 6px;
+  font-variant-numeric: tabular-nums;
+  user-select: all;
+}
+.smart-card__note {
+  margin: 0 0 4px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.smart-card__route {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 8px 0 4px;
+  font: 400 40px/48px var(--md-ref-typeface-brand);
+  font-variation-settings: 'ROND' 100;
+  letter-spacing: 1px;
+}
+.smart-card__route-plane {
+  transform: rotate(90deg);
+  color: var(--md-sys-color-primary);
+}
+.smart-card__row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 52px;
+  padding: 4px 0;
+}
+.smart-card__row-icon {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.smart-card__row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.smart-card__row-text > :last-child {
+  overflow-wrap: anywhere;
+}
+.smart-card__row-label {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.smart-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.smart-card__actions--event {
+  justify-content: space-between;
+}
+.smart-card__rsvp {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+/* Four stops on a track, filled up to today. */
+.tracker {
+  list-style: none;
+  margin: 12px 0 8px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+.tracker__step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.tracker__step::before {
+  content: '';
+  position: absolute;
+  top: 9px;
+  left: 0;
+  right: 0;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--md-sys-color-surface-container-highest);
+}
+.tracker__step:last-child::before {
+  right: auto;
+  width: 20px;
+}
+.tracker__step[data-done]::before {
+  background: var(--md-sys-color-primary);
+}
+.tracker__step[data-current]::before {
+  background: linear-gradient(to right, var(--md-sys-color-primary) 0 22px, var(--md-sys-color-surface-container-highest) 22px);
+}
+.tracker__step[data-current]:last-child::before {
+  background: var(--md-sys-color-primary);
+}
+.tracker__dot {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-primary);
+  transition: transform var(--md-sys-motion-spatial-fast);
+}
+.tracker__step[data-done] .tracker__dot {
+  background: var(--md-sys-color-primary);
+}
+.tracker__step[data-current] .tracker__dot {
+  transform: scale(1.2);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--md-sys-color-primary) 22%, transparent);
+}
+.tracker[data-problem] .tracker__step[data-current] .tracker__dot {
+  background: var(--md-sys-color-error);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--md-sys-color-error) 22%, transparent);
+}
+.tracker__label {
+  color: var(--md-sys-color-on-surface-variant);
+  padding-right: 8px;
+}
+.tracker__step[data-current] .tracker__label {
+  color: var(--md-sys-color-on-surface);
+}
+/* A narrow pane can't fit four labels: keep the current step and let the dots say the rest. */
+.tracker {
+  container-type: inline-size;
+}
+@container (max-width: 300px) {
+  .tracker__step:not([data-current]) .tracker__label {
+    visibility: hidden;
+  }
+  .tracker__step[data-current] .tracker__label {
+    position: absolute;
+    top: 30px;
+    right: 0;
+    white-space: nowrap;
+    padding: 0;
+  }
+  .tracker__step:not(:last-child)[data-current] .tracker__label {
+    right: auto;
+    left: 0;
+  }
+}
+
+/* Banners inside a thread */
+.banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  margin: 12px 0 0;
+  padding: 14px 16px;
+  border-radius: var(--md-sys-shape-corner-large);
+}
+/* Thread-wide banners line up with the subject and cards, not the message text. */
+.banner--thread {
+  margin: 0 0 16px;
+}
+.banner__icon {
+  flex: none;
+}
+.banner__text {
+  flex: 1 1 260px;
+  min-width: 0;
+  margin: 0;
+}
+.banner__text p {
+  margin: 0;
+}
+.banner__text p + p {
+  margin-top: 2px;
+}
+.banner__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.banner--error {
+  background: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
+}
+.banner--error .m3-button--outlined {
+  color: inherit;
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+.banner--warning {
+  background: #fef7e0;
+  color: #5c3c00;
+}
+.banner--warning .m3-button--filled {
+  background: #b06000;
+  color: #fff;
+}
+.banner--warning .m3-button--text {
+  color: #5c3c00;
+}
+:root[data-theme-mode='dark'] .banner--warning {
+  background: #4a3a00;
+  color: #fde293;
+}
+:root[data-theme-mode='dark'] .banner--warning .m3-button--filled {
+  background: #fcc934;
+  color: #3a2a00;
+}
+:root[data-theme-mode='dark'] .banner--warning .m3-button--text {
+  color: #fde293;
+}
+.banner--quiet {
+  padding: 6px 8px 6px 16px;
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* Purchases */
+.purchases__section {
+  margin: 24px 16px 8px;
+}
+.purchases__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+.package-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 20px;
+  border-radius: var(--md-sys-shape-corner-extra-large);
+  background: var(--md-sys-color-surface-container-lowest);
+}
+:root[data-theme-mode='dark'] .package-tile {
+  background: var(--md-sys-color-surface-container-high);
+}
+.package-tile__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 8px;
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+.package-tile[data-status='delivered'] .package-tile__icon {
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+}
+.package-tile[data-status='problem'] .package-tile__icon {
+  background: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
+}
+.package-tile p {
+  margin: 0;
+}
+.package-tile__from {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.package-tile__status {
+  font: 400 24px/32px var(--md-ref-typeface-brand);
+  font-variation-settings: 'ROND' 100;
+}
+/* LinearProgressIndicatorTokens: a 4px indicator, a 4px gap, then the track, ending in a stop dot. */
+.package-tile__bar {
+  position: relative;
+  height: 4px;
+  margin: 12px 0 8px;
+  --bar: var(--md-sys-color-primary);
+}
+.package-tile__bar span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--p);
+  border-radius: 2px;
+  background: var(--bar);
+}
+.package-tile__bar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--p) + 4px);
+  right: 0;
+  border-radius: 2px;
+  background: var(--md-sys-color-secondary-container);
+}
+.package-tile__bar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--bar);
+}
+.package-tile[data-status='delivered'] .package-tile__bar::before,
+.package-tile[data-status='delivered'] .package-tile__bar::after {
+  display: none;
+}
+.package-tile[data-status='delivered'] .package-tile__bar {
+  --bar: var(--md-sys-color-tertiary);
+}
+.package-tile[data-status='problem'] .package-tile__bar {
+  --bar: var(--md-sys-color-error);
+}
+.package-tile__meta {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.package-tile__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.purchase-row {
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  grid-template-areas: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  background: var(--row-unread);
+  color: var(--md-sys-color-on-surface);
+}
+.purchase-row__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.purchase-row__text > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.purchase-row__meta {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.purchase-row__amount {
+  font: 500 16px/24px var(--md-ref-typeface-plain);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Pull to refresh */
+.list-pane {
+  position: relative;
+}
+.ptr {
+  position: absolute;
+  z-index: 6;
+  top: 56px;
+  left: 50%;
+  width: 48px;
+  height: 48px;
+  pointer-events: none;
+  opacity: 0;
+  transition:
+    transform var(--md-sys-motion-spatial-default),
+    opacity var(--md-sys-motion-effects-fast);
+}
+.ptr[data-active] {
+  transition: none;
+}
+.ptr__arrow {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  box-shadow: var(--md-sys-elevation-2);
+}
+.ptr .m3-loading--contained {
+  box-shadow: var(--md-sys-elevation-2);
+}
+.list-scroll {
+  transition: transform var(--md-sys-motion-spatial-default);
+}
+.list-scroll[data-pulling] {
+  transition: none;
+  overscroll-behavior-y: none;
+}
+
+.settings-subhead {
+  /* Android's settings category header: LabelLarge in primary. */
+  margin: 28px 16px 8px;
+  color: var(--md-sys-color-primary);
+  font-weight: 600;
+}
+
+.nudge-row {
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  grid-template-areas: none;
+  background: var(--row-unread);
+  color: var(--md-sys-color-on-surface);
+}
+.nudge-row__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.nudge-row__text > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nudge-row__subject {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.scheduled-soon__when {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--md-sys-color-primary);
+  font-weight: 500;
+}
+.scheduled-soon__more {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  min-height: 48px;
+  border: none;
+  font: inherit;
+  color: var(--md-sys-color-primary);
+  cursor: pointer;
+}
+.nudges + .list-section,
+.nudges + .seg-list {
+  margin-top: 12px;
+}
+
+.qs-switch-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.qs-switch-desc {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.diagnostics {
+  max-width: 520px;
+  margin: 4px 0 12px;
+  text-align: left;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.diagnostics summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: fit-content;
+  height: 40px;
+  margin: 0 auto;
+  padding: 0 12px 0 8px;
+  border-radius: 20px;
+  list-style: none;
+  cursor: pointer;
+}
+.diagnostics summary::-webkit-details-marker {
+  display: none;
+}
+@media (hover: hover) {
+  .diagnostics summary:hover {
+    background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+  }
+}
+.diagnostics summary > .m3-icon {
+  transition: transform var(--md-sys-motion-spatial-fast);
+}
+.diagnostics[open] summary > .m3-icon {
+  transform: rotate(180deg);
+}
+.diagnostics pre {
+  margin: 8px 0 0;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--md-sys-color-surface-container-high);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Quick filters and Pause inbox ---------- */
+.list-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px 12px;
+  animation: m3-pop 240ms var(--md-sys-motion-easing-emphasized-decelerate);
+}
+.pause-banner {
+  animation: m3-pop 300ms var(--md-sys-motion-easing-emphasized-decelerate);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 0 0 12px;
+  padding: 12px 12px 12px 16px;
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+}
+.pause-banner__icon {
+  flex: none;
+}
+.pause-banner__text {
+  flex: 1;
+  min-width: 0;
+}
+.pause-banner__text p {
+  margin: 0;
+}
+.pause-banner .m3-button {
+  flex: none;
+}
+.pause-banner .m3-button {
+  color: var(--md-sys-color-on-tertiary-container);
+}
+/* A quiet pill under the message, as far from the card's bottom edge as from the message. */
+.msg__trackers {
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  gap: 6px;
+  margin: 16px 0 -8px;
+  padding: 6px 12px 6px 10px;
+  color: var(--md-sys-color-on-surface-variant);
+  background: var(--md-sys-color-surface-container-high);
+  border-radius: var(--md-sys-shape-corner-full);
+  outline: none;
+}
+.msg__trackers:focus-visible {
+  outline: 2px solid var(--md-sys-color-secondary);
+  outline-offset: 2px;
+}
+@media (max-width: 379px) {
+  .app[data-compact] .reply-bar__buttons {
+    gap: 6px;
+  }
+  .app[data-compact] .reply-bar__buttons .m3-button {
+    padding: 0 8px;
+    gap: 6px;
+    font-size: 14px;
+  }
+}
+/* A narrow list tightens the toolbar's gaps rather than clipping the last action. */
+@container list (max-width: 520px) {
+  .selection-bar,
+  .selection-bar__actions {
+    gap: 0;
+  }
+  .selection-bar .toolbar-divider {
+    width: 4px;
+  }
+  .selection-bar__count {
+    margin: 0 4px;
+  }
+}
+
+/* ---------- Merged inboxes ---------- */
+/* One line that scrolls sideways, like Gmail Android's chip rows. */
+.account-filter {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  scroll-padding-inline: 16px;
+  mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+}
+.account-filter::-webkit-scrollbar {
+  display: none;
+}
+.account-filter > * {
+  flex: none;
+}
+.account-filter__failed {
+  color: var(--md-sys-color-error);
+}
+/* M3 chips are 32 tall with a 48 touch target. */
+.account-filter__chip::after {
+  content: '';
+  position: absolute;
+  inset: -8px 0;
+}
+.account-filter__dot {
+  margin-left: 2px;
+}
+.account-filter__count {
+  margin-left: 8px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+/* A partial failure, not an outage: the error colour on the icon only. */
+.list-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding: 8px 8px 8px 16px;
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+  transform-origin: top center;
+  animation: list-notice-in var(--md-sys-motion-spatial-default) backwards;
+}
+@keyframes list-notice-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .list-notice {
+    animation: none;
+  }
+}
+.list-notice__icon {
+  flex: none;
+  color: var(--md-sys-color-error);
+}
+.list-notice__text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.row__lead {
+  position: relative;
+}
+/* A dot on the photo, ringed in the row's own surface. */
+.row__account-dot {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--account-color);
+  box-shadow: 0 0 0 2px var(--row-read);
+  pointer-events: none;
+}
+.row--unread .row__account-dot {
+  box-shadow: 0 0 0 2px var(--row-unread);
+}
+.row--active .row__account-dot {
+  box-shadow: 0 0 0 2px var(--row-open);
+}
+.row--selected .row__account-dot {
+  box-shadow: 0 0 0 2px var(--row-selected);
+}
+@media (forced-colors: active) {
+  .row__account-dot {
+    background: CanvasText;
+  }
+}
+
+/* ---------- Accounts settings ---------- */
+.account-setting {
+  gap: 16px;
+}
+.account-setting__text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.account-setting__name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--md-sys-color-on-surface);
+}
+.account-setting__email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.account-setting__tag {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+.account-setting__stack {
+  --stack-bg: var(--md-sys-color-surface-container-low);
+}
+.delegated-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.accounts-empty {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  max-width: 480px;
+  padding: 24px;
+  border-radius: var(--md-sys-shape-corner-extra-large);
+  background: var(--md-sys-color-surface-container-low);
+}
+.accounts-empty__icon {
+  color: var(--md-sys-color-primary);
+}
+.accounts-empty__text {
+  margin: 0 0 8px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.circle-members {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+.circle-members__legend {
+  padding: 0;
+  margin-bottom: 8px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.circle-member {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 56px;
+  padding: 4px 4px 4px 16px;
+  border-radius: var(--md-sys-shape-corner-extra-small);
+  background: var(--md-sys-color-surface-container);
+  cursor: pointer;
+  transition:
+    border-radius var(--md-sys-motion-spatial-fast),
+    background-color var(--md-sys-motion-effects-fast);
+}
+.circle-member:first-of-type {
+  border-top-left-radius: var(--md-sys-shape-corner-large);
+  border-top-right-radius: var(--md-sys-shape-corner-large);
+}
+.circle-member:last-of-type {
+  border-bottom-left-radius: var(--md-sys-shape-corner-large);
+  border-bottom-right-radius: var(--md-sys-shape-corner-large);
+}
+.circle-member:hover {
+  border-radius: var(--md-sys-shape-corner-medium);
+}
+.circle-member[data-selected] {
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+.circle-member__text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.circle-member__email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.circle-member[data-selected] .circle-member__email {
+  color: inherit;
+  opacity: 0.8;
+}
+.circle-members__error {
+  margin: 4px 16px 0;
+  color: var(--md-sys-color-error);
+}
+.circle-start {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  cursor: pointer;
+}
+.circle-start__text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+.circle-start__desc {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.account-setting__tag--muted {
+  background: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-surface-variant);
+}
+.account-setting__count {
+  flex: none;
+  color: var(--md-sys-color-on-surface-variant);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Narrow windows: full screen, sections as a scrolling row of pills. */
+@media (max-width: 760px) {
+  .settings {
+    inset: 0;
+    left: 0;
+    top: 0;
+    translate: none;
+    width: 100vw;
+    height: 100dvh;
+    border-radius: 0;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
+  .settings__appbar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 64px;
+    padding: 0 16px 0 4px;
+    color: var(--md-sys-color-on-surface);
+  }
+  .settings__title,
+  .settings__close,
+  .settings__footer {
+    display: none;
+  }
+  .settings__bar {
+    min-height: 48px;
+  }
+  .settings__nav {
+    padding: 4px 0 8px;
+  }
+  .settings-search {
+    margin: 0 16px 8px;
+  }
+  .settings__sections {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 16px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .settings__sections::-webkit-scrollbar {
+    display: none;
+  }
+  .settings__title {
+    flex: none;
+    margin: 0 12px 0 4px;
+  }
+  .settings-nav-item {
+    flex: none;
+    height: 40px;
+    gap: 8px;
+    padding: 0 16px 0 12px;
+  }
+  .settings-nav-item__icon {
+    font-size: 20px !important;
+    width: 20px;
+    height: 20px;
+  }
+  /* Full screen there's no dialog corner to nest in: the pane takes the reading pane's phone shape. */
+  .settings__content {
+    margin: 0 8px 8px;
+    border-radius: var(--md-sys-shape-corner-extra-large);
+  }
+  .settings__bar {
+    padding: 12px 8px 4px 16px;
+  }
+  .settings__scroll {
+    padding: 0 16px 24px;
+  }
+  .setting-row {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .setting-row__text {
+    flex: 1 1 220px;
+  }
+  .setting-row__control {
+    margin-left: auto;
+    max-width: 100%;
+  }
+}
+
+/* A full-round chip outlined in the account's color, so it never reads as a label. */
+.row__account-chip {
+  flex: none;
+  margin-left: 4px;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-sys-color-surface-container-lowest);
+  color: var(--md-sys-color-on-surface-variant);
+  box-shadow: inset 0 0 0 1px var(--account-color);
+  font-weight: 500;
+}
+.row--unread .row__account-chip {
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+.account-setting__name > .md-body-large,
+.account-setting__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (forced-colors: active) {
+  .account-badge {
+    forced-color-adjust: none;
+    background: CanvasText;
+    box-shadow: 0 0 0 2px Canvas;
+  }
+  .account-badge__initial {
+    color: Canvas;
+  }
+  .account-chip {
+    outline: 1px solid CanvasText;
+  }
+}
+@media (max-width: 480px) {
+  .account-setting__count {
+    display: none;
+  }
+}
+
+/* ---------- Account hand-off ---------- */
+/* Switching accounts loads that account's page: the old page fades into this card, and the new page lets it go once its mail shows. */
+.account-travel {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  background: var(--app-frame);
+  color: var(--md-sys-color-on-surface);
+}
+.account-travel__card {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  text-align: center;
+}
+.account-travel__photo {
+  display: grid;
+  place-items: center;
+  margin-bottom: 12px;
+  padding: 3px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px var(--account-color);
+}
+.account-travel__name {
+  font-variation-settings: 'ROND' 100;
+}
+.account-travel__email {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.account-travel__busy {
+  margin-top: 20px;
+}
+.account-travel[data-phase='leaving'] {
+  animation: account-travel-in var(--md-sys-motion-effects-default) both;
+}
+.account-travel[data-phase='leaving'] .account-travel__card {
+  animation: account-travel-card-in var(--md-sys-motion-spatial-default) both;
+}
+.account-travel[data-phase='settled'] {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--md-sys-motion-effects-slow);
+}
+.account-travel[data-phase='settled'] .account-travel__card {
+  transform: scale(1.04);
+  transition: transform var(--md-sys-motion-spatial-slow);
+}
+@keyframes account-travel-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes account-travel-card-in {
+  from {
+    transform: scale(0.9);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .account-travel[data-phase='leaving'] .account-travel__card {
+    animation: none;
+  }
+  .account-travel[data-phase='settled'] .account-travel__card {
+    transform: none;
+  }
+}
+
+/* ---------- At a glance (empty reading pane) ---------- */
+.detail-pane--glance {
+  animation: none;
+}
+.glance {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: clamp(32px, 9vh, 88px) 24px 32px;
+}
+.glance__head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0 16px 8px;
+}
+.glance__mark {
+  margin-bottom: 20px;
+  animation: glance-mark-in 700ms var(--md-spring-0-8) backwards;
+}
+@keyframes glance-mark-in {
+  from {
+    transform: scale(0.5) rotate(-45deg);
+    opacity: 0;
+  }
+}
+.glance__date {
+  margin: 0;
+  color: var(--md-sys-color-tertiary);
+}
+.glance__greeting {
+  margin: 4px 0 0;
+  font: 500 clamp(32px, 3.2vw, 45px) / 1.16 var(--md-ref-typeface-brand);
+  font-variation-settings: 'ROND' 100;
+  letter-spacing: 0;
+  color: var(--md-sys-color-on-surface);
+  text-wrap: balance;
+  transition: opacity var(--md-sys-motion-effects-default);
+}
+/* Holds its line until the name is known, then fades in once. */
+.glance__greeting[data-pending] {
+  opacity: 0;
+}
+/* A section fades in (its rows then step in), even when its data comes after the board is up. */
+.glance__section {
+  margin-top: 24px;
+  animation: fade-in var(--md-sys-motion-effects-default) backwards;
+}
+.glance__section .list-section {
+  margin: 0 16px 8px;
+}
+.glance-row-wrap {
+  position: relative;
+  display: grid;
+  animation: row-in 300ms var(--md-sys-motion-easing-emphasized-decelerate) backwards;
+  animation-delay: min(calc(var(--i, 0) * 30ms), 240ms);
+}
+.glance-row {
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  grid-template-areas: none;
+  width: 100%;
+  min-height: 72px;
+  border: none;
+  font: inherit;
+  text-align: start;
+  background: var(--md-sys-color-surface-container-low);
+  color: var(--md-sys-color-on-surface);
+}
+.glance-row__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.glance-row__title,
+.glance-row__sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.glance-row__sub {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.glance-row__meta {
+  color: var(--md-sys-color-on-surface-variant);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.glance-row__go {
+  color: var(--md-sys-color-on-surface-variant);
+}
+/* The copy action sits over the row's trailing edge so the row stays one target. */
+.glance-row-wrap:has(.glance-row__action) .glance-row {
+  padding-right: 112px;
+}
+.glance-row__action {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  translate: 0 -50%;
+}
+/* Back from a conversation: just a short fade. */
+.glance[data-settled] {
+  animation: fade-in var(--md-sys-motion-effects-fast);
+}
+.glance[data-settled] .glance__mark,
+.glance[data-settled] .glance-row-wrap {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .glance__mark,
+  .glance-row-wrap,
+  .glance__section {
+    animation: none;
+  }
+}
+
+/* ---------- Inbox zero ---------- */
+.inbox-zero {
+  padding-top: clamp(48px, 10vh, 96px);
+}
+.inbox-zero__art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 200px;
+  height: 176px;
+}
+.inbox-zero__shape {
+  grid-area: 1 / 1;
+}
+.inbox-zero__shape--a {
+  z-index: 1;
+  animation: empty-art-in 700ms var(--md-spring-0-8) both;
+}
+.inbox-zero__shape--b,
+.inbox-zero__shape--c {
+  width: 44px;
+  height: 44px;
+  animation: inbox-zero-pop 600ms var(--md-spring-0-8) both;
+}
+.inbox-zero__shape--b {
+  translate: -84px -56px;
+  fill: var(--md-sys-color-tertiary-container);
+  animation-delay: 160ms;
+}
+.inbox-zero__shape--c {
+  width: 32px;
+  height: 32px;
+  translate: 88px 52px;
+  fill: var(--md-sys-color-secondary-container);
+  rotate: 20deg;
+  animation-delay: 240ms;
+}
+@keyframes inbox-zero-pop {
+  from {
+    scale: 0;
+    opacity: 0;
+  }
+}
+.inbox-zero__title {
+  margin: 20px 0 0;
+  font: 500 32px/40px var(--md-ref-typeface-brand);
+  font-variation-settings: 'ROND' 100;
+  color: var(--md-sys-color-on-surface);
+}
+@media (prefers-reduced-motion: reduce) {
+  .inbox-zero__shape--a,
+  .inbox-zero__shape--b,
+  .inbox-zero__shape--c {
+    animation: none;
+  }
+}
+.page__mark {
+  margin-bottom: 4px;
+}

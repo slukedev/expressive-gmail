@@ -1,0 +1,140 @@
+name: CI
+
+# Every push builds the extension for Chrome, Firefox and Safari, and the Safari apps for Mac,
+# iPhone and iPad. The builds are kept as downloadable artifacts on the run.
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build Chrome, Firefox and Safari
+        run: npm run build:all
+
+      - name: No demo mailbox in release builds
+        run: npm run check:no-demo -- .output/chrome-mv3 .output/firefox-mv3 .output/safari-mv3
+
+      - name: Store zips for Chrome and Firefox
+        run: npm run zip
+
+      - name: Upload Chrome and Firefox builds
+        uses: actions/upload-artifact@v5
+        with:
+          name: extensions
+          path: |
+            .output/expressive-gmail-*.zip
+            .output/safari-mv3/
+          # The builds live in .output, which the upload skips unless told otherwise.
+          include-hidden-files: true
+          retention-days: 30
+
+  e2e:
+    name: e2e (${{ matrix.project }} ${{ matrix.shard }})
+    # One job per browser, side by side: the whole suite on one runner takes longer than its time limit.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # WebKit on Linux is too slow for two workers on a 2-core runner (tests time out under load),
+    # so it runs one worker in two shards.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { project: chromium, workers: 2, shard: 1/1 }
+          - { project: phone, workers: 2, shard: 1/1 }
+          - { project: webkit, workers: 1, shard: 1/2 }
+          - { project: webkit, workers: 1, shard: 2/2 }
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps ${{ matrix.project == 'chromium' && 'chromium' || 'webkit' }}
+
+      - name: End-to-end tests (${{ matrix.project }} ${{ matrix.shard }})
+        run: npx playwright test --project=${{ matrix.project }} --workers=${{ matrix.workers }} --shard=${{ matrix.shard }}
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-report-${{ matrix.project }}-${{ strategy.job-index }}
+          path: playwright-report/
+          retention-days: 7
+
+  safari-apps:
+    # Unsigned builds, to prove the Xcode projects build; signed ones come from npm run release:mac and release:appstore.
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Use the newest Xcode
+        # The Mac app's icon is an Icon Composer document, which needs Xcode 26 or later.
+        run: |
+          sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+          xcodebuild -version
+
+      - name: Mac app
+        run: |
+          npm run safari:xcode
+          xcodebuild -project "safari/Expressive Gmail/Expressive Gmail.xcodeproj" -scheme "Expressive Gmail" -configuration Release \
+            -destination 'generic/platform=macOS' -derivedDataPath build/mac CODE_SIGNING_ALLOWED=NO build
+
+      - name: iPhone and iPad app
+        run: |
+          npm run safari:ios
+          xcodebuild -project "safari-ios/Expressive Gmail/Expressive Gmail.xcodeproj" -scheme "Expressive Gmail" -configuration Release \
+            -sdk iphonesimulator -derivedDataPath build/ios CODE_SIGNING_ALLOWED=NO build
+
+      - name: Zip the apps
+        run: |
+          ditto -c -k --keepParent "build/mac/Build/Products/Release/Expressive Gmail.app" expressive-gmail-mac-unsigned.zip
+          ditto -c -k --keepParent "build/ios/Build/Products/Release-iphonesimulator/Expressive Gmail.app" expressive-gmail-ios-simulator.zip
+
+      - name: Upload Safari apps
+        uses: actions/upload-artifact@v5
+        with:
+          name: safari-apps
+          path: expressive-gmail-*.zip
+          retention-days: 30

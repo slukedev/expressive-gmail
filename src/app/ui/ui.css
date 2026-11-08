@@ -1,0 +1,1875 @@
+/* M3 Expressive components. Dimensions follow the Compose material3 token files. */
+
+/* ---------- Icon ---------- */
+.m3-icon {
+  font-family: 'Material Symbols Rounded';
+  font-weight: normal;
+  font-style: normal;
+  font-size: var(--icon-size, 24px);
+  width: var(--icon-size, 24px);
+  height: var(--icon-size, 24px);
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  user-select: none;
+  white-space: nowrap;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+  font-variation-settings: 'FILL' 0, 'wght' var(--icon-wght, 400), 'GRAD' 0, 'opsz' 24;
+  transition: font-variation-settings var(--md-sys-motion-effects-default);
+}
+.m3-icon[data-filled] {
+  font-variation-settings: 'FILL' 1, 'wght' var(--icon-wght, 400), 'GRAD' 0, 'opsz' 24;
+}
+
+/* ---------- Ripple / state layer ---------- */
+.m3-ripple {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+.m3-ripple::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity var(--md-sys-motion-effects-fast);
+}
+@media (hover: hover) {
+  :hover > .m3-ripple:not([data-disabled])::before {
+    opacity: var(--md-sys-state-hover);
+  }
+}
+:focus-visible > .m3-ripple:not([data-disabled])::before,
+[data-highlighted] > .m3-ripple::before {
+  opacity: var(--md-sys-state-focus);
+}
+.m3-ripple-wave {
+  position: absolute;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: var(--md-sys-state-pressed);
+  transform: scale(0.2);
+  animation: m3-ripple-grow 450ms var(--md-sys-motion-easing-standard) forwards;
+  transition: opacity 375ms linear;
+}
+.m3-ripple-wave[data-out] {
+  opacity: 0;
+}
+@keyframes m3-ripple-grow {
+  to {
+    transform: scale(1);
+  }
+}
+
+/* ---------- Shared control sizing ---------- */
+.m3-button,
+.m3-icon-button,
+.m3-fab,
+.m3-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  margin: 0;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  text-decoration: none;
+  isolation: isolate;
+  outline-offset: 2px;
+  /* Press shape morphs on DefaultEffects so a press never overshoots (Button.kt, IconButton.kt); a group neighbour's squish is FastSpatial. */
+  transition:
+    border-radius var(--md-sys-motion-effects-default),
+    background-color var(--md-sys-motion-effects-default),
+    color var(--md-sys-motion-effects-default),
+    box-shadow var(--md-sys-motion-effects-default),
+    width var(--md-sys-motion-spatial-fast);
+}
+/* Chip.kt: shape morphs on FastSpatial. */
+.m3-chip {
+  transition:
+    border-radius var(--md-sys-motion-spatial-fast),
+    background-color var(--md-sys-motion-effects-default),
+    color var(--md-sys-motion-effects-default),
+    box-shadow var(--md-sys-motion-effects-default);
+}
+.m3-button > :not(.m3-ripple),
+.m3-icon-button > :not(.m3-ripple),
+.m3-fab > :not(.m3-ripple),
+.m3-chip > :not(.m3-ripple) {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------- Button ---------- */
+.m3-button {
+  gap: 8px;
+  font: 500 14px/20px var(--md-ref-typeface-plain);
+  letter-spacing: 0.1px;
+  min-width: 48px;
+}
+.m3-button.m3-size--xs {
+  height: 32px;
+  padding: 0 12px;
+  gap: 4px;
+  --round: 16px;
+  --square: 12px;
+  --pressed: 8px;
+}
+.m3-button.m3-size--s {
+  height: 40px;
+  padding: 0 16px;
+  --round: 20px;
+  --square: 12px;
+  --pressed: 8px;
+}
+.m3-button.m3-size--m {
+  height: 56px;
+  padding: 0 24px;
+  font: 500 16px/24px var(--md-ref-typeface-plain);
+  letter-spacing: 0.2px;
+  --round: 28px;
+  --square: 16px;
+  --pressed: 12px;
+}
+.m3-button.m3-shape--round {
+  border-radius: var(--round);
+}
+.m3-button.m3-shape--square {
+  border-radius: var(--square);
+}
+.m3-button:active:not(:disabled) {
+  border-radius: var(--pressed);
+}
+.m3-button--filled {
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+}
+.m3-button--tonal {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+.m3-button--outlined {
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  box-shadow: inset 0 0 0 1px var(--md-sys-color-outline-variant);
+}
+.m3-button--text {
+  background: transparent;
+  color: var(--md-sys-color-primary);
+  min-width: 0;
+}
+.m3-button--text.m3-size--s {
+  padding: 0 12px;
+}
+.m3-button--elevated {
+  background: var(--md-sys-color-surface-container-low);
+  color: var(--md-sys-color-primary);
+  box-shadow: var(--md-sys-elevation-1);
+}
+@media (hover: hover) {
+  .m3-button--filled:hover:not(:disabled),
+  .m3-button--tonal:hover:not(:disabled) {
+    box-shadow: var(--md-sys-elevation-1);
+  }
+  .m3-button--elevated:hover:not(:disabled) {
+    box-shadow: var(--md-sys-elevation-2);
+  }
+}
+.m3-button:disabled {
+  cursor: default;
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 10%, transparent);
+  color: color-mix(in srgb, var(--md-sys-color-on-surface-variant) 38%, transparent);
+  box-shadow: none;
+}
+.m3-button--text:disabled,
+.m3-button--outlined:disabled {
+  background: transparent;
+}
+.m3-button--outlined:disabled {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent);
+}
+
+/* ---------- Icon button ---------- */
+.m3-icon-button {
+  padding: 0;
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  flex: none;
+}
+.m3-icon-button.m3-size--xs {
+  height: 32px;
+  --round: 16px;
+  --square: 12px;
+  --pressed: 8px;
+}
+.m3-icon-button.m3-size--xs.m3-width--narrow { width: 28px; }
+.m3-icon-button.m3-size--xs.m3-width--default { width: 32px; }
+.m3-icon-button.m3-size--xs.m3-width--wide { width: 40px; }
+.m3-icon-button.m3-size--s {
+  height: 40px;
+  --round: 20px;
+  --square: 12px;
+  --pressed: 8px;
+}
+.m3-icon-button.m3-size--s.m3-width--narrow { width: 32px; }
+.m3-icon-button.m3-size--s.m3-width--default { width: 40px; }
+.m3-icon-button.m3-size--s.m3-width--wide { width: 52px; }
+.m3-icon-button.m3-size--m {
+  height: 56px;
+  --round: 28px;
+  --square: 16px;
+  --pressed: 12px;
+}
+.m3-icon-button.m3-size--m.m3-width--narrow { width: 48px; }
+.m3-icon-button.m3-size--m.m3-width--default { width: 56px; }
+.m3-icon-button.m3-size--m.m3-width--wide { width: 72px; }
+.m3-icon-button {
+  border-radius: var(--round);
+}
+.m3-icon-button[data-selected]:not(.m3-icon-button--standard) {
+  border-radius: var(--square);
+}
+.m3-icon-button:active:not(:disabled) {
+  border-radius: var(--pressed);
+}
+.m3-icon-button--standard[data-selected] {
+  color: var(--md-sys-color-primary);
+}
+.m3-icon-button--filled {
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+}
+.m3-icon-button--filled[aria-pressed='false'] {
+  background: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface-variant);
+}
+.m3-icon-button--tonal {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+.m3-icon-button--tonal[data-selected] {
+  background: var(--md-sys-color-secondary);
+  color: var(--md-sys-color-on-secondary);
+}
+.m3-icon-button--outlined {
+  box-shadow: inset 0 0 0 1px var(--md-sys-color-outline-variant);
+}
+.m3-icon-button--outlined[data-selected] {
+  background: var(--md-sys-color-inverse-surface);
+  color: var(--md-sys-color-inverse-on-surface);
+  box-shadow: none;
+}
+.m3-icon-button:disabled {
+  cursor: default;
+  color: color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent);
+}
+.m3-icon-button--filled:disabled,
+.m3-icon-button--tonal:disabled {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 10%, transparent);
+}
+
+/* ---------- FAB ---------- ExtendedFab{Small,Medium,Large}Tokens: S 56px/16 corners, M 80px/20, L 96px/28. Pressing squares the corners off a step. */
+.m3-fab {
+  --fab-h: 56px;
+  --fab-r: var(--md-sys-shape-corner-large);
+  --fab-r-pressed: var(--md-sys-shape-corner-medium);
+  --fab-pad: 16px;
+  --fab-gap: 8px;
+  gap: 0;
+  padding: 0 var(--fab-pad);
+  height: var(--fab-h);
+  min-width: var(--fab-h);
+  border-radius: var(--fab-r);
+  box-shadow: var(--md-sys-elevation-3);
+  font: 500 16px/24px var(--md-ref-typeface-plain);
+  letter-spacing: 0.2px;
+  transition:
+    border-radius var(--md-sys-motion-effects-default),
+    background-color var(--md-sys-motion-effects-default),
+    color var(--md-sys-motion-effects-default),
+    box-shadow var(--md-sys-motion-effects-default),
+    height var(--md-sys-motion-spatial-default),
+    padding var(--md-sys-motion-spatial-default),
+    font-size var(--md-sys-motion-spatial-default);
+}
+.m3-fab[data-lowered] {
+  box-shadow: var(--md-sys-elevation-1);
+}
+@media (hover: hover) {
+  .m3-fab:hover {
+    box-shadow: var(--md-sys-elevation-4);
+  }
+  .m3-fab[data-lowered]:hover {
+    box-shadow: var(--md-sys-elevation-2);
+  }
+}
+.m3-fab:active {
+  border-radius: var(--fab-r-pressed);
+}
+.m3-fab--m {
+  --fab-h: 80px;
+  --fab-r: var(--md-sys-shape-corner-large-increased);
+  --fab-r-pressed: var(--md-sys-shape-corner-medium);
+  --fab-pad: 26px;
+  --fab-gap: 16px;
+  font-size: 22px;
+  line-height: 28px;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+.m3-fab--l {
+  --fab-h: 96px;
+  --fab-r: var(--md-sys-shape-corner-extra-large);
+  --fab-r-pressed: var(--md-sys-shape-corner-large);
+  --fab-pad: 28px;
+  --fab-gap: 20px;
+  font-size: 24px;
+  line-height: 32px;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+.m3-fab .m3-icon {
+  transition: font-size var(--md-sys-motion-spatial-default);
+}
+.m3-fab--primary-container {
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+.m3-fab--secondary-container {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+.m3-fab--tertiary-container {
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+}
+.m3-fab--primary {
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+}
+.m3-fab--surface {
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-primary);
+}
+/* FloatingActionButton.kt: the label track goes 1fr <-> 0fr, so the width follows the real label. Expanding: width FastSpatial, fade DefaultEffects; collapsing: DefaultSpatial, FastEffects. */
+.m3-fab__label {
+  display: grid;
+  grid-template-columns: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-columns var(--md-sys-motion-spatial-fast),
+    opacity var(--md-sys-motion-effects-default);
+}
+.m3-fab__label-text {
+  min-width: 0;
+  overflow: hidden;
+}
+.m3-fab__label-text::before {
+  content: '';
+  display: inline-block;
+  width: var(--fab-gap);
+}
+.m3-fab:not([data-extended]) .m3-fab__label {
+  grid-template-columns: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-columns var(--md-sys-motion-spatial-default),
+    opacity var(--md-sys-motion-effects-fast);
+}
+
+/* ---------- Chips ---------- */
+.m3-chip-wrap {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+.m3-chip {
+  height: 32px;
+  padding: 0 16px;
+  gap: 8px;
+  border-radius: var(--md-sys-shape-corner-small);
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  box-shadow: inset 0 0 0 1px var(--md-sys-color-outline-variant);
+  font: 500 14px/20px var(--md-ref-typeface-plain);
+  letter-spacing: 0.1px;
+}
+.m3-chip--assist {
+  color: var(--md-sys-color-on-surface);
+}
+/* ChipsTokens: 12 resting, 8 pressed, a full pill when selected, on the fast spatial spring. */
+.m3-chip--filter {
+  border-radius: var(--md-sys-shape-corner-medium);
+}
+.m3-chip--filter:active:not(:disabled) {
+  border-radius: var(--md-sys-shape-corner-small);
+}
+.m3-chip--filter[data-selected] {
+  border-radius: var(--md-sys-shape-corner-full);
+}
+.m3-chip[data-has-leading] {
+  padding-left: 8px;
+}
+.m3-chip[data-has-trailing] {
+  padding-right: 8px;
+}
+.m3-chip-wrap--removable .m3-chip {
+  padding-right: 36px;
+}
+.m3-chip__leading {
+  color: var(--md-sys-color-primary);
+}
+.m3-chip--filter .m3-chip__leading {
+  color: inherit;
+}
+/* Grows in from the start: width FastSpatial, fade SlowEffects; out on DefaultEffects and FastEffects. */
+.m3-chip__check {
+  margin-left: -18px;
+  opacity: 0;
+  transform: scale(0.6);
+  transition:
+    margin-left var(--md-sys-motion-effects-default),
+    transform var(--md-sys-motion-effects-default),
+    opacity var(--md-sys-motion-effects-fast);
+}
+.m3-chip[data-selected] .m3-chip__check {
+  margin-left: 0;
+  opacity: 1;
+  transform: none;
+  transition:
+    margin-left var(--md-sys-motion-spatial-fast),
+    transform var(--md-sys-motion-spatial-fast),
+    opacity var(--md-sys-motion-effects-slow);
+}
+.m3-chip[data-selected] {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+  box-shadow: none;
+}
+.m3-chip--elevated {
+  box-shadow: var(--md-sys-elevation-1);
+  background: var(--md-sys-color-surface-container-low);
+}
+.m3-chip:disabled {
+  cursor: default;
+  color: color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent);
+}
+.m3-chip__remove {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  width: 24px;
+  height: 24px;
+  border: none;
+  padding: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .m3-chip__remove:hover {
+    background: color-mix(in srgb, currentColor 8%, transparent);
+  }
+}
+
+/* ---------- Tooltip ---------- */
+.m3-tooltip {
+  background: var(--md-sys-color-inverse-surface);
+  color: var(--md-sys-color-inverse-on-surface);
+  border-radius: var(--md-sys-shape-corner-extra-small);
+  padding: 4px 8px;
+  min-height: 24px;
+  max-width: 200px;
+  font: 400 12px/16px var(--md-ref-typeface-plain);
+  letter-spacing: 0.4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transform-origin: var(--transform-origin);
+  /* Tooltip.kt: scale FastSpatial, alpha FastEffects; it leaves on effects only. */
+  transition:
+    opacity var(--md-sys-motion-effects-fast),
+    transform var(--md-sys-motion-spatial-fast);
+}
+.m3-tooltip[data-starting-style],
+.m3-tooltip[data-ending-style] {
+  opacity: 0;
+  transform: scale(0.9);
+}
+.m3-tooltip[data-ending-style] {
+  transition:
+    opacity var(--md-sys-motion-effects-fast),
+    transform var(--md-sys-motion-effects-fast);
+}
+.m3-tooltip[data-instant] {
+  transition-duration: 0ms;
+}
+.m3-tooltip-positioner {
+  z-index: 1000;
+}
+
+/* ---------- Menu ---------- Menu.kt, SegmentedMenuTokens: no outer container; each section is a surface 2px from the next (16 outside, 8 between, tightening to 8 once the pointer is in one). Items 44 min, 12 / 4 corners by position; selected takes tertiary with a leading check. */
+.m3-menu-positioner {
+  z-index: 900;
+  outline: none;
+}
+.m3-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 200px;
+  max-width: 320px;
+  max-height: min(var(--available-height), 560px);
+  overflow-y: auto;
+  /* Room for the sections' shadows inside the scroll box. */
+  padding: 6px;
+  margin: -6px;
+  background: transparent;
+  color: var(--md-sys-color-on-surface);
+  /* A vertical reveal from the anchor's edge, as Compose's DropdownMenu unrolls: the clip runs on FastSpatial, content fades on FastEffects. The clip sits on the padding box, which the scroll box already clips to. */
+  clip-path: inset(0 0 0 0 round 22px);
+  transition:
+    opacity var(--md-sys-motion-effects-fast),
+    clip-path var(--md-sys-motion-spatial-fast),
+    translate var(--md-sys-motion-spatial-fast);
+  outline: none;
+  scrollbar-width: thin;
+}
+.m3-menu[data-starting-style] {
+  opacity: 0;
+  clip-path: inset(0 0 calc(100% - 28px) 0 round 22px);
+  translate: 0 -4px;
+}
+.m3-menu[data-side='top'][data-starting-style] {
+  clip-path: inset(calc(100% - 28px) 0 0 0 round 22px);
+  translate: 0 4px;
+}
+.m3-menu[data-ending-style] {
+  opacity: 0;
+  transition: opacity var(--md-sys-motion-effects-fast);
+}
+.m3-menu-section {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  padding: 2px 4px;
+  border-radius: var(--md-sys-shape-corner-small);
+  background: var(--app-menu-bg);
+  box-shadow: var(--md-sys-elevation-2);
+  transition: border-radius var(--md-sys-motion-spatial-fast);
+}
+.m3-menu-section:first-child {
+  border-top-left-radius: var(--md-sys-shape-corner-large);
+  border-top-right-radius: var(--md-sys-shape-corner-large);
+}
+.m3-menu-section:last-child {
+  border-bottom-left-radius: var(--md-sys-shape-corner-large);
+  border-bottom-right-radius: var(--md-sys-shape-corner-large);
+}
+@media (hover: hover) {
+  .m3-menu:has(.m3-menu-section:hover) .m3-menu-section:not(:hover) {
+    border-radius: var(--md-sys-shape-corner-small);
+  }
+}
+.m3-menu-section:first-child:only-child {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.m3-menu-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 12px;
+  border-radius: var(--md-sys-shape-corner-extra-small);
+  font: 500 14px/20px var(--md-ref-typeface-plain);
+  letter-spacing: 0.1px;
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+  color: var(--md-sys-color-on-surface);
+  transition:
+    border-radius var(--md-sys-motion-spatial-fast),
+    background-color var(--md-sys-motion-effects-fast);
+}
+.m3-menu-section > .m3-menu-item:first-child,
+.m3-menu-section > :first-child .m3-menu-item:first-child {
+  border-top-left-radius: var(--md-sys-shape-corner-medium);
+  border-top-right-radius: var(--md-sys-shape-corner-medium);
+}
+.m3-menu-section > .m3-menu-item:last-child,
+.m3-menu-section > :last-child .m3-menu-item:last-child {
+  border-bottom-left-radius: var(--md-sys-shape-corner-medium);
+  border-bottom-right-radius: var(--md-sys-shape-corner-medium);
+}
+.m3-menu-item[data-highlighted] {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+}
+.m3-menu-item[data-checked],
+.m3-menu-item[data-selected],
+.m3-menu-item[data-popup-open] {
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+  border-radius: var(--md-sys-shape-corner-medium);
+}
+.m3-menu-item[data-checked][data-highlighted],
+.m3-menu-item[data-selected][data-highlighted] {
+  background: color-mix(in srgb, var(--md-sys-color-on-tertiary-container) 8%, var(--md-sys-color-tertiary-container));
+}
+.m3-menu-item[data-disabled] {
+  opacity: 0.38;
+  cursor: default;
+}
+.m3-menu-item__icon {
+  flex: none;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.m3-menu-item[data-checked] .m3-menu-item__icon,
+.m3-menu-item[data-selected] .m3-menu-item__icon,
+.m3-menu-item[data-popup-open] .m3-menu-item__icon {
+  color: inherit;
+}
+.m3-menu-item--danger,
+.m3-menu-item--danger .m3-menu-item__icon {
+  color: var(--md-sys-color-error);
+}
+.m3-menu-item__text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.m3-menu-item__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.m3-menu-item__supporting {
+  font: 400 14px/20px var(--md-ref-typeface-plain);
+  letter-spacing: 0.2px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.m3-menu-item__trailing-icon {
+  color: var(--md-sys-color-on-surface-variant);
+  margin-right: -4px;
+}
+/* The item's icon, or a check when selected; without an icon the check expands in from the start. */
+.m3-menu-lead {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 0;
+  margin-right: -12px;
+  overflow: hidden;
+  transition:
+    width var(--md-sys-motion-spatial-fast),
+    margin var(--md-sys-motion-spatial-fast);
+}
+.m3-menu-lead[data-has-icon],
+.m3-menu-lead[data-checked],
+.m3-menu-item[data-checked] .m3-menu-lead,
+.m3-menu-item[data-selected] .m3-menu-lead {
+  width: 20px;
+  margin-right: 0;
+}
+.m3-menu-lead > * {
+  grid-area: 1 / 1;
+  transition:
+    opacity var(--md-sys-motion-effects-fast),
+    transform var(--md-sys-motion-spatial-fast);
+}
+.m3-menu-lead__check {
+  opacity: 0;
+  transform: scale(0.6);
+}
+.m3-menu-lead[data-checked] .m3-menu-lead__check,
+.m3-menu-item[data-checked] .m3-menu-lead__check,
+.m3-menu-item[data-selected] .m3-menu-lead__check {
+  opacity: 1;
+  transform: none;
+}
+.m3-menu-lead[data-checked] .m3-menu-lead__icon,
+.m3-menu-item[data-checked] .m3-menu-lead__icon {
+  opacity: 0;
+  transform: scale(0.6);
+}
+/* A rule only where one section holds two kinds of item. */
+.m3-menu-separator {
+  height: 1px;
+  margin: 2px 12px;
+  background: var(--md-sys-color-outline-variant);
+  border: none;
+}
+.m3-menu-group-label {
+  padding: 12px 4px 4px 12px;
+  font: 500 14px/20px var(--md-ref-typeface-plain);
+  letter-spacing: 0.1px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* ---------- Dialog ---------- Every modal sits on the scrim, in the dialogs' layer, so a dialog opened from another dims the first. */
+.m3-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 801;
+  background: var(--app-scrim);
+  transition: opacity var(--md-sys-motion-effects-default);
+}
+.m3-scrim[data-starting-style],
+.m3-scrim[data-ending-style] {
+  opacity: 0;
+}
+/* One modal handing over to another: the new backdrop comes in at full strength, so the page never brightens between them. */
+:root:has(.m3-scrim[data-ending-style]) .m3-scrim[data-starting-style] {
+  opacity: 1;
+}
+.m3-dialog {
+  position: fixed;
+  z-index: 801;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  width: min(560px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--md-sys-shape-corner-extra-large);
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+  box-shadow: var(--md-sys-elevation-3);
+  outline: none;
+  overflow: hidden;
+  transform-origin: 50% 40%;
+  transition:
+    opacity var(--md-sys-motion-effects-default),
+    transform var(--md-sys-motion-spatial-default);
+}
+.m3-dialog[data-starting-style] {
+  opacity: 0;
+  transform: scale(0.88) translateY(12px);
+}
+.m3-dialog[data-ending-style] {
+  opacity: 0;
+  transform: scale(0.96);
+  transition:
+    opacity var(--md-sys-motion-effects-fast),
+    transform var(--md-sys-motion-effects-fast);
+}
+.m3-dialog--basic {
+  width: min(400px, calc(100vw - 48px));
+}
+.m3-dialog--large {
+  width: min(840px, calc(100vw - 48px));
+  height: min(720px, calc(100vh - 48px));
+}
+.m3-dialog--full {
+  width: min(1040px, calc(100vw - 48px));
+  height: min(800px, calc(100vh - 48px));
+}
+.m3-dialog__header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 24px 24px 16px;
+}
+.m3-dialog--with-icon .m3-dialog__header {
+  flex-direction: column;
+  text-align: center;
+}
+.m3-dialog__icon {
+  color: var(--md-sys-color-secondary);
+}
+.m3-dialog__title {
+  margin: 0;
+  flex: 1;
+  color: var(--md-sys-color-on-surface);
+}
+.m3-dialog__close {
+  margin: -8px -8px -8px 0;
+}
+.m3-dialog__description {
+  margin: 0;
+  padding: 0 24px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.m3-dialog__content {
+  padding: 16px 24px 0;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+.m3-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 24px;
+}
+
+/* ---------- Checkbox ---------- */
+.m3-checkbox {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.m3-checkbox::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity var(--md-sys-motion-effects-fast);
+}
+@media (hover: hover) {
+  .m3-checkbox:hover::before {
+    opacity: var(--md-sys-state-hover);
+  }
+}
+.m3-checkbox:active::before {
+  opacity: var(--md-sys-state-pressed);
+}
+.m3-checkbox__box {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 2px var(--md-sys-color-on-surface-variant);
+  display: grid;
+  place-items: center;
+  transition:
+    background-color var(--md-sys-motion-effects-fast),
+    box-shadow var(--md-sys-motion-effects-fast);
+}
+.m3-checkbox[data-checked],
+.m3-checkbox[data-indeterminate] {
+  color: var(--md-sys-color-primary);
+}
+.m3-checkbox[data-checked] .m3-checkbox__box,
+.m3-checkbox[data-indeterminate] .m3-checkbox__box {
+  background: var(--md-sys-color-primary);
+  box-shadow: none;
+}
+.m3-checkbox__indicator {
+  color: var(--md-sys-color-on-primary);
+  display: grid;
+  transform: scale(0.6);
+  opacity: 0;
+  clip-path: inset(0 100% 0 0);
+  /* Checkbox.kt: the stroke wipes in on DefaultSpatial while the box fills; unchecking just fades. */
+  transition:
+    transform var(--md-sys-motion-spatial-default),
+    clip-path var(--md-sys-motion-effects-fast),
+    opacity var(--md-sys-motion-effects-fast);
+}
+.m3-checkbox[data-checked] .m3-checkbox__indicator,
+.m3-checkbox[data-indeterminate] .m3-checkbox__indicator {
+  transform: none;
+  opacity: 1;
+  clip-path: inset(0 0 0 0);
+  transition:
+    transform var(--md-sys-motion-spatial-default),
+    clip-path var(--md-sys-motion-spatial-default),
+    opacity var(--md-sys-motion-effects-fast);
+}
+.m3-checkbox:active:not([data-disabled]) .m3-checkbox__box {
+  transform: scale(0.9);
+}
+.m3-checkbox__box {
+  transition:
+    background-color var(--md-sys-motion-effects-fast),
+    box-shadow var(--md-sys-motion-effects-fast),
+    transform var(--md-sys-motion-spatial-fast);
+}
+
+/* ---------- Switch ---------- */
+.m3-switch {
+  position: relative;
+  display: inline-block;
+  vertical-align: middle;
+  width: 52px;
+  height: 32px;
+  flex: none;
+  padding: 0;
+  border: none;
+  border-radius: 16px;
+  background: var(--md-sys-color-surface-container-highest);
+  box-shadow: inset 0 0 0 2px var(--md-sys-color-outline);
+  cursor: pointer;
+  transition:
+    background-color var(--md-sys-motion-effects-default),
+    box-shadow var(--md-sys-motion-effects-default);
+}
+.m3-switch[data-checked] {
+  background: var(--md-sys-color-primary);
+  box-shadow: none;
+}
+.m3-switch__thumb {
+  position: absolute;
+  top: 50%;
+  left: 16px;
+  width: 16px;
+  height: 16px;
+  margin: -8px;
+  border-radius: 50%;
+  background: var(--md-sys-color-outline);
+  display: grid;
+  place-items: center;
+  transition:
+    left var(--md-sys-motion-spatial-fast),
+    width var(--md-sys-motion-spatial-fast),
+    height var(--md-sys-motion-spatial-fast),
+    margin var(--md-sys-motion-spatial-fast),
+    background-color var(--md-sys-motion-effects-default),
+    box-shadow var(--md-sys-motion-effects-fast);
+}
+.m3-switch[data-checked] .m3-switch__thumb {
+  left: 36px;
+  width: 24px;
+  height: 24px;
+  margin: -12px;
+  background: var(--md-sys-color-on-primary);
+}
+.m3-switch:active .m3-switch__thumb {
+  width: 28px;
+  height: 28px;
+  margin: -14px;
+}
+@media (hover: hover) {
+  .m3-switch:not([data-checked]):hover .m3-switch__thumb {
+    background: var(--md-sys-color-on-surface-variant);
+  }
+  .m3-switch:hover .m3-switch__thumb {
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+  }
+  .m3-switch[data-checked]:hover .m3-switch__thumb {
+    background: var(--md-sys-color-primary-container);
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
+  }
+}
+.m3-switch__icon {
+  color: var(--md-sys-color-on-primary-container);
+  opacity: 0;
+  transition: opacity var(--md-sys-motion-effects-fast);
+}
+.m3-switch[data-checked] .m3-switch__icon {
+  opacity: 1;
+}
+.m3-switch[data-disabled] {
+  opacity: 0.38;
+  cursor: default;
+}
+
+/* ---------- Radio ---------- */
+.m3-radio {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  width: 20px;
+  height: 20px;
+  margin: 10px;
+  flex: none;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 2px var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  transition: box-shadow var(--md-sys-motion-effects-fast);
+}
+.m3-radio::before {
+  content: '';
+  position: absolute;
+  inset: -10px;
+  border-radius: 50%;
+  background: var(--md-sys-color-on-surface);
+  opacity: 0;
+  transition: opacity var(--md-sys-motion-effects-fast);
+}
+.m3-radio::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: var(--md-sys-color-primary);
+  transform: scale(0);
+  transition: transform var(--md-sys-motion-spatial-fast);
+}
+.m3-radio:checked {
+  box-shadow: inset 0 0 0 2px var(--md-sys-color-primary);
+}
+.m3-radio:checked::after {
+  transform: scale(1);
+}
+@media (hover: hover) {
+  .m3-radio:hover::before {
+    opacity: var(--md-sys-state-hover);
+  }
+}
+.m3-radio:focus-visible {
+  outline-offset: 8px;
+}
+
+/* ---------- Loading indicator ---------- */
+.m3-loading {
+  display: inline-grid;
+  place-items: center;
+  color: var(--md-sys-color-primary);
+  flex: none;
+}
+.m3-loading--contained {
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  border-radius: 50%;
+}
+.m3-loading svg {
+  overflow: visible;
+}
+
+/* ---------- Wavy linear progress ---------- */
+.m3-linear-progress {
+  position: relative;
+  isolation: isolate;
+  height: 10px;
+  overflow: hidden;
+  color: var(--md-sys-color-primary);
+}
+.m3-linear-progress__bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: currentColor;
+  --wave: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='10'%3E%3Cpath d='M-5 5 C-1.25 1.1 1.25 1.1 5 5 S11.25 8.9 15 5 S21.25 1.1 25 5' fill='none' stroke='black' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E");
+  -webkit-mask: var(--wave) 0 0 / 20px 10px repeat-x;
+  mask: var(--wave) 0 0 / 20px 10px repeat-x;
+  animation:
+    m3-wave-scroll 1000ms linear infinite,
+    m3-wave-span 1750ms var(--md-sys-motion-easing-emphasized) infinite;
+}
+/* Secondary container, 4 thick, under the wave. */
+.m3-linear-progress__track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 3px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--md-sys-color-secondary-container);
+  z-index: -1;
+}
+@keyframes m3-wave-scroll {
+  to {
+    -webkit-mask-position: 20px 0;
+    mask-position: 20px 0;
+  }
+}
+@keyframes m3-wave-span {
+  0% {
+    clip-path: inset(0 100% 0 0 round 2px);
+  }
+  50% {
+    clip-path: inset(0 25% 0 15% round 2px);
+  }
+  100% {
+    clip-path: inset(0 0 0 100% round 2px);
+  }
+}
+
+/* ---------- Avatar ---------- */
+.m3-avatar {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  overflow: hidden;
+  flex: none;
+  font-family: var(--md-ref-typeface-brand);
+  font-weight: 500;
+  line-height: 1;
+  user-select: none;
+}
+.m3-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* The initial and the image share one cell; the image fades in over the initial once loaded (at once when cached). avatarFit.ts places each one. */
+.m3-avatar > * {
+  grid-area: 1 / 1;
+}
+.m3-avatar img {
+  opacity: 0;
+}
+.m3-avatar[data-ready] img {
+  opacity: 1;
+  transition: opacity var(--md-sys-motion-effects-default);
+}
+.m3-avatar[data-instant] img {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .m3-avatar[data-ready] img {
+    transition: none;
+  }
+}
+.m3-avatar[data-fit='mark'],
+.m3-avatar[data-fit^='unknown'],
+.m3-avatar[data-light] {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--md-sys-color-outline-variant) 60%, transparent);
+}
+.m3-avatar[data-fit='mark'] img,
+.m3-avatar[data-fit='tile'] img {
+  object-fit: contain;
+}
+/* Unreadable pixels: large app icons fill the white circle; small favicons sit inside it. */
+.m3-avatar[data-fit='unknown-large'] img {
+  object-fit: cover;
+}
+.m3-avatar[data-fit='unknown-small'] img {
+  width: 64%;
+  height: 64%;
+  object-fit: contain;
+}
+
+/* ---------- Snackbar ---------- */
+/* A gutter from the window's bottom start, like the quick settings sheet. */
+.m3-snackbar-viewport {
+  position: fixed;
+  z-index: 950;
+  left: 16px;
+  bottom: 16px;
+  width: min(600px, calc(100vw - 32px));
+  outline: none;
+}
+.m3-snackbar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  min-width: 288px;
+  max-width: 100%;
+  min-height: 56px;
+  padding: 4px 8px 4px 20px;
+  /* Rounder than SnackbarTokens' 4dp, to sit with the Expressive menus and cards. */
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-inverse-surface);
+  color: var(--md-sys-color-inverse-on-surface);
+  box-shadow: var(--md-sys-elevation-3);
+  display: flex;
+  align-items: center;
+  transition:
+    transform var(--md-sys-motion-spatial-default),
+    opacity var(--md-sys-motion-effects-default);
+  transform: translateX(var(--toast-swipe-movement-x, 0)) translateY(var(--toast-swipe-movement-y, 0));
+}
+.m3-snackbar[data-starting-style] {
+  opacity: 0;
+  transform: translateY(24px) scale(0.96);
+}
+.m3-snackbar[data-ending-style] {
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    transform var(--md-sys-motion-effects-default),
+    opacity var(--md-sys-motion-effects-fast);
+}
+/* One snackbar at a time (M3): the older one fades out quickly instead of sitting underneath. */
+.m3-snackbar[data-limited] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(8px) scale(0.98);
+  transition:
+    opacity var(--md-sys-motion-effects-fast),
+    transform var(--md-sys-motion-effects-fast),
+    visibility 0s var(--md-sys-motion-effects-fast);
+}
+.m3-snackbar__content {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+.m3-snackbar__text {
+  flex: 1;
+  margin: 0;
+  padding: 10px 8px 10px 0;
+  font: 400 14px/20px var(--md-ref-typeface-plain);
+  letter-spacing: 0.25px;
+}
+.m3-snackbar__action {
+  border: none;
+  background: transparent;
+  color: var(--md-sys-color-inverse-primary);
+  font: 500 14px/20px var(--md-ref-typeface-plain);
+  letter-spacing: 0.1px;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 20px;
+  cursor: pointer;
+}
+.m3-snackbar__close {
+  border: none;
+  background: transparent;
+  color: var(--md-sys-color-inverse-on-surface);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .m3-snackbar__action:hover,
+  .m3-snackbar__close:hover {
+    background: color-mix(in srgb, currentColor 8%, transparent);
+  }
+}
+
+/* ---------- Text field ---------- */
+.m3-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.m3-field__container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 56px;
+  border-radius: var(--md-sys-shape-corner-extra-small);
+}
+.m3-field--filled .m3-field__container {
+  background: var(--md-sys-color-surface-container-highest);
+  border-radius: var(--md-sys-shape-corner-extra-small) var(--md-sys-shape-corner-extra-small) 0 0;
+  box-shadow: inset 0 -1px 0 var(--md-sys-color-on-surface-variant);
+  transition: box-shadow var(--md-sys-motion-effects-fast);
+}
+.m3-field--filled .m3-field__container:hover {
+  box-shadow: inset 0 -1px 0 var(--md-sys-color-on-surface);
+}
+.m3-field--filled .m3-field__container:focus-within {
+  box-shadow: inset 0 -2px 0 var(--md-sys-color-primary);
+}
+.m3-field__input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: 16px;
+  font: 400 16px/24px var(--md-ref-typeface-plain);
+  letter-spacing: 0.5px;
+  color: var(--md-sys-color-on-surface);
+}
+.m3-field--filled .m3-field__input {
+  padding: 24px 16px 8px;
+}
+.m3-field__container[data-has-leading] .m3-field__input {
+  padding-left: 52px;
+}
+.m3-field__leading {
+  position: absolute;
+  left: 12px;
+  color: var(--md-sys-color-on-surface-variant);
+  pointer-events: none;
+}
+.m3-field__trailing {
+  display: flex;
+  padding-right: 4px;
+}
+.m3-field__label {
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  font: 400 16px/24px var(--md-ref-typeface-plain);
+  letter-spacing: 0.5px;
+  color: var(--md-sys-color-on-surface-variant);
+  pointer-events: none;
+  transform-origin: left top;
+  padding: 0 4px;
+  margin-left: -4px;
+  /* Above the outline so the floated label cuts its notch. */
+  z-index: 1;
+  transition:
+    transform var(--md-sys-motion-spatial-fast),
+    color var(--md-sys-motion-effects-fast);
+}
+.m3-field__container[data-has-leading] .m3-field__label {
+  left: 52px;
+}
+.m3-field--outlined .m3-field__input:focus ~ .m3-field__label,
+.m3-field--outlined .m3-field__input:not(:placeholder-shown) ~ .m3-field__label {
+  transform: translateY(-24px) scale(0.75);
+  background: var(--field-bg, var(--md-sys-color-surface-container-high));
+}
+.m3-field--filled .m3-field__input:focus ~ .m3-field__label,
+.m3-field--filled .m3-field__input:not(:placeholder-shown) ~ .m3-field__label {
+  transform: translateY(-10px) scale(0.75);
+}
+.m3-field__input:focus ~ .m3-field__label {
+  color: var(--md-sys-color-primary);
+}
+.m3-field__outline {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--md-sys-color-outline);
+  pointer-events: none;
+  transition: box-shadow var(--md-sys-motion-effects-fast);
+}
+.m3-field__input:focus ~ .m3-field__outline {
+  box-shadow: inset 0 0 0 2px var(--md-sys-color-primary);
+}
+.m3-field--error .m3-field__outline {
+  box-shadow: inset 0 0 0 2px var(--md-sys-color-error);
+}
+.m3-field--error .m3-field__label,
+.m3-field--error .m3-field__supporting {
+  color: var(--md-sys-color-error);
+}
+.m3-field__supporting {
+  padding: 0 16px;
+  font: 400 12px/16px var(--md-ref-typeface-plain);
+  letter-spacing: 0.4px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* ---------- Tabs ---------- */
+.m3-tabs {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.m3-tab {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 280px;
+  height: 48px;
+  padding: 0 16px;
+  border: none;
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  font: 500 14px/20px var(--md-ref-typeface-plain);
+  letter-spacing: 0.1px;
+  transition: color var(--md-sys-motion-effects-default);
+}
+.m3-tab[data-active] {
+  color: var(--md-sys-color-primary);
+}
+.m3-tab__content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  margin-inline: auto;
+}
+.m3-tab__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  text-align: left;
+}
+.m3-tab__label,
+.m3-tab__supporting {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.m3-tab__supporting {
+  font: 400 12px/16px var(--md-ref-typeface-plain);
+  letter-spacing: 0.4px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.m3-tabs__indicator {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--md-sys-color-primary);
+  pointer-events: none;
+  transition:
+    transform var(--md-sys-motion-spatial-default),
+    width var(--md-sys-motion-spatial-default);
+}
+
+/* ---------- Shape icon ---------- */
+.shape-icon {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  color: var(--shape-fg);
+}
+.shape-icon svg {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+.shape-icon path {
+  fill: var(--shape-bg);
+  transition: fill var(--md-sys-motion-effects-default);
+}
+.shape-icon .m3-icon {
+  position: relative;
+  transition: color var(--md-sys-motion-effects-default);
+}
+
+/* ---------- Confirm feedback ---------- A quick action answers in place: the glyph turns into a check, the label rolls to "Copied", the container takes tertiary and squares off, then it settles back. */
+.m3-swap-icon {
+  display: inline-grid;
+  flex: none;
+}
+.m3-swap-icon > .m3-icon {
+  grid-area: 1 / 1;
+  transition:
+    opacity var(--md-sys-motion-effects-fast),
+    transform var(--md-sys-motion-spatial-fast),
+    font-variation-settings var(--md-sys-motion-effects-default);
+}
+.m3-swap-icon > .m3-icon:last-child,
+.m3-swap-icon[data-on] > .m3-icon:first-child {
+  opacity: 0;
+  transform: scale(0.4) rotate(-45deg);
+}
+.m3-swap-icon[data-on] > .m3-icon:first-child {
+  transform: scale(0.4) rotate(45deg);
+}
+.m3-swap-icon[data-on] > .m3-icon:last-child {
+  opacity: 1;
+  transform: none;
+}
+.m3-swap-text {
+  position: relative;
+  display: inline-block;
+  vertical-align: top;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.m3-swap-text > span {
+  display: inline-block;
+  transition:
+    opacity var(--md-sys-motion-effects-fast),
+    transform var(--md-sys-motion-spatial-fast),
+    filter var(--md-sys-motion-effects-fast);
+}
+.m3-swap-text > span:last-child,
+.m3-swap-text[data-on] > span:first-child {
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0;
+  opacity: 0;
+  filter: blur(2px);
+  transform: translateY(70%);
+}
+.m3-swap-text[data-on] > span:first-child {
+  transform: translateY(-70%);
+}
+.m3-swap-text[data-on] > span:last-child {
+  position: static;
+  opacity: 1;
+  filter: none;
+  transform: none;
+}
+.m3-button[data-confirmed],
+.m3-icon-button[data-confirmed] {
+  border-radius: var(--square);
+}
+.m3-button[data-confirmed]:not(:disabled) {
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+  box-shadow: none;
+}
+.m3-button--filled[data-confirmed]:not(:disabled) {
+  background: var(--md-sys-color-tertiary);
+  color: var(--md-sys-color-on-tertiary);
+}
+.m3-icon-button[data-confirmed] {
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+  box-shadow: none;
+}
+.m3-button[data-confirmed]:active:not(:disabled),
+.m3-icon-button[data-confirmed]:active:not(:disabled) {
+  border-radius: var(--pressed);
+}
+
+/* Theme changes cross-fade the whole app on SlowEffects. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 325ms;
+  animation-timing-function: var(--md-spring-1-0);
+}
+
+
+/* An option's icon turns into the check; a text-only option grows one in from the start. */
+.button-group__lead {
+  display: inline-grid;
+  flex: none;
+}
+.button-group__item {
+  overflow: hidden;
+  --lead-shift: 14px;
+}
+.button-group.m3-size--xs .button-group__item {
+  --lead-shift: 12px;
+}
+/* The check's slot is always there; unselected, the label slides half a slot back so it reads centred. Only transforms move. */
+.button-group__lead--grow,
+.button-group__lead--grow + span {
+  transition: transform var(--md-sys-motion-spatial-fast);
+}
+.button-group__item:not([data-selected]) > .button-group__lead--grow,
+.button-group__item:not([data-selected]) > .button-group__lead--grow + span {
+  transform: translateX(calc(-1 * var(--lead-shift)));
+}
+.button-group__item:not([data-selected]):dir(rtl) > .button-group__lead--grow,
+.button-group__item:not([data-selected]):dir(rtl) > .button-group__lead--grow + span {
+  transform: translateX(var(--lead-shift));
+}
+.button-group__lead--grow > .m3-icon {
+  opacity: 0;
+  transform: scale(0.4);
+  transition:
+    opacity var(--md-sys-motion-effects-fast),
+    transform var(--md-sys-motion-spatial-fast);
+}
+.button-group__item[data-selected] .button-group__lead--grow > .m3-icon {
+  opacity: 1;
+  transform: none;
+}
+
+/* No turning, rolling or growing; swaps still cross-fade so the confirmation shows. */
+@media (prefers-reduced-motion: reduce) {
+  .m3-swap-icon > .m3-icon,
+  .m3-swap-text > span,
+  .button-group__lead--grow,
+  .button-group__lead--grow + span {
+    transition: none !important;
+  }
+  .button-group__lead--grow > .m3-icon {
+    transform: none !important;
+    filter: none !important;
+    transition: opacity 150ms linear !important;
+  }
+}
+
+/* A ring, not only a tint, so it shows on selected rows too. */
+.m3-menu-item:focus-visible {
+  outline: 2px solid var(--md-sys-color-secondary);
+  outline-offset: -2px;
+}
+/* Forced colors drop backgrounds and box-shadows, which is all that draws these controls and surfaces. */
+@media (forced-colors: active) {
+  .m3-chip:not(:focus-visible) {
+    outline: 1px solid ButtonText;
+  }
+  .m3-chip[aria-pressed='true']:not(:focus-visible),
+  .m3-chip[data-selected]:not(:focus-visible) {
+    outline: 3px solid Highlight;
+  }
+  .m3-switch {
+    border: 2px solid ButtonText;
+  }
+  .m3-switch__thumb {
+    translate: -2px 0;
+    background: ButtonText;
+  }
+  .m3-switch[data-checked] {
+    background: Highlight;
+    border-color: Highlight;
+  }
+  .m3-switch[data-checked] .m3-switch__thumb {
+    background: HighlightText;
+  }
+  .m3-switch__icon {
+    display: none;
+  }
+  .button-group__item:not(:focus-visible),
+  .m3-select-field:not(:focus-visible) {
+    outline: 1px solid ButtonText;
+    outline-offset: -1px;
+  }
+  .button-group__item[data-selected]:not(:focus-visible) {
+    outline: 3px solid Highlight;
+    outline-offset: -3px;
+  }
+  .m3-dialog,
+  .m3-menu,
+  .m3-snackbar,
+  .m3-tooltip,
+  .settings,
+  .side-sheet,
+  .palette,
+  .sender-card,
+  .details-popover,
+  .compose-window {
+    border: 1px solid CanvasText;
+  }
+}
+
+/* ---------- Date picker (DatePickerModalTokens) ---------- */
+.m3-datepicker {
+  width: min(360px, calc(100vw - 32px));
+  padding-bottom: 8px;
+}
+.m3-datepicker__header {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 120px;
+  padding: 16px 12px 12px 24px;
+}
+.m3-datepicker__title {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.m3-datepicker__headline {
+  margin: 0;
+  font: 400 32px/40px var(--md-ref-typeface-brand);
+  color: var(--md-sys-color-on-surface-variant);
+}
+.m3-datepicker__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  padding: 0 12px 0 16px;
+}
+.m3-datepicker__month {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 40px;
+  padding: 0 8px 0 12px;
+  border: none;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  transition: background-color var(--md-sys-motion-effects-fast);
+}
+.m3-datepicker__month:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface-variant) 8%, transparent);
+}
+.m3-datepicker__month:focus-visible,
+.m3-datepicker__day:focus-visible,
+.m3-datepicker__year:focus-visible {
+  outline: 2px solid var(--md-sys-color-secondary);
+  outline-offset: 2px;
+}
+.m3-datepicker__caret {
+  transition: transform var(--md-sys-motion-spatial-fast);
+}
+.m3-datepicker__caret[data-open] {
+  transform: rotate(180deg);
+}
+.m3-datepicker__arrows {
+  display: flex;
+}
+.m3-datepicker__grid {
+  padding: 0 12px;
+}
+.m3-datepicker__row {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  height: 48px;
+  place-items: center;
+}
+.m3-datepicker__weekday {
+  font: 400 16px/24px var(--md-ref-typeface-plain);
+  letter-spacing: 0.5px;
+  color: var(--md-sys-color-on-surface);
+}
+.m3-datepicker__day {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: transparent;
+  color: var(--md-sys-color-on-surface);
+  font: 400 16px/24px var(--md-ref-typeface-plain);
+  letter-spacing: 0.5px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background-color var(--md-sys-motion-effects-fast);
+}
+.m3-datepicker__day:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+}
+.m3-datepicker__day--today {
+  box-shadow: inset 0 0 0 1px var(--md-sys-color-primary);
+  color: var(--md-sys-color-primary);
+}
+.m3-datepicker__day--selected,
+.m3-datepicker__day--selected:hover {
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  box-shadow: none;
+}
+.m3-datepicker__day:disabled {
+  background: transparent;
+  color: color-mix(in srgb, var(--md-sys-color-on-surface) 38%, transparent);
+  cursor: default;
+}
+/* The time sits under the calendar, before the actions. */
+.m3-datepicker__time {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px 24px 0;
+}
+.m3-datepicker__time .m3-field {
+  flex: 1;
+}
+.m3-datepicker__error {
+  margin: 4px 24px 0;
+  color: var(--md-sys-color-error);
+}
+.m3-datepicker__note {
+  margin: 8px 24px 0;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.m3-datepicker__years {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px 0;
+  justify-items: center;
+  height: 288px;
+  padding: 8px 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.m3-datepicker__year {
+  width: 72px;
+  height: 36px;
+  border: none;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  font: 400 16px/24px var(--md-ref-typeface-plain);
+  letter-spacing: 0.5px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.m3-datepicker__year:hover {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface-variant) 8%, transparent);
+}
+.m3-datepicker__year--current {
+  box-shadow: inset 0 0 0 1px var(--md-sys-color-primary);
+  color: var(--md-sys-color-primary);
+}
+.m3-datepicker__year[aria-selected='true'] {
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  box-shadow: none;
+}
+.m3-datepicker__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 12px 0;
+}
+.m3-datepicker__clear {
+  margin-right: auto;
+}
+.m3-datefield .m3-field__input {
+  cursor: pointer;
+}
+
+/* ---------- Slider ---------- M3 Expressive standard (xsmall). */
+.m3-slider {
+  --slider-gap: 6px;
+  width: 100%;
+  touch-action: none;
+}
+.m3-slider__control {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  cursor: pointer;
+}
+.m3-slider__track {
+  position: relative;
+  width: 100%;
+  height: 16px;
+}
+.m3-slider__active,
+.m3-slider__inactive {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+.m3-slider__active {
+  left: 0;
+  width: max(0px, calc(var(--slider-at) * 100% - var(--slider-gap) - 2px));
+  border-radius: 8px 2px 2px 8px;
+  background: var(--md-sys-color-primary);
+}
+.m3-slider__inactive {
+  right: 0;
+  width: max(0px, calc((1 - var(--slider-at)) * 100% - var(--slider-gap) - 2px));
+  border-radius: 2px 8px 8px 2px;
+  background: var(--md-sys-color-secondary-container);
+}
+/* The stop indicator where the track ends. */
+.m3-slider__inactive::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--md-sys-color-primary);
+}
+.m3-slider__handle {
+  width: 4px;
+  height: 44px;
+  border-radius: 2px;
+  background: var(--md-sys-color-primary);
+  outline: none;
+  transition: width var(--md-sys-motion-spatial-fast);
+}
+.m3-slider__handle:has(:focus-visible) {
+  outline: 2px solid var(--md-sys-color-secondary);
+  outline-offset: 2px;
+}
+/* Pressed, the handle narrows, as in Compose. */
+.m3-slider__handle[data-dragging] {
+  width: 2px;
+}

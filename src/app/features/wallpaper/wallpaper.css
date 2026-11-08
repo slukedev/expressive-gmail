@@ -1,0 +1,371 @@
+/* The picture and the unread badge on its shoulder. */
+.glance-picture-wrap {
+  position: relative;
+  display: inline-flex;
+  margin-bottom: 20px;
+}
+/* Around the time-of-day mark (no picture) or the picture. */
+.glance-picture {
+  position: relative;
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--md-sys-color-on-surface);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+  transition: scale var(--md-sys-motion-spatial-fast);
+}
+.glance-picture:focus-visible {
+  outline: none;
+}
+.glance-picture--mark {
+  border-radius: var(--md-sys-shape-corner-full);
+}
+.glance-picture--mark .glance__mark {
+  margin: 0;
+}
+.glance-picture--mark:focus-visible {
+  outline: 3px solid var(--md-sys-color-secondary);
+  outline-offset: 2px;
+}
+.glance-picture--mark > .m3-ripple {
+  display: none;
+}
+.glance-picture--mark:hover,
+.glance-picture[data-drop] {
+  scale: 1.06;
+}
+
+/* With a picture: the mark itself, grown, a cookie on a tonal ring. */
+.glance-picture:not(.glance-picture--mark) {
+  width: var(--glance-picture-size, 112px);
+  height: var(--glance-picture-size, 112px);
+  clip-path: url(#glance-picture-shape);
+}
+.glance-picture__defs {
+  position: absolute;
+}
+.glance-picture__ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: var(--md-sys-color-tertiary-container);
+  transition: fill var(--md-sys-motion-effects-default);
+}
+.glance-picture__photo {
+  position: absolute;
+  inset: 6px;
+  overflow: hidden;
+  clip-path: url(#glance-picture-shape);
+  background: var(--md-sys-color-surface-container-highest);
+  transition: inset var(--md-sys-motion-spatial-fast);
+}
+.glance-picture__photo img {
+  position: absolute;
+  display: block;
+  max-width: none;
+  -webkit-user-drag: none;
+  opacity: 0;
+}
+/* In once decoded; a picture already shown this session is simply there. */
+.glance-picture__photo img[data-ready] {
+  opacity: 1;
+  transition: opacity var(--md-sys-motion-effects-slow);
+}
+.glance-picture__photo img[data-instant] {
+  transition: none;
+}
+.glance-picture > .m3-ripple {
+  z-index: 1;
+}
+.glance-picture:focus-visible .glance-picture__ring,
+.glance-picture[data-popup-open] .glance-picture__ring {
+  fill: var(--md-sys-color-tertiary);
+}
+/* A picture held over it: the ring thickens and takes primary. */
+.glance-picture[data-drop] .glance-picture__ring {
+  fill: var(--md-sys-color-primary);
+}
+.glance-picture[data-drop] .glance-picture__photo {
+  inset: 10px;
+}
+@keyframes glance-picture-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .glance-picture,
+  .glance-picture__photo,
+  .glance-picture__photo img[data-ready] {
+    transition: none;
+  }
+  /* No grow or morph: the picture fades in where the mark was. */
+  .glance-picture:not(.glance-picture--mark) {
+    animation: glance-picture-in var(--md-sys-motion-effects-slow) backwards;
+  }
+  .glance[data-settled] .glance-picture {
+    animation: none;
+  }
+}
+.glance-picture__photo .glance-picture__profile {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* The picture in the swatch's corner, where the check goes once picked. */
+.swatch-wallpaper__photo {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  outline: 2px solid var(--md-sys-color-surface-container-low);
+}
+
+.picture-editor .m3-dialog__content {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.picture-editor__body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.picture-editor__stage {
+  position: relative;
+  flex: none;
+  align-self: center;
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-surface-container-highest);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  outline: none;
+}
+.picture-editor__stage:active {
+  cursor: grabbing;
+}
+.picture-editor__stage:focus-visible {
+  box-shadow: 0 0 0 3px var(--md-sys-color-secondary);
+}
+.picture-editor__stage img {
+  position: absolute;
+  display: block;
+  max-width: none;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+.picture-editor__mask {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+/* Outside the shape the picture dims to the dialog's surface, so the shape reads as the picture. */
+.picture-editor__mask > path:first-child {
+  fill: color-mix(in srgb, var(--md-sys-color-surface-container-high) 82%, transparent);
+}
+.picture-editor__outline {
+  fill: none;
+  stroke: var(--md-sys-color-on-surface);
+  stroke-opacity: 0.6;
+  stroke-width: 1.5px;
+  vector-effect: non-scaling-stroke;
+}
+.picture-editor__zoom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px 0;
+}
+.picture-editor__shapes {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+  padding: 8px 20px 0;
+}
+.picture-editor__shape {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: none;
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  outline: none;
+  transition:
+    background-color var(--md-sys-motion-effects-fast),
+    border-radius var(--md-sys-motion-spatial-fast);
+}
+.picture-editor__shape svg {
+  width: 26px;
+  height: 26px;
+  fill: currentColor;
+  transition: scale var(--md-sys-motion-spatial-fast);
+}
+@media (hover: hover) {
+  .picture-editor__shape:hover {
+    background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+  }
+}
+.picture-editor__shape:active svg {
+  scale: 0.86;
+}
+.picture-editor__shape:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--md-sys-color-secondary);
+}
+/* A tonal container that rounds fully, like a selected toggle. */
+.picture-editor__shape[aria-checked='true'] {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-primary);
+  border-radius: var(--md-sys-shape-corner-full);
+}
+.picture-editor__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 24px 24px;
+}
+.picture-editor__spacer {
+  flex: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .picture-editor__shape,
+  .picture-editor__shape svg {
+    transition: none;
+  }
+}
+
+/* The unread count, also a toggle: tertiary at rest, primary while the inbox shows only unread, cut out of the shape in the pane's colour. */
+.glance-badge {
+  position: absolute;
+  top: 0;
+  right: -12px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  min-width: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-sys-color-tertiary);
+  color: var(--md-sys-color-on-tertiary);
+  box-shadow: 0 0 0 3px var(--app-pane, var(--md-sys-color-surface));
+  font: 500 13px/16px var(--md-ref-typeface-plain);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.1px;
+  cursor: pointer;
+  outline: none;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color var(--md-sys-motion-effects-default),
+    color var(--md-sys-motion-effects-default),
+    padding var(--md-sys-motion-spatial-fast),
+    scale var(--md-sys-motion-spatial-fast);
+}
+/* A 48 px target around the 28 px badge. */
+.glance-badge::before {
+  content: '';
+  position: absolute;
+  inset: -10px;
+}
+.glance-badge::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity var(--md-sys-motion-effects-fast);
+}
+@media (hover: hover) {
+  .glance-badge:hover::after {
+    opacity: 0.08;
+  }
+}
+.glance-badge:active {
+  scale: 0.92;
+}
+.glance-badge:active::after {
+  opacity: 0.1;
+}
+.glance-badge:focus-visible {
+  outline: 3px solid var(--md-sys-color-secondary);
+  outline-offset: 3px;
+}
+.glance-badge[data-on] {
+  padding-left: 6px;
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+}
+/* The envelope slides in only while the filter is on. */
+.glance-badge__icon {
+  display: inline-grid;
+  width: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition:
+    width var(--md-sys-motion-spatial-fast),
+    margin var(--md-sys-motion-spatial-fast),
+    opacity var(--md-sys-motion-effects-fast);
+}
+.glance-badge[data-on] .glance-badge__icon {
+  width: 16px;
+  margin-right: 4px;
+  opacity: 1;
+}
+.glance-badge__count[data-bump] {
+  animation: glance-badge-bump 420ms var(--md-spring-0-8);
+}
+@keyframes glance-badge-bump {
+  from {
+    translate: 0 70%;
+    opacity: 0;
+  }
+}
+.glance-badge--clear {
+  padding: 0;
+  justify-content: center;
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+  cursor: default;
+  animation: glance-badge-clear 420ms var(--md-spring-0-8);
+}
+@keyframes glance-badge-clear {
+  from {
+    scale: 0.4;
+    opacity: 0;
+  }
+}
+.glance-picture-wrap:has(.glance-picture--mark) .glance-badge {
+  right: -10px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .glance-badge,
+  .glance-badge__icon {
+    transition: none;
+  }
+  .glance-badge__count[data-bump],
+  .glance-badge--clear {
+    animation: none;
+  }
+}

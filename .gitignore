@@ -1,0 +1,37 @@
+# Dependencies and build output
+node_modules/
+.output/
+.wxt/
+*.zip
+
+# Generated Safari Xcode project (scripts/package-safari.sh); it carries your bundle id and signing team
+safari/
+safari-ios/
+build/
+
+# Test output
+test-results/
+playwright-report/
+blob-report/
+coverage/
+
+# Local design-review scratch (screenshots, critiques, live sessions)
+.impeccable/review/
+.impeccable/critique/
+.impeccable/live/
+
+# Local env and secrets (OAuth client ids, team ids)
+.env
+.env.*
+!.env.example
+
+# Editors and OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.log
+*.tmp
+
+# Local before/after review screenshots
+after/

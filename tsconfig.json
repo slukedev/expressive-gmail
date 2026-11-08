@@ -1,0 +1,14 @@
+{
+  "extends": "./.wxt/tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUncheckedIndexedAccess": false,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "allowImportingTsExtensions": true,
+    "types": ["vitest/globals"]
+  },
+  "include": [".wxt/wxt.d.ts", "src", "tests", "preview", "scripts", "*.ts"]
+}
