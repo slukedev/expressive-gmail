@@ -1,0 +1,11 @@
+/* Designed emails darkened for the dark theme sit on a quiet paper, not white. */
+.msg__body[data-designed][data-adapted] {
+  background: var(--md-sys-color-surface-container-low);
+}
+.msg__frame {
+  transition: opacity var(--md-sys-motion-effects-fast);
+}
+.msg__frame[data-adapting] {
+  opacity: 0;
+  transition: none;
+}

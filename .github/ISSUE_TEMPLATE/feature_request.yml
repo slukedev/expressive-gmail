@@ -1,0 +1,31 @@
+name: Feature request
+description: Something Gmail or Expressive Gmail should do.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe the situation and what gets in the way today.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+      description: How you'd like it to work. Sketches and screenshots of other apps are welcome.
+    validations:
+      required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: Mail source it matters for
+      multiple: true
+      options:
+        - Gmail session
+        - Gmail API
+        - Any
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else

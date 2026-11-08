@@ -1,0 +1,141 @@
+/* A package's steps across emails, under its tracker. A segmented list like the
+   app's others (16 outer, 4 inner, 2px apart); rows that open another email
+   take the hover and focus states of list rows. */
+.pkg-updates {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0 4px;
+}
+.pkg-updates__title {
+  margin: 0;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.pkg-updates__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pkg-updates__row {
+  --r-top: var(--md-sys-shape-corner-extra-small);
+  --r-bottom: var(--md-sys-shape-corner-extra-small);
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 16px 8px 12px;
+  border: none;
+  border-radius: var(--r-top) var(--r-top) var(--r-bottom) var(--r-bottom);
+  background: var(--md-sys-color-surface-container-low);
+  color: var(--md-sys-color-on-surface);
+  font: inherit;
+  text-align: start;
+  transition: border-radius var(--md-sys-motion-spatial-fast);
+}
+.pkg-updates__item:first-child .pkg-updates__row {
+  --r-top: var(--md-sys-shape-corner-large);
+}
+.pkg-updates__item:last-child .pkg-updates__row {
+  --r-bottom: var(--md-sys-shape-corner-large);
+}
+.pkg-updates__row--link {
+  cursor: pointer;
+}
+.pkg-updates__row--link::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--md-sys-color-on-surface);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--md-sys-motion-effects-fast);
+}
+@media (hover: hover) {
+  .pkg-updates__row--link:hover {
+    border-radius: var(--md-sys-shape-corner-medium);
+  }
+  .pkg-updates__row--link:hover::before {
+    opacity: var(--md-sys-state-hover);
+  }
+}
+.pkg-updates__row--link:active {
+  border-radius: var(--md-sys-shape-corner-large);
+}
+.pkg-updates__row--link:active::before {
+  opacity: var(--md-sys-state-pressed);
+}
+.pkg-updates__row--link:focus-visible {
+  outline: none;
+  border-radius: var(--md-sys-shape-corner-large);
+  box-shadow: inset 0 0 0 2px var(--md-sys-color-secondary);
+}
+.pkg-updates__dot {
+  justify-self: center;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--md-sys-color-outline-variant);
+}
+.pkg-updates__item[data-current] .pkg-updates__dot {
+  width: 12px;
+  height: 12px;
+  background: var(--md-sys-color-primary);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--md-sys-color-primary) 22%, transparent);
+}
+.smart-card:has(.smart-card__big[data-tone='delivered']) .pkg-updates__item[data-current] .pkg-updates__dot {
+  background: var(--md-sys-color-tertiary);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--md-sys-color-tertiary) 22%, transparent);
+}
+.smart-card:has(.smart-card__big[data-tone='problem']) .pkg-updates__item[data-current] .pkg-updates__dot {
+  background: var(--md-sys-color-error);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--md-sys-color-error) 22%, transparent);
+}
+.pkg-updates__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.pkg-updates__meta {
+  color: var(--md-sys-color-on-surface-variant);
+  overflow-wrap: anywhere;
+}
+.pkg-updates__here {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.pkg-updates__go {
+  color: var(--md-sys-color-on-surface-variant);
+}
+@media (forced-colors: active) {
+  .pkg-updates__row {
+    border: 1px solid CanvasText;
+  }
+  .pkg-updates__dot {
+    background: CanvasText;
+    forced-color-adjust: none;
+  }
+  .pkg-updates__item[data-current] .pkg-updates__dot {
+    background: Highlight;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pkg-updates__row {
+    transition: none;
+  }
+}
+/* The package card's options sit at the end of its header row. */
+.smart-card__menu {
+  margin-inline-start: auto;
+  align-self: flex-start;
+}
+.package-tile__menu {
+  margin-inline-start: auto;
+}

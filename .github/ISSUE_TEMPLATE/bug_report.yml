@@ -1,0 +1,61 @@
+name: Bug report
+description: Something doesn't work or looks wrong.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please leave out real email addresses, message content, tokens and anything else from your mailbox. Screenshots of the demo mailbox are ideal. Security problems go through the Security tab instead (see SECURITY.md).
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      options:
+        - Chrome
+        - Another Chromium browser (Edge, Brave, Arc, Dia)
+        - Firefox
+        - Safari
+    validations:
+      required: true
+  - type: input
+    id: browser-version
+    attributes:
+      label: Browser and OS version
+      placeholder: Chrome 141 on macOS 26
+  - type: dropdown
+    id: source
+    attributes:
+      label: Mail source
+      description: Settings > Connection
+      options:
+        - Gmail session (default)
+        - Gmail API
+        - Demo mailbox
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Expressive Gmail version or commit
+      placeholder: 0.1.0, or the commit you built from
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Click ...
+        3. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and what happened instead
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots, console errors, anything else
+      description: Errors from the extension's console help a lot. Redact addresses and message text.

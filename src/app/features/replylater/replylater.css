@@ -1,0 +1,287 @@
+/* Reply later: a stack card at the top of the inbox. */
+
+.aside {
+  container-type: inline-size;
+  margin: 4px 0 16px;
+}
+.aside__stack {
+  position: relative;
+  isolation: isolate;
+}
+/* With more than one, the folded sheets hang into the bottom margin, so folding never moves the list. */
+.aside[data-many] {
+  margin-bottom: 24px;
+}
+/* The next two peek out under the card, like an Android notification stack. */
+.aside__stack::before,
+.aside__stack::after {
+  content: '';
+  position: absolute;
+  bottom: -12px;
+  height: 24px;
+  border-radius: 0 0 var(--md-sys-shape-corner-medium) var(--md-sys-shape-corner-medium);
+  opacity: 0;
+  transform: translateY(-12px);
+  transition:
+    opacity var(--md-sys-motion-effects-fast),
+    transform var(--md-sys-motion-spatial-fast);
+  pointer-events: none;
+}
+.aside__stack::before {
+  inset-inline: 12px;
+  bottom: -6px;
+  background: var(--md-sys-color-surface-container-highest);
+  z-index: 0;
+}
+.aside__stack::after {
+  inset-inline: 28px;
+  background: var(--md-sys-color-surface-container-high);
+  z-index: -1;
+}
+.aside[data-many]:not([data-open]) .aside__stack::before,
+.aside[data-many]:not([data-open]) .aside__stack::after {
+  opacity: 1;
+  transform: none;
+}
+
+.aside__card {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-inline-end: 16px;
+  background: var(--row-unread);
+  color: var(--md-sys-color-on-surface);
+  border-radius: var(--md-sys-shape-corner-large);
+  transition: border-radius var(--md-sys-motion-spatial-fast);
+}
+.aside[data-open] .aside__card {
+  border-end-start-radius: var(--md-sys-shape-corner-extra-small);
+  border-end-end-radius: var(--md-sys-shape-corner-extra-small);
+}
+
+.aside__head {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 4px;
+  padding: 8px 8px 8px 12px;
+  border: none;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  isolation: isolate;
+}
+.aside__head::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--md-sys-color-on-surface);
+  opacity: 0;
+  transition: opacity var(--md-sys-motion-effects-fast);
+  z-index: -1;
+}
+@media (hover: hover) {
+  .aside__head:hover::before {
+    opacity: 0.08;
+  }
+}
+.aside__head:active::before {
+  opacity: 0.1;
+}
+.aside__head:focus-visible {
+  outline: 2px solid var(--md-sys-color-secondary);
+  outline-offset: -2px;
+}
+
+/* At least the rows' 40px avatar column, so the title starts where their text does. */
+.aside__faces {
+  display: flex;
+  flex: none;
+  justify-content: center;
+  min-width: 40px;
+}
+.aside__face {
+  box-shadow: 0 0 0 2px var(--row-unread);
+  border-radius: var(--md-sys-shape-corner-full);
+}
+.aside__face + .aside__face {
+  margin-inline-start: -10px;
+}
+.aside__titles {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.aside__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.aside__count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+  font-variant-numeric: tabular-nums;
+}
+.aside__who {
+  color: var(--md-sys-color-on-surface-variant);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.aside__chevron {
+  margin-inline-start: auto;
+  flex: none;
+  color: var(--md-sys-color-on-surface-variant);
+  transition: transform var(--md-sys-motion-spatial-fast);
+}
+.aside[data-open] .aside__chevron {
+  transform: rotate(180deg);
+}
+.aside__start {
+  flex: none;
+}
+.aside__start-short {
+  display: none;
+}
+
+.aside__fold {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--md-sys-motion-spatial-default);
+}
+.aside[data-open] .aside__fold {
+  grid-template-rows: 1fr;
+}
+.aside__fold-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+.aside__list {
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+  opacity: 0;
+  transition: opacity var(--md-sys-motion-effects-fast);
+}
+.aside[data-open] .aside__list {
+  opacity: 1;
+  transition-duration: var(--md-sys-motion-effects-default);
+}
+.aside__list > :first-child .row {
+  --r-top: var(--md-sys-shape-corner-extra-small);
+}
+.row.aside-row {
+  grid-template-columns: 40px minmax(0, 1fr) auto auto;
+  grid-template-areas: none;
+  column-gap: 12px;
+  background: var(--row-unread);
+  color: var(--md-sys-color-on-surface);
+}
+.aside-row__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin-inline-end: 4px;
+}
+.aside-row__from,
+.aside-row__subject {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.aside-row__subject {
+  color: var(--md-sys-color-on-surface);
+}
+.aside-row__snippet {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.aside-row__when {
+  color: var(--md-sys-color-on-surface-variant);
+  font-variant-numeric: tabular-nums;
+}
+
+@container (max-width: 440px) {
+  .aside__face:nth-child(n + 2) {
+    display: none;
+  }
+  .aside__start-long {
+    display: none;
+  }
+  .aside__start-short {
+    display: inline;
+  }
+  .aside-row__when {
+    display: none;
+  }
+}
+
+/* A progress strip over the conversation while working through the stack. */
+.aside-session {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 8px 8px 8px 16px;
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+  animation: aside-session-in var(--md-sys-motion-spatial-default) backwards;
+  /* Sticky while you read and reply; the ring in the pane colour keeps scrolled text out of the gap. */
+  position: sticky;
+  top: 8px;
+  z-index: 4;
+  box-shadow: 0 0 0 8px var(--app-pane);
+}
+/* The reply scrolls into view below the strip, not under it. */
+.thread:has(.aside-session) .inline-compose {
+  scroll-margin-top: 104px;
+}
+.aside-session__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.aside-session__progress {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+.aside-session__dot {
+  width: 16px;
+  height: 4px;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: color-mix(in srgb, var(--md-sys-color-on-tertiary-container) 24%, transparent);
+  transition:
+    width var(--md-sys-motion-spatial-fast),
+    background-color var(--md-sys-motion-effects-default);
+}
+.aside-session__dot[data-current] {
+  width: 28px;
+  background: var(--md-sys-color-on-tertiary-container);
+}
+.aside-session .m3-button--text,
+.aside-session .m3-icon-button--standard {
+  color: var(--md-sys-color-on-tertiary-container);
+}
+@keyframes aside-session-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}

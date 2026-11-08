@@ -1,0 +1,1457 @@
+/* ---------- Compose ---------- Docked windows, full screen, the inline reply and their tools. Recipient fields live in app.css. */
+
+/* ----- Dock ----- */
+.compose-dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 600;
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  /* More windows than fit scroll sideways; the top padding leaves the shadows room inside the scroller. */
+  padding: 32px 16px 0;
+  overflow: auto hidden;
+  overscroll-behavior-x: contain;
+  /* No scrollbar: a trackpad, or a wheel over the title bars, moves along the row. */
+  scrollbar-width: none;
+  pointer-events: none;
+}
+.compose-dock::-webkit-scrollbar {
+  display: none;
+}
+/* Pushed to the right edge like Gmail's but scrollable: justify-content: flex-end would push overflow out of reach. */
+.compose-dock > :first-child {
+  margin-left: auto;
+}
+.compose-window {
+  /* Above a window folding beside it (z-index 0 while it folds). */
+  position: relative;
+  z-index: 1;
+  --compose-bg: var(--md-sys-color-surface-container-lowest);
+  /* Read by the fold in ComposeDock.tsx as the colour it lands on. */
+  --compose-bar-bg: var(--md-sys-color-surface-container-high);
+  pointer-events: auto;
+  /* When they don't fit, the dock scrolls instead of squeezing them. */
+  flex: none;
+  width: min(560px, calc(100vw - 32px));
+  height: min(640px, calc(100dvh - 96px));
+  display: flex;
+  flex-direction: column;
+  /* A docked sheet (SheetBottomTokens): 28 on top, square at the edge. */
+  border-radius: var(--md-sys-shape-corner-extra-large) var(--md-sys-shape-corner-extra-large) 0 0;
+  background: var(--compose-bg);
+  box-shadow: var(--md-sys-elevation-3);
+  overflow: hidden;
+  animation:
+    compose-rise var(--md-sys-motion-spatial-default) backwards,
+    compose-fade var(--md-sys-motion-effects-fast) backwards;
+  transform-origin: bottom right;
+}
+:root[data-theme-mode='dark'] .compose-window,
+:root[data-theme-mode='dark'] .compose-full,
+:root[data-theme-mode='dark'] .inline-compose__card {
+  --compose-bg: var(--md-sys-color-surface-container-high);
+  --compose-bar-bg: var(--md-sys-color-surface-container-highest);
+}
+.compose-window[data-state='minimized'] {
+  width: 280px;
+  height: 56px;
+  background: var(--compose-bar-bg);
+  box-shadow: var(--md-sys-elevation-2);
+  /* Already in place; the bar's title fades in where the fold landed. */
+  animation: none;
+}
+/* Hidden, it keeps its state out of sight. */
+.compose-window__body {
+  display: contents;
+}
+.compose-window__body[hidden] {
+  display: none;
+}
+.compose-warmup {
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  visibility: hidden;
+  pointer-events: none;
+}
+/* Still copies held over the app while compose hands over between docked and full screen. */
+[data-ghost],
+[data-ghost] * {
+  animation: none !important;
+  transition: none !important;
+}
+.compose-warmup .compose-full {
+  left: -10000px;
+  transition: none;
+}
+/* Faded over the contents while folding (veil in ComposeDock). */
+.compose-window__veil {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: var(--compose-bar-bg);
+  opacity: 0;
+  pointer-events: none;
+}
+.compose-window[data-busy] {
+  pointer-events: none;
+}
+.compose-window[data-leaving] {
+  pointer-events: none;
+  animation: compose-out var(--md-sys-motion-effects-default) forwards;
+}
+@keyframes compose-out {
+  to {
+    transform: translateY(40px) scale(0.96);
+    opacity: 0;
+  }
+}
+/* Entrances rise 24px on the spatial spring while fading on the effects one. */
+@keyframes compose-rise {
+  from {
+    transform: translateY(24px);
+  }
+}
+@keyframes compose-fade {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .compose-window,
+  .inline-compose {
+    animation-name: compose-fade !important;
+    animation-duration: 150ms !important;
+  }
+}
+
+/* Part of the sheet (small app bar): same surface, 56 tall, TitleMedium. Minimized, it is the whole window. */
+.compose-window__bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 56px;
+  /* Title, fields, body and Send share the 20px edge. */
+  padding: 0 12px 0 20px;
+  flex: none;
+  cursor: default;
+}
+.compose-window[data-state='minimized'] .compose-window__bar {
+  cursor: pointer;
+  transition: background-color var(--md-sys-motion-effects-fast);
+}
+@media (hover: hover) {
+  .compose-window[data-state='minimized'] .compose-window__bar:hover {
+    background: color-mix(in srgb, var(--md-sys-color-on-surface) 6%, transparent);
+  }
+}
+.compose-window__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font: 500 16px/24px var(--md-ref-typeface-plain);
+  letter-spacing: 0.15px;
+  color: var(--md-sys-color-on-surface);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.compose-window__controls {
+  display: flex;
+  gap: 2px;
+}
+
+/* The three states share one cell and cross-fade, so the title never shifts. */
+.save-status {
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  margin-inline: 8px 4px;
+  color: var(--md-sys-color-on-surface-variant);
+  white-space: nowrap;
+}
+.save-status__text {
+  grid-area: 1 / 1;
+  justify-self: end;
+  opacity: 0;
+  transition: opacity var(--md-sys-motion-effects-default);
+}
+.save-status__text[data-on] {
+  opacity: 1;
+}
+.save-status[data-state='error'] {
+  color: var(--md-sys-color-error);
+}
+.save-status__retry {
+  grid-area: 1 / 2;
+  margin-inline-start: 4px;
+}
+
+/* ----- Full screen ----- */
+.compose-full {
+  --compose-bg: var(--md-sys-color-surface-container-lowest);
+  /* About 80 characters of BodyLarge. */
+  --compose-measure: 720px;
+  position: fixed;
+  z-index: 801;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  /* The whole window less a 16px gutter all round. */
+  width: calc(100vw - 32px);
+  height: calc(100dvh - 32px);
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--md-sys-shape-corner-extra-large);
+  background: var(--compose-bg);
+  box-shadow: var(--md-sys-elevation-3);
+  overflow: hidden;
+  outline: none;
+  transition:
+    opacity var(--md-sys-motion-effects-fast),
+    transform var(--md-sys-motion-spatial-default);
+}
+.compose-full[data-starting-style] {
+  opacity: 0;
+  transform: translateY(24px);
+}
+/* Coming from a docked window, ComposeDock grows it out of that window instead. */
+.compose-full[data-handoff][data-starting-style] {
+  opacity: 1;
+  transform: none;
+}
+.compose-full[data-ending-style] {
+  opacity: 0;
+  transform: translateY(24px);
+  transition:
+    opacity var(--md-sys-motion-effects-fast),
+    transform var(--md-sys-motion-effects-fast);
+}
+.compose-full[data-compact] {
+  width: 100vw;
+  height: 100dvh;
+  border-radius: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .compose-full {
+    transition-duration: 150ms !important;
+  }
+  .compose-full[data-starting-style],
+  .compose-full[data-ending-style] {
+    transform: none;
+  }
+}
+
+/* Too narrow for its rail (a small window, not a phone): one centred column. */
+.compose-full:not([data-compact]) .compose-form:not(.compose-form--wide) .compose-fields,
+.compose-full:not([data-compact]) .compose-form:not(.compose-form--wide) .compose-footer {
+  width: 100%;
+  max-width: calc(var(--compose-measure) + 40px);
+  margin-inline: auto;
+}
+.compose-full:not([data-compact]) .compose-form:not(.compose-form--wide) .compose-body > * {
+  max-width: var(--compose-measure);
+  margin-inline: auto;
+}
+
+/* ----- The form ----- */
+/* Outside the expanded page these wrappers add nothing to the layout. */
+.compose-sheet,
+.compose-people {
+  display: contents;
+}
+.compose-form {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.compose-fields {
+  padding: 0 20px;
+  flex: none;
+}
+.compose-from,
+.compose-subject,
+.compose-summary {
+  background-image: linear-gradient(var(--md-sys-color-outline), var(--md-sys-color-outline));
+  background-size: 100% 1px;
+  background-position: bottom;
+  background-repeat: no-repeat;
+}
+.compose-from {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 4px 0;
+}
+.compose-from select {
+  border: none;
+  background: transparent;
+  outline: none;
+  font: 400 16px/24px var(--md-ref-typeface-plain);
+  letter-spacing: 0.5px;
+}
+.compose-from .compose-from__select {
+  box-shadow: none;
+  height: 36px;
+  padding-left: 4px;
+  flex: 1;
+  background: transparent;
+}
+@media (hover: hover) {
+  .compose-from .compose-from__select:hover {
+    background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+  }
+}
+.compose-from--fixed {
+  cursor: default;
+}
+.compose-from__address {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.compose-subject {
+  width: 100%;
+  height: 48px;
+  padding: 0;
+  border: none;
+  outline: none;
+  background-color: transparent;
+  font: 400 16px/24px var(--md-ref-typeface-plain);
+  letter-spacing: 0.5px;
+  color: var(--md-sys-color-on-surface);
+}
+.compose-subject::placeholder {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* Folded into one line until you open them. */
+.compose-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  margin: 0 20px;
+  min-height: 44px;
+  padding: 0;
+  border: none;
+  background-color: transparent;
+  color: var(--md-sys-color-on-surface);
+  font: 400 16px/24px var(--md-ref-typeface-plain);
+  letter-spacing: 0.5px;
+  text-align: start;
+  cursor: text;
+}
+.compose-summary__names {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.compose-summary__cc {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.compose-summary__edit {
+  color: var(--md-sys-color-on-surface-variant);
+  opacity: 0;
+  transition: opacity var(--md-sys-motion-effects-fast);
+}
+.compose-summary:hover .compose-summary__edit,
+.compose-summary:focus-visible .compose-summary__edit {
+  opacity: 1;
+}
+
+/* ----- Writing ----- */
+.compose-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 12px 20px;
+  scrollbar-width: thin;
+}
+/* Room to scroll the last lines out from under the floating toolbar. */
+.compose-body[data-toolbar] {
+  padding-bottom: 72px;
+}
+.editor {
+  min-height: 160px;
+  display: flex;
+  flex-direction: column;
+  cursor: text;
+}
+.editor__content {
+  flex: 1;
+  min-height: 100%;
+  outline: none;
+  font: 400 16px/24px var(--md-ref-typeface-plain);
+  letter-spacing: 0.5px;
+  color: var(--md-sys-color-on-surface);
+  caret-color: var(--md-sys-color-primary);
+  overflow-wrap: anywhere;
+}
+.editor__content:focus-visible {
+  outline: none;
+  animation: none;
+}
+.editor__content[data-empty]::before {
+  content: attr(data-placeholder);
+  color: var(--md-sys-color-on-surface-variant);
+  pointer-events: none;
+  position: absolute;
+}
+/* A tinted block here; the mail itself keeps Gmail's quote styling. */
+.editor__content blockquote {
+  margin: 8px 0;
+  padding: 8px 12px;
+  border: 0 !important;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: color-mix(in srgb, var(--md-sys-color-primary) 6%, transparent);
+  color: var(--md-sys-color-on-surface-variant);
+}
+.editor__content a {
+  color: var(--md-sys-color-primary);
+  text-underline-offset: 2px;
+}
+.editor__content ul,
+.editor__content ol {
+  margin: 4px 0;
+  padding-inline-start: 28px;
+}
+.editor__content img {
+  max-width: 100%;
+  height: auto;
+}
+.editor__content .gmail_signature {
+  color: var(--md-sys-color-on-surface-variant);
+}
+/* Signatures often hard-code grey text that disappears on a dark surface. */
+:root[data-theme-mode='dark'] .editor__content .gmail_signature :is(div, span, p, font):not(a) {
+  color: inherit !important;
+}
+.compose-quote .compose__quote-toggle {
+  margin-top: 8px;
+}
+.compose-quote__forward {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  width: 100%;
+  margin-top: 16px;
+  padding: 12px 16px;
+  border: none;
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface);
+  text-align: start;
+  cursor: pointer;
+  transition:
+    background-color var(--md-sys-motion-effects-fast),
+    border-radius var(--md-sys-motion-spatial-fast);
+}
+@media (hover: hover) {
+  .compose-quote__forward:hover {
+    background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, var(--md-sys-color-surface-container));
+  }
+}
+.compose-quote__forward:active {
+  border-radius: var(--md-sys-shape-corner-medium);
+}
+.compose-quote__forward > .m3-icon {
+  color: var(--md-sys-color-primary);
+}
+.compose-quote__hint {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* ----- Footer: attachments, then the action row, with the toolbar floating above ----- */
+.compose-footer {
+  position: relative;
+  flex: none;
+  background: var(--compose-bg);
+}
+.compose-footer__toolbar {
+  position: absolute;
+  z-index: 3;
+  left: 12px;
+  right: 12px;
+  bottom: calc(100% + 4px);
+  display: flex;
+  pointer-events: none;
+}
+.compose-attachments {
+  list-style: none;
+  margin: 0;
+  padding: 8px 20px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 104px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.compose-att {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  max-width: 240px;
+  padding: 0 4px 0 8px;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: var(--md-sys-color-surface-container-high);
+  overflow: hidden;
+  animation: compose-att-in var(--md-sys-motion-spatial-fast) backwards;
+}
+@keyframes compose-att-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+.compose-att__icon {
+  flex: none;
+  color: var(--md-sys-color-primary);
+}
+/* 8 inside the 12px chip, 4 from its edge. */
+.compose-att__thumb {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  margin-inline-start: -2px;
+  border-radius: var(--md-sys-shape-corner-small);
+  object-fit: cover;
+}
+.compose-att__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 500 14px/20px var(--md-ref-typeface-plain);
+  letter-spacing: 0.1px;
+  color: var(--md-sys-color-on-surface);
+}
+.compose-att__size {
+  flex: none;
+  font: 400 12px/16px var(--md-ref-typeface-plain);
+  color: var(--md-sys-color-on-surface-variant);
+  font-variant-numeric: tabular-nums;
+}
+.compose-att--loading {
+  padding-inline-end: 12px;
+}
+.compose-att__progress {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 4px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--md-sys-color-secondary-container);
+  overflow: hidden;
+}
+.compose-att__progress > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--md-sys-color-primary);
+  transform-origin: left;
+  transition: transform 120ms linear;
+}
+
+.compose-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px 12px 20px;
+}
+.compose-actions__group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.compose-actions__spacer {
+  flex: 1;
+}
+.compose-form--narrow .compose-actions {
+  gap: 4px;
+}
+.compose-form--tight .compose-actions {
+  gap: 2px;
+  padding-inline: 12px 8px;
+}
+
+/* SplitButtonSmallTokens: 2px apart, inner corners 4 rounding to 12 on hover and press; the trailing half becomes a circle when its menu opens. */
+.split-button {
+  display: inline-flex;
+  gap: 2px;
+}
+.split-button .split-button__main {
+  border-radius: 20px 4px 4px 20px;
+  padding: 0 12px 0 16px;
+  min-width: 0;
+}
+/* A picked schedule time takes Send's place. */
+.split-button .split-button__main[data-scheduled] {
+  gap: 6px;
+  padding-left: 12px;
+}
+.split-button .split-button__main:hover,
+.split-button .split-button__main:active {
+  border-radius: 20px 12px 12px 20px;
+}
+.split-button .split-button__menu {
+  border-radius: 4px 20px 20px 4px;
+  padding: 0 13px;
+  min-width: 0;
+}
+.split-button .split-button__menu:hover,
+.split-button .split-button__menu:active {
+  border-radius: 12px 20px 20px 12px;
+}
+.split-button .split-button__menu[data-popup-open] {
+  border-radius: 20px;
+}
+.split-button__menu .m3-icon {
+  transition: transform var(--md-sys-motion-spatial-fast);
+}
+.split-button__menu[data-popup-open] .m3-icon {
+  transform: rotate(180deg);
+}
+
+/* ----- Formatting: an M3 Expressive floating toolbar that rises out of its button and folds back in ----- */
+.format-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 100%;
+  padding: 4px 8px;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-sys-color-surface-container);
+  color: var(--md-sys-color-on-surface-variant);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.format-toolbar--floating {
+  pointer-events: auto;
+  box-shadow: var(--md-sys-elevation-3);
+  transform-origin: 40px 100%;
+  transition:
+    transform var(--md-sys-motion-spatial-default),
+    opacity var(--md-sys-motion-effects-fast),
+    visibility 0s;
+}
+.format-toolbar--floating:not([data-open]) {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(12px) scale(0.9);
+  transition:
+    transform var(--md-sys-motion-spatial-fast),
+    opacity var(--md-sys-motion-effects-fast),
+    visibility 0s linear 150ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  .format-toolbar--floating,
+  .format-toolbar--floating:not([data-open]) {
+    transform: none;
+  }
+}
+.format-toolbar__group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+/* Toggle buttons: secondary container, corners squared from 20 to 12. */
+.format-toolbar .m3-icon-button[data-selected] {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+  border-radius: var(--square);
+}
+.format-toolbar .format-toolbar__menu {
+  position: relative;
+  border-radius: var(--round);
+}
+.format-toolbar .format-toolbar__menu[data-popup-open] {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+  border-radius: var(--square);
+}
+/* The current text colour shows on the A's bar. */
+.format-toolbar__swatch {
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  bottom: 8px;
+  height: 4px;
+  border-radius: 2px;
+  pointer-events: none;
+}
+.format-toolbar__swatch:not([style]) {
+  display: none;
+}
+
+.m3-menu.color-menu {
+  min-width: 0;
+}
+.color-menu__grid {
+  display: grid;
+  grid-template-columns: repeat(6, 28px);
+  gap: 8px;
+  padding: 4px 12px 12px;
+}
+.color-menu__swatch {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--md-sys-shape-corner-full);
+  color: #fff;
+  cursor: pointer;
+  outline: none;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent);
+  transition: border-radius var(--md-sys-motion-spatial-fast);
+}
+.color-menu__swatch--light {
+  color: #1f1f1f;
+}
+.color-menu__swatch[data-highlighted],
+.color-menu__swatch[data-current] {
+  border-radius: var(--md-sys-shape-corner-small);
+}
+.color-menu__swatch[data-highlighted] {
+  outline: 2px solid var(--md-sys-color-secondary);
+  outline-offset: 2px;
+}
+.size-menu__sample--2 {
+  font-size: 13px;
+}
+.size-menu__sample--4 {
+  font-size: 18px;
+}
+.size-menu__sample--6 {
+  font-size: 24px;
+  line-height: 28px;
+}
+
+.m3-menu.signature-menu {
+  min-width: 260px;
+}
+.signature-choice {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.signature-choice__preview {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 12px/16px var(--md-ref-typeface-plain);
+  letter-spacing: 0.4px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* ----- Emoji ----- */
+.emoji-picker {
+  display: flex;
+  flex-direction: column;
+  width: 344px;
+  max-width: calc(100vw - 16px);
+  max-height: min(400px, var(--available-height));
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--app-menu-bg);
+  box-shadow: var(--md-sys-elevation-2);
+  overflow: hidden;
+  outline: none;
+  transform-origin: var(--transform-origin);
+  transition:
+    opacity var(--md-sys-motion-effects-fast),
+    transform var(--md-sys-motion-spatial-fast);
+}
+.emoji-picker[data-starting-style],
+.emoji-picker[data-ending-style] {
+  opacity: 0;
+  transform: scale(0.9);
+}
+.emoji-picker[data-ending-style] {
+  transition: opacity var(--md-sys-motion-effects-fast);
+}
+.emoji-picker__search {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 48px;
+  margin: 8px 8px 0;
+  padding: 0 16px;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-surface-variant);
+}
+.emoji-picker__search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: 400 16px/24px var(--md-ref-typeface-plain);
+  letter-spacing: 0.5px;
+  color: var(--md-sys-color-on-surface);
+}
+.emoji-picker__search input::placeholder {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.emoji-picker__scroll {
+  overflow-y: auto;
+  padding: 0 8px 8px;
+  scrollbar-width: thin;
+}
+.emoji-picker__title {
+  margin: 12px 8px 4px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.emoji-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(8, 40px);
+}
+.emoji-picker__item {
+  width: 40px;
+  height: 40px;
+  border: none;
+  padding: 0;
+  border-radius: var(--md-sys-shape-corner-full);
+  background: transparent;
+  font: 24px/1 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+  cursor: pointer;
+  outline: none;
+  transition:
+    background-color var(--md-sys-motion-effects-fast),
+    border-radius var(--md-sys-motion-spatial-fast);
+}
+.emoji-picker__item:hover,
+.emoji-picker__item:focus-visible {
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+}
+.emoji-picker__item:focus-visible {
+  outline: 2px solid var(--md-sys-color-secondary);
+  outline-offset: -2px;
+}
+.emoji-picker__empty {
+  margin: 24px 8px;
+  text-align: center;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* ----- Dropping files ----- */
+.compose-form--drop .compose-body {
+  overflow: hidden;
+}
+.compose-drop {
+  position: absolute;
+  inset: 8px;
+  z-index: 5;
+  border-radius: var(--md-sys-shape-corner-large-increased);
+  background: color-mix(in srgb, var(--md-sys-color-primary-container) 94%, transparent);
+  color: var(--md-sys-color-on-primary-container);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  pointer-events: none;
+  animation: compose-drop-in var(--md-sys-motion-effects-default) backwards;
+}
+.compose-drop__shape {
+  animation: compose-drop-shape var(--md-sys-motion-spatial-default) backwards;
+}
+@keyframes compose-drop-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes compose-drop-shape {
+  from {
+    transform: scale(0.6) rotate(-40deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .compose-drop__shape {
+    animation: none;
+  }
+}
+
+/* ----- Templates ----- */
+.template-picker {
+  position: absolute;
+  left: 20px;
+  bottom: 8px;
+  z-index: 10;
+  min-width: 260px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--app-menu-bg);
+  box-shadow: var(--md-sys-elevation-2);
+  animation: m3-pop 200ms var(--md-sys-motion-easing-emphasized-decelerate);
+}
+.template-picker__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--md-sys-shape-corner-medium);
+  cursor: pointer;
+}
+.template-picker__item[aria-selected='true'] {
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+}
+.template-picker__key {
+  margin-left: auto;
+  opacity: 0.7;
+}
+
+.link-dialog__remove {
+  margin-inline-end: auto;
+}
+
+/* ----- Inline reply ----- */
+.inline-compose {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 20px;
+  animation:
+    compose-rise var(--md-sys-motion-spatial-default) backwards,
+    compose-fade var(--md-sys-motion-effects-fast) backwards;
+}
+.inline-compose__card {
+  --compose-bg: var(--md-sys-color-surface-container-lowest);
+  border-radius: var(--md-sys-shape-corner-extra-large);
+  background: var(--compose-bg);
+  box-shadow: var(--md-sys-elevation-2);
+  /* Clip, not hidden: the action row can still stick to the bottom of the pane. */
+  overflow: clip;
+  display: flex;
+  flex-direction: column;
+}
+.inline-compose__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 0 12px;
+}
+.inline-compose__mode {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 4px 0 8px;
+  border: none;
+  border-radius: var(--md-sys-shape-corner-large);
+  background: transparent;
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  transition: background-color var(--md-sys-motion-effects-fast);
+}
+.inline-compose__mode:hover,
+.inline-compose__mode[data-popup-open] {
+  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+}
+.inline-compose__to {
+  flex: 1;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.compose-form--inline .compose-body {
+  min-height: 140px;
+  overflow: visible;
+}
+.compose-form--inline .compose-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  border-radius: 0 0 var(--md-sys-shape-corner-extra-large) var(--md-sys-shape-corner-extra-large);
+}
+.app[data-compact] .inline-compose {
+  grid-template-columns: minmax(0, 1fr);
+}
+.app[data-compact] .inline-compose__avatar {
+  display: none;
+}
+.app[data-compact] .compose-dock {
+  left: 0;
+  right: 0;
+}
+
+/* ----- Settings > Signatures ----- */
+.signature-row {
+  min-height: 64px;
+}
+.signature-row__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 0;
+  border: none;
+  background: none;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.signature-row__name,
+.signature-row__preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.signature-row__preview {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.signature-empty {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 0 16px;
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-surface-container-low);
+  color: var(--md-sys-color-on-surface-variant);
+}
+.signature-settings__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.signature-settings__heading {
+  margin: 28px 0 4px;
+}
+.signature-defaults {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.signature-defaults__address {
+  margin: 16px 16px 6px;
+  color: var(--md-sys-color-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.signature-defaults .setting-row {
+  min-height: 64px;
+}
+/* The toolbar along the top: 16 outside, 12 inside less the 4px inset. */
+.signature-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 4px 12px;
+  border-radius: var(--md-sys-shape-corner-large);
+  box-shadow: inset 0 0 0 1px var(--md-sys-color-outline);
+}
+.signature-editor:focus-within {
+  box-shadow: inset 0 0 0 2px var(--md-sys-color-primary);
+}
+.signature-editor .format-toolbar {
+  align-self: stretch;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: var(--md-sys-color-surface-container);
+}
+.signature-editor .editor {
+  padding: 4px 12px 0;
+}
+/* Room for the Name field's floating label. */
+.signature-edit {
+  padding-top: 8px;
+}
+
+/* ----- Expanded: a page with a side rail ----- */
+/* The rail sits 12 from the page on three sides; the writing column keeps 40 (32 narrower) from every edge and the rail, which grows with the page (360 to 440). The subject is the title, the people one tonal strip under it, the text a 720 measure, the send row at the foot. */
+.compose-form--wide {
+  --rail: clamp(360px, 24cqi, 440px);
+  --gap: 40px;
+  --sheet-inset: var(--gap);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--rail);
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+@container (max-width: 1200px) {
+  .compose-form--wide {
+    --rail: 320px;
+    --gap: 32px;
+  }
+}
+.compose-full {
+  container-type: inline-size;
+}
+.compose-full:has(.compose-form--wide) .compose-window__title {
+  display: none;
+}
+/* In the rail's top row, level with its first heading. */
+.compose-full:has(.compose-form--wide) .compose-window__bar {
+  position: absolute;
+  z-index: 4;
+  top: 12px;
+  right: 12px;
+  height: 56px;
+  padding: 0 8px 0 16px;
+}
+/* Room for the bar's save status, so the rail's first heading starts under it. */
+.compose-full:has(.compose-form--wide) .compose-rail {
+  padding-top: 56px;
+}
+.compose-form--wide .compose-sheet {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--gap) var(--sheet-inset) 0;
+  scrollbar-width: thin;
+  scrollbar-gutter: stable;
+}
+.compose-form--wide .compose-fields {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+.compose-form--wide .compose-subject {
+  height: auto;
+  resize: none;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  margin: 0 0 20px;
+  font: 500 32px/40px var(--md-ref-typeface-brand);
+  font-variation-settings: 'ROND' 100;
+  letter-spacing: 0;
+  background-image: none;
+}
+.compose-form--wide .compose-subject::placeholder {
+  color: var(--md-sys-color-on-surface-variant);
+  opacity: 0.8;
+}
+.compose-form--wide .compose-people {
+  display: flex;
+  flex-direction: column;
+  padding: 2px 16px;
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-surface-container-low);
+}
+:root[data-theme-mode='dark'] .compose-form--wide .compose-people {
+  background: var(--md-sys-color-surface-container-highest);
+}
+.compose-form--wide .compose-people > :last-child {
+  background-image: none;
+}
+.compose-format-dock {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  margin-top: 12px;
+  padding: 8px 0;
+  /* Only the pill floats over the text; the rest of the row lets clicks through. */
+  pointer-events: none;
+}
+.compose-format-dock .format-toolbar {
+  width: fit-content;
+  pointer-events: auto;
+}
+.compose-form--wide .compose-body {
+  flex: 1 0 auto;
+  min-height: 280px;
+  overflow: visible;
+  padding: 12px 0 32px;
+}
+.compose-form--wide .compose-body .editor {
+  min-height: 100%;
+  max-width: var(--compose-measure);
+}
+.compose-form--wide .template-picker {
+  left: 0;
+}
+.compose-form--wide .compose-footer {
+  grid-column: 1;
+  grid-row: 2;
+  padding-inline: calc(var(--sheet-inset) - 20px) calc(var(--sheet-inset) - 12px);
+}
+.compose-form--wide .compose-actions {
+  padding-block: 12px var(--gap);
+}
+
+/* Its own surface, 16 inside the 28 page. */
+.compose-rail {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+  margin: 12px;
+  margin-left: 0;
+  padding: 8px 16px 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-surface-container-low);
+  scrollbar-width: thin;
+  animation:
+    compose-rail-in var(--md-sys-motion-spatial-default) 80ms backwards,
+    compose-fade var(--md-sys-motion-effects-default) 80ms backwards;
+}
+:root[data-theme-mode='dark'] .compose-rail {
+  background: var(--md-sys-color-surface-container);
+}
+@keyframes compose-rail-in {
+  from {
+    transform: translateX(24px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .compose-rail {
+    animation: compose-fade 150ms backwards;
+  }
+}
+.compose-rail__section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0;
+}
+.compose-rail__title {
+  margin: 0;
+  color: var(--md-sys-color-on-surface);
+}
+.compose-rail__note {
+  margin: 0;
+  color: var(--md-sys-color-on-surface-variant);
+}
+/* Segmented rows, 2 apart, 12 outside and 4 between. */
+.compose-rail__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.compose-recent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 10px 14px 12px;
+  border: none;
+  border-radius: var(--md-sys-shape-corner-extra-small);
+  background: var(--md-sys-color-surface-container-lowest);
+  color: var(--md-sys-color-on-surface);
+  text-align: start;
+  cursor: pointer;
+  transition:
+    background-color var(--md-sys-motion-effects-fast),
+    border-radius var(--md-sys-motion-spatial-fast);
+}
+:root[data-theme-mode='dark'] .compose-recent {
+  background: var(--md-sys-color-surface-container-high);
+}
+.compose-rail__list > li:first-child > .compose-recent {
+  border-top-left-radius: var(--md-sys-shape-corner-medium);
+  border-top-right-radius: var(--md-sys-shape-corner-medium);
+}
+.compose-rail__list > li:last-child > .compose-recent {
+  border-bottom-left-radius: var(--md-sys-shape-corner-medium);
+  border-bottom-right-radius: var(--md-sys-shape-corner-medium);
+}
+@media (hover: hover) {
+  .compose-recent:not(.compose-recent--loading):hover {
+    border-radius: var(--md-sys-shape-corner-medium);
+    background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, var(--md-sys-color-surface-container-lowest));
+  }
+}
+.compose-recent:focus-visible {
+  outline: 3px solid var(--md-sys-color-secondary);
+  outline-offset: 2px;
+}
+.compose-recent--loading {
+  cursor: default;
+  animation: sk-pulse 1.6s ease-in-out infinite;
+}
+.compose-recent__head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.compose-recent__subject {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.compose-recent__date {
+  flex: none;
+  color: var(--md-sys-color-on-surface-variant);
+  font-variant-numeric: tabular-nums;
+}
+.compose-recent__snippet {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  color: var(--md-sys-color-on-surface-variant);
+}
+.compose-rail__count {
+  margin: auto 0 0;
+  padding-top: 12px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Two across, a picture or the file's glyph on a tinted preview. 12 corners inside the 16 rail. */
+.compose-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.compose-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 6px 6px 10px;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: var(--md-sys-color-surface-container-lowest);
+  animation: compose-att-in var(--md-sys-motion-spatial-fast) backwards;
+}
+:root[data-theme-mode='dark'] .compose-tile {
+  background: var(--md-sys-color-surface-container-high);
+}
+.compose-tile__preview {
+  display: grid;
+  place-items: center;
+  height: 88px;
+  margin-bottom: 6px;
+  border-radius: var(--md-sys-shape-corner-small);
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+  overflow: hidden;
+}
+.compose-tile__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.compose-tile__name,
+.compose-tile__size {
+  padding-inline: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.compose-tile__size {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.compose-tile .compose-tile__remove {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+.compose-tile__progress {
+  position: static;
+  margin: 6px 4px 0;
+}
+.compose-tile--add {
+  padding: 0;
+  background: none;
+  animation: none;
+}
+.compose-tile__add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+  min-height: 136px;
+  padding: 12px;
+  border: none;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
+  color: var(--md-sys-color-primary);
+  text-align: center;
+  cursor: pointer;
+  transition:
+    background-color var(--md-sys-motion-effects-fast),
+    border-radius var(--md-sys-motion-spatial-fast);
+}
+.compose-tile__add:hover {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 14%, transparent);
+}
+.compose-tile__add:active {
+  border-radius: var(--md-sys-shape-corner-large);
+}
+.compose-tile__hint {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* Readable beside what you write. */
+.compose-quote-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: var(--md-sys-color-surface-container-lowest);
+  overflow: hidden;
+}
+:root[data-theme-mode='dark'] .compose-quote-card {
+  background: var(--md-sys-color-surface-container-high);
+}
+.compose-quote-card__text {
+  max-height: 320px;
+  margin: 0;
+  padding: 12px 16px;
+  overflow-y: auto;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  color: var(--md-sys-color-on-surface-variant);
+  scrollbar-width: thin;
+}
+.compose-quote-card__open {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: none;
+  background: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
+  color: var(--md-sys-color-primary);
+  text-align: start;
+  cursor: pointer;
+  transition: background-color var(--md-sys-motion-effects-fast);
+}
+.compose-quote-card__open:hover {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 14%, transparent);
+}
