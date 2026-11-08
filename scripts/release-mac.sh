@@ -18,7 +18,7 @@ rm -rf "$DD"
 xcodebuild -project "safari/Expressive Gmail/Expressive Gmail.xcodeproj" -scheme "Expressive Gmail" -configuration Release \
   -destination 'platform=macOS' -derivedDataPath "$DD" \
   DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$IDENTITY" OTHER_CODE_SIGN_FLAGS=--timestamp \
-  ENABLE_HARDENED_RUNTIME=YES CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$VERSION" build >/dev/null
+  ENABLE_HARDENED_RUNTIME=YES CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO PROVISIONING_PROFILE_REQUIRED=NO MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$VERSION" build >/dev/null
 APP="$DD/Build/Products/Release/Expressive Gmail.app"
 sh scripts/embed-chromium.sh "$APP" "$IDENTITY"
 codesign --verify --deep --strict "$APP"
@@ -27,6 +27,7 @@ ZIP=".output/Expressive-Gmail-$VERSION.zip"
 rm -f "$ZIP"
 ditto -c -k --keepParent "$APP" "$ZIP"
 # Debug-only entitlements (get-task-allow) are left out above; notarization refuses them.
+# Developer ID needs no provisioning profile for the sandbox alone; only the App Store build asks for one.
 OUT=$(xcrun notarytool submit "$ZIP" --keychain-profile "$NOTARY_PROFILE" --wait)
 echo "$OUT"
 echo "$OUT" | grep -q "status: Accepted" || { echo "Notarization failed. Details: xcrun notarytool log <id> --keychain-profile $NOTARY_PROFILE" >&2; exit 1; }

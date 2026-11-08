@@ -8,18 +8,24 @@ npx wxt build -b safari --mv3
 xcrun safari-web-extension-packager .output/safari-mv3 \
   --project-location safari --app-name "Expressive Gmail" --bundle-identifier "$APP_ID" \
   --swift --macos-only --copy-resources --no-open --no-prompt --force >/dev/null
-PBX="safari/Expressive Gmail/Expressive Gmail.xcodeproj/project.pbxproj"
+PROJ="safari/Expressive Gmail/Expressive Gmail.xcodeproj"
+VERSION=$(node -p "require('./package.json').version")
+grep -rl "extensionBundleIdentifier\|\.Extension\"" "safari/Expressive Gmail/Expressive Gmail" 2>/dev/null | while read -r f; do
+  sed -i '' -E "s/\"[A-Za-z0-9.-]+\.Extension\"/\"$APP_ID.Extension\"/" "$f"
+done
+# Xcode 27's packager writes project.xcproj; patch-xcproj.mjs makes the same edits as the pbxproj steps below.
+if [ -f "$PROJ/project.xcproj" ]; then
+PBX="$PROJ/project.xcproj"
+node scripts/patch-xcproj.mjs "$PBX" "$APP_ID" "$VERSION"
+else
+PBX="$PROJ/project.pbxproj"
 sed -i '' -E "s/PRODUCT_BUNDLE_IDENTIFIER = [^;]*Extension[^;]*;/PRODUCT_BUNDLE_IDENTIFIER = $APP_ID.Extension;/" "$PBX"
 sed -i '' -E "/Extension;/!s/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = $APP_ID;/" "$PBX"
 # Automatic signing skips the extension's App ID and profile on macOS unless asked; the App Store wants both.
 sed -i '' -E "s/(PRODUCT_BUNDLE_IDENTIFIER = $APP_ID\.Extension;)/\1\\
 				PROVISIONING_PROFILE_REQUIRED = YES;/" "$PBX"
-grep -rl "extensionBundleIdentifier\|\.Extension\"" "safari/Expressive Gmail/Expressive Gmail" 2>/dev/null | while read -r f; do
-  sed -i '' -E "s/\"[A-Za-z0-9.-]+\.Extension\"/\"$APP_ID.Extension\"/" "$f"
-done
 # What the Mac App Store reads from the app's Info.plist: its category, the export compliance answer
 # (only HTTPS through the system, which is exempt), the copyright line and the version from package.json.
-VERSION=$(node -p "require('./package.json').version")
 sed -i '' -E "s/INFOPLIST_KEY_NSPrincipalClass = NSApplication;/INFOPLIST_KEY_NSPrincipalClass = NSApplication;\\
 				INFOPLIST_KEY_LSApplicationCategoryType = \"public.app-category.productivity\";\\
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;/" "$PBX"
@@ -27,6 +33,7 @@ sed -i '' -E "s/INFOPLIST_KEY_NSHumanReadableCopyright = \"\";/INFOPLIST_KEY_NSH
 # The packager targets the running macOS; the app runs from Monterey like its extension (and the Homebrew cask).
 # It never opens files, so it doesn't ask for the sandbox's user-selected files access the template adds.
 sed -i '' -E "s/MACOSX_DEPLOYMENT_TARGET = [0-9.]+;/MACOSX_DEPLOYMENT_TARGET = 12.0;/; /ENABLE_USER_SELECTED_FILES = readonly;/d" "$PBX"
+fi
 # The app's own window (safari-app/): a browser picker, the new Gmail switch and Safari's extension state.
 APP="safari/Expressive Gmail/Expressive Gmail"
 cp safari-app/ViewController.swift "$APP/ViewController.swift"
