@@ -195,3 +195,38 @@ test('the Support menu and the command palette open the project on GitHub', asyn
   await page.keyboard.press('Enter');
   expect((await popup).url()).toBe('https://github.com/slukedev/expressive-gmail');
 });
+
+test('undoing an archive opens the row back up instead of snapping it in', async ({ mail, page }) => {
+  await mail.open('inbox');
+  await expect(mail.rows.first()).toBeVisible();
+  const count = await mail.rows.count();
+  await mail.rows.first().hover();
+  await mail.rows.first().getByRole('button', { name: /archive/i }).first().click();
+  await expect(mail.rows).toHaveCount(count - 1);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  const heights = await page.evaluate(async () => {
+    const seen: number[] = [];
+    const end = performance.now() + 900;
+    while (performance.now() < end) {
+      const wrap = document.querySelector('.row-wrap[data-entering]');
+      if (wrap) seen.push(Math.round(wrap.getBoundingClientRect().height));
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+    return seen;
+  });
+  expect(heights.some((h) => h > 0 && h < Math.max(...heights))).toBe(true);
+  await expect(mail.rows).toHaveCount(count);
+});
+
+test('Move to Inbox from All mail, where the row stays, answers with a tint and an Inbox chip', async ({ mail, page }) => {
+  await mail.open('all');
+  await expect(mail.rows.first()).toBeVisible();
+  await mail.rows.first().hover();
+  await mail.rows.first().getByRole('button', { name: /move to inbox/i }).first().click();
+  await expect
+    .poll(() => page.evaluate(() => document.getAnimations().some((a) => (a.effect as KeyframeEffect)?.target?.classList.contains('row') && a instanceof Animation && !(a instanceof CSSTransition))))
+    .toBe(true);
+  // The row never leaves, and never slides.
+  await expect(mail.rows.first()).toBeVisible();
+  await expect(mail.rows.first()).toContainText('Inbox');
+});

@@ -101,10 +101,11 @@ function darkBorder(c: Rgb, paper: Rgb): Rgb {
 const SKIP = new Set(['IMG', 'PICTURE', 'VIDEO', 'SVG', 'CANVAS', 'IFRAME', 'SCRIPT', 'STYLE', 'BR', 'HR']);
 
 /** Inline !important styles so the email's own CSS can't undo them. Document order, so a parent's new background is known before its children's text is checked against it. */
-export function adaptDocument(doc: Document, paper: Rgb) {
+export function adaptDocument(doc: Document, paper: Rgb, { textOnly = false }: { textOnly?: boolean } = {}) {
   const win = doc.defaultView;
   if (!win) return;
   const backgrounds = new Map<Element, Rgb>();
+  const base = parseColor(win.getComputedStyle(doc.documentElement).color) ?? { r: 227, g: 227, b: 227, a: 1 };
   const elements = [doc.body, ...doc.body.querySelectorAll('*')];
   for (const el of elements) {
     if (SKIP.has(el.tagName.toUpperCase()) || el.closest('svg')) continue;
@@ -113,7 +114,10 @@ export function adaptDocument(doc: Document, paper: Rgb) {
     let bg = parentBg;
     const own = parseColor(style.backgroundColor);
     const hasImage = style.backgroundImage && style.backgroundImage !== 'none';
-    if (own && own.a > 0 && !hasImage) {
+    if (textOnly) {
+      // Plain mail keeps its own surfaces; only text that can't be read on the pane gets lighter.
+      if (own && own.a >= 0.5 && !hasImage) bg = { ...own, a: 1 };
+    } else if (own && own.a > 0 && !hasImage) {
       const next = darkBackground(own, paper);
       if (next !== own) (el as HTMLElement).style.setProperty('background-color', toCss(next), 'important');
       // A see-through tint sits on whatever is under it.
@@ -126,9 +130,12 @@ export function adaptDocument(doc: Document, paper: Rgb) {
 
     const text = parseColor(style.color);
     if (text && text.a > 0 && !hasImage) {
-      const next = readableText(text, bg);
+      let next = readableText(text, bg);
+      // Grey or black text becomes the message's own text color, so it matches the unstyled lines around it.
+      if (textOnly && next !== text && toHsl(text).s < 0.12 && contrast(base, bg) >= 4.5) next = base;
       if (next !== text) (el as HTMLElement).style.setProperty('color', toCss(next), 'important');
     }
+    if (textOnly) continue;
     for (const side of ['top', 'right', 'bottom', 'left'] as const) {
       if (style.getPropertyValue(`border-${side}-style`) === 'none') continue;
       const border = parseColor(style.getPropertyValue(`border-${side}-color`));

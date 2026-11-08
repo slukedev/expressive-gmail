@@ -1,4 +1,7 @@
 import { memo, useEffect, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
+import { isArriving } from '../../data/client';
+import { useMoved } from '../../data/moved';
+import { motionToken } from '../../ui/motion';
 import { mail } from '../../data/actions';
 import { prefetchThread, useMe } from '../../data/hooks';
 import type { Label, ThreadSummary } from '../../data/types';
@@ -45,6 +48,26 @@ const PREFETCH_HOVER_MS = 80;
 
 export const ThreadRow = memo(function ThreadRow({ thread, index, view, active, selected, leaving, pinned, labels }: RowProps) {
   const me = useMe();
+  // Read once, as the row mounts: only a row put back by an undo opens up.
+  const [entering] = useState(() => isArriving(thread.id));
+  const moved = useMoved((s) => s.tokens.get(thread.id));
+  const leavingNow = useRef(leaving);
+  leavingNow.current = leaving;
+  const seen = useRef(moved);
+  useEffect(() => {
+    if (moved === seen.current) return;
+    seen.current = moved;
+    // A row that stays in its list (All mail, a label) can't leave, so it answers with a tint that fades; one that leaves folds away instead.
+    const timer = window.setTimeout(() => {
+      const row = wrapRef.current?.querySelector<HTMLElement>(':scope > .row');
+      if (!row || leavingNow.current || wrapRef.current?.hasAttribute('data-leaving') || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      row.animate([{ backgroundColor: 'color-mix(in srgb, var(--md-sys-color-primary) 16%, transparent)' }], {
+        duration: motionToken('--md-sys-motion-effects-slow').duration + 300,
+        easing: 'cubic-bezier(0.2, 0, 0, 1)',
+      });
+    }, 60);
+    return () => window.clearTimeout(timer);
+  }, [moved]);
   const chosen = useSettings((s) => s.accountMarker);
   const forcedColors = useMediaQuery('(forced-colors: active)');
   const focused = useAccounts((s) => !!s.focus);
@@ -118,7 +141,7 @@ export const ThreadRow = memo(function ThreadRow({ thread, index, view, active, 
   );
   const inFolder = (id: string) => thread.labelIds.includes(id);
   // Searches show where a thread lives, like Gmail's "Inbox" chip.
-  if (view.kind === 'search' && showLabelChips && inFolder('INBOX')) labelChips.unshift({ id: 'INBOX', name: 'Inbox', type: 'system' });
+  if ((view.kind === 'search' || (view.kind === 'folder' && view.folder === 'all')) && showLabelChips && inFolder('INBOX')) labelChips.unshift({ id: 'INBOX', name: 'Inbox', type: 'system' });
 
   const toggleSelect = (e: MouseEvent) => {
     e.stopPropagation();
@@ -162,6 +185,7 @@ export const ThreadRow = memo(function ThreadRow({ thread, index, view, active, 
         role="listitem"
         className="row-wrap"
         data-leaving={leaving || undefined}
+        data-entering={entering || undefined}
         onFocus={() => setArmed(true)}
         // A row mounted under a resting pointer gets no pointerenter.
         onPointerMove={armed ? undefined : () => setArmed(true)}

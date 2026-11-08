@@ -127,13 +127,14 @@ export function sendDraft(d: ComposeDraft, opts: SendOptions = {}) {
         // Session mode can't always send; Gmail's own compose window always can.
         const account = queryClient.getQueryData<{ index: number }>(keys.account);
         snack("This connection can't send that message. Your draft is still here.", {
+          state: 'error',
           timeout: 0,
           action: { label: 'Send in Gmail', onClick: () => openUrl(composeFallbackUrl(message, account?.index ?? 0)) },
         });
       } else if (err instanceof BackendError && err.code === 'unknown') {
-        snack("Gmail didn't confirm the send. Check Sent before trying again.", { timeout: 0 });
+        snack("Gmail didn't confirm the send. Check Sent before trying again.", { state: 'error', timeout: 0 });
       } else {
-        snack(err instanceof Error && err.message ? `Couldn't send: ${err.message}` : "Couldn't send. Your message is back in the compose window.");
+        snack(err instanceof Error && err.message ? `Couldn't send: ${err.message}` : "Couldn't send. Your message is back in the compose window.", { state: 'error' });
       }
     }
   }, delay);
@@ -152,7 +153,7 @@ function scheduleDraft(d: ComposeDraft, sendAt: number) {
   const savedIds = (): Partial<ComposeDraft> => (saved ? { draftId: saved.id, draftMessageId: saved.message.id, threadId: saved.message.threadId } : {});
   const reopen = (patch: Partial<ComposeDraft> = {}) =>
     useUi.getState().openCompose({ ...d, inline: d.inline && getRoute().threadId === d.threadId, window: d.inline ? ('open' as const) : d.window, ...patch });
-  const progress = snack('Scheduling…', { timeout: 0 });
+  const progress = snack('Scheduling…', { state: 'loading' });
   const b = backend();
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: keys.allThreads });

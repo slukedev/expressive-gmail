@@ -1182,8 +1182,15 @@
   align-items: center;
   transition:
     transform var(--md-sys-motion-spatial-default),
-    opacity var(--md-sys-motion-effects-default);
+    opacity var(--md-sys-motion-effects-default),
+    background-color var(--md-sys-motion-effects-default),
+    color var(--md-sys-motion-effects-default);
   transform: translateX(var(--toast-swipe-movement-x, 0)) translateY(var(--toast-swipe-movement-y, 0));
+}
+/* A failure takes the error container so it reads as one before it's read. */
+.m3-snackbar[data-state='error'] {
+  background: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
 }
 .m3-snackbar[data-starting-style] {
   opacity: 0;
@@ -1213,7 +1220,30 @@
   gap: 4px;
   width: 100%;
 }
+/* The state mark takes its place as the snackbar changes: it grows in from nothing, words fade up. */
+.m3-snackbar__lead {
+  flex: none;
+  color: var(--md-sys-color-inverse-primary);
+  margin-inline-end: 12px;
+  animation: snackbar-lead var(--md-sys-motion-spatial-fast) both;
+}
+.m3-snackbar__lead--error {
+  color: var(--md-sys-color-error);
+}
+@keyframes snackbar-lead {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+@keyframes snackbar-text {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
 .m3-snackbar__text {
+  animation: snackbar-text var(--md-sys-motion-effects-default) both;
   flex: 1;
   margin: 0;
   padding: 10px 8px 10px 0;
@@ -1224,6 +1254,7 @@
   border: none;
   background: transparent;
   color: var(--md-sys-color-inverse-primary);
+  transition: color var(--md-sys-motion-effects-default);
   font: 500 14px/20px var(--md-ref-typeface-plain);
   letter-spacing: 0.1px;
   height: 40px;
@@ -1241,6 +1272,10 @@
   display: grid;
   place-items: center;
   cursor: pointer;
+}
+.m3-snackbar[data-state='error'] .m3-snackbar__action,
+.m3-snackbar[data-state='error'] .m3-snackbar__close {
+  color: var(--md-sys-color-on-error-container);
 }
 @media (hover: hover) {
   .m3-snackbar__action:hover,
