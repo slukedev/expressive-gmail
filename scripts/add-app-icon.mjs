@@ -9,6 +9,9 @@ fs.cpSync('safari-app/AppIcon.icon', path.join(app, 'AppIcon.icon'), { recursive
 // Two icons named AppIcon would clash; the .icon one wins.
 fs.rmSync(path.join(app, 'Assets.xcassets/AppIcon.appiconset'), { recursive: true, force: true });
 
+// patch-xcproj.mjs lists the icon in Xcode 27's project.xcproj format.
+if (!pbx.endsWith('.pbxproj')) process.exit(0);
+
 const FILE = 'B0B0A1C0000000000000A001';
 const BUILD = 'B0B0A1C0000000000000A002';
 let text = fs.readFileSync(pbx, 'utf8');
