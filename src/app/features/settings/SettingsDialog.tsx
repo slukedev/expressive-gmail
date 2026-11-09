@@ -26,6 +26,7 @@ import { plural, stripHtml } from '../../lib/format';
 import { local, useLocal } from '../../state/local';
 import { AccountsSettings, NewCircleHost } from '../accounts/AccountsSettings';
 import { Diagnostics } from '../../ui/Diagnostics';
+import { useMediaQuery } from '../../lib/useMediaQuery';
 import { applyPictureColors, usePictureChoice } from '../wallpaper/colors';
 import { keyLabel } from '../../ui/keys';
 import { SidebarSettings } from './SidebarSettings';
@@ -349,6 +350,8 @@ function Toggle({ k, title, description, keywords }: { k: keyof Settings; title:
 
 function General() {
   const s = useSettings((x) => x);
+  // Phones always compose full screen.
+  const compact = useMediaQuery('(max-width: 599px)');
   return (
     <div className="settings-group">
       <Block title="Sending">
@@ -380,6 +383,7 @@ function General() {
         />
       </Row>
       <Toggle k="sendAndArchive" title="Send and archive" keywords="reply" />
+      {!compact && <Toggle k="composeFullScreen" title="Compose in full screen" keywords="maximize expand large big window new message" />}
       <Toggle
         k="attachmentReminder"
         title="Attachment reminder"

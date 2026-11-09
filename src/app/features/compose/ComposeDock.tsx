@@ -2,6 +2,7 @@ import { Dialog as BaseDialog } from '@base-ui/react/dialog';
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useShallow } from 'zustand/react/shallow';
+import { useSettingsStore } from '../../state/settings';
 import { useUi, type ComposeDraft } from '../../state/ui';
 import { IconButton } from '../../ui/Button';
 import { easingFn, motionToken, reducedMotion } from '../../ui/motion';
@@ -545,9 +546,9 @@ function ComposeWindow({ draft, leaving }: { draft: ComposeDraft; leaving?: bool
 function FullCompose({ draft, compact }: { draft: ComposeDraft; compact: boolean }) {
   const ref = useHandoff(draft.key);
   const [fromDock] = useState(() => handoff.has(draft.key));
-  // Escape shrinks it back into its docked window; a phone has no dock, so it saves and closes.
+  // Escape shrinks it back into its docked window. A phone has no dock, and someone who composes full screen by default never asked for one, so there it saves and closes.
   const leave = () => {
-    if (compact) return close(draft);
+    if (compact || useSettingsStore.getState().settings.composeFullScreen) return close(draft);
     const box = document.querySelector(`.compose-full[data-key="${draft.key}"]`);
     if (box) rememberBox(draft.key, box);
     useUi.getState().updateCompose(draft.key, { window: 'open' });

@@ -16,7 +16,7 @@ import { useLocal } from '../../state/local';
 import { useSettings } from '../../state/settings';
 import { useUi } from '../../state/ui';
 import { LinearProgress } from '../../ui/Progress';
-import { CategoryTabs } from './CategoryTabs';
+import { CategoryTabs, useCategoryUnread } from './CategoryTabs';
 import { ListEmpty, ListError } from './ListStates';
 import { ListSkeleton } from './ListSkeleton';
 import { ListToolbar } from './ListToolbar';
@@ -184,7 +184,10 @@ export function ListPane({ split }: { split: boolean }) {
   }, [route.threadId, orderedIds]);
 
   const showTabs = (isInbox && inboxType === 'categories') || view.kind === 'category';
-  const heroMeta = useHeroMeta(view, labels, list.data?.pages[0]?.resultSizeEstimate, list.data?.pages[0]?.resultSizeAtLeast);
+  const heroCategory = view.kind === 'category' && view.category !== 'primary' ? view.category : null;
+  const categoryLabelUnread = heroCategory ? (labels.find((l) => l.id === CATEGORY_LABEL[heroCategory])?.unreadCount ?? 0) : 0;
+  const categoryUnread = useCategoryUnread(heroCategory ?? '', categoryLabelUnread, !!heroCategory);
+  const heroMeta = useHeroMeta(view, labels, list.data?.pages[0]?.resultSizeEstimate, list.data?.pages[0]?.resultSizeAtLeast, categoryUnread);
   const ptrRef = useRef<HTMLDivElement>(null);
   const ptrArrowRef = useRef<HTMLSpanElement>(null);
   const ptr = usePullToRefresh(
@@ -440,7 +443,13 @@ function UnavailableNotice({ missing, onRetry }: { missing: { email: string; mes
 }
 
 /** Counts come from the label list, the same source as the menu. */
-function useHeroMeta(view: View, labels: Label[], estimate?: number, atLeast?: boolean): string | null {
+function useHeroMeta(
+  view: View,
+  labels: Label[],
+  estimate?: number,
+  atLeast?: boolean,
+  category?: { count: number | undefined; more: boolean },
+): string | null {
   const unread = (id: string) => labels.find((l) => l.id === id)?.unreadCount ?? 0;
   const total = (id: string) => labels.find((l) => l.id === id)?.totalCount;
   const fmt = (n: number, word: string) => `${n.toLocaleString()} ${word}`;
@@ -451,8 +460,11 @@ function useHeroMeta(view: View, labels: Label[], estimate?: number, atLeast?: b
       if (estimate === undefined) return null;
       return atLeast ? `${estimate.toLocaleString()}+ conversations` : fmt(estimate, estimate === 1 ? 'conversation' : 'conversations');
     case 'category': {
-      const n = view.category === 'primary' ? unread('INBOX') : unread(CATEGORY_LABEL[view.category]);
-      return n ? fmt(n, 'unread') : 'All caught up';
+      if (view.category === 'primary') return unread('INBOX') ? fmt(unread('INBOX'), 'unread') : 'All caught up';
+      // The same inbox count as the tab's badge, so the two never disagree.
+      if (category?.count === undefined) return null;
+      if (!category.count) return 'All caught up';
+      return category.more ? `${category.count.toLocaleString()}+ unread` : fmt(category.count, 'unread');
     }
     case 'label': {
       const l = labels.find((x) => x.name === view.label);

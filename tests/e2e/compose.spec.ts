@@ -1,4 +1,4 @@
-import { expect, test, type Mail } from './fixtures';
+import { DEFAULT_SEED, expect, test, type Mail } from './fixtures';
 
 async function writeMessage(mail: Mail, subject: string, body: string) {
   const { page } = mail;
@@ -521,5 +521,38 @@ test.describe('the Drafts folder', () => {
     await page.getByRole('button', { name: 'Refresh' }).click();
     await expect(mail.row('Toast for Sofia’s graduation')).toBeVisible();
     await expect(mail.row('Peer feedback for Tomás')).toHaveCount(0);
+  });
+});
+
+test.describe('compose in full screen, turned on', () => {
+  test.use({ viewport: { width: 1440, height: 900 }, seed: { ...DEFAULT_SEED, composeFullScreen: true } });
+
+  test('new mail opens full screen, Escape saves and closes, and Exit full screen docks it', async ({ mail, page }) => {
+    await mail.open('inbox');
+    await expect(mail.rows.first()).toBeVisible();
+    await page.keyboard.press('c');
+    const full = page.getByRole('dialog', { name: 'New message' });
+    await expect(full).toBeVisible();
+    await expect(full.getByRole('combobox', { name: 'To' })).toBeFocused();
+    await expect(page.locator('.compose-dock')).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(full).toBeHidden();
+    await expect(page.locator('.compose-dock')).toHaveCount(0);
+
+    await page.keyboard.press('c');
+    await expect(full).toBeVisible();
+    await full.getByRole('textbox', { name: 'Subject' }).fill('Quarterly notes');
+    await page.getByRole('dialog', { name: 'Quarterly notes' }).getByRole('button', { name: 'Exit full screen' }).click();
+    const docked = page.getByRole('region', { name: 'Quarterly notes' });
+    await expect(docked).toHaveAttribute('data-state', 'open');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  });
+
+  test('replies in an open conversation stay inline', async ({ mail }) => {
+    await mail.open('inbox/t-onboarding-v4');
+    await expect(mail.threadHeading).toContainText('Onboarding v4');
+    await mail.thread.getByRole('button', { name: 'Reply', exact: true }).last().click();
+    await expect(mail.thread.getByRole('textbox', { name: 'Message body' })).toBeFocused();
+    await expect(mail.page.getByRole('dialog')).toHaveCount(0);
   });
 });

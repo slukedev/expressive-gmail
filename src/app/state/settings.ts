@@ -77,6 +77,8 @@ export interface Settings {
   categories: { social: boolean; promotions: boolean; updates: boolean; forums: boolean };
   undoSendSeconds: 0 | 5 | 10 | 20 | 30;
   sendAndArchive: boolean;
+  /** New compose windows open full screen instead of docked. Replies inside a conversation stay inline. */
+  composeFullScreen: boolean;
   defaultReply: 'reply' | 'reply-all';
   externalImages: 'always' | 'ask';
   keyboardShortcuts: boolean;
@@ -150,6 +152,7 @@ export const DEFAULT_SETTINGS: Settings = {
   categories: { social: true, promotions: true, updates: true, forums: false },
   undoSendSeconds: 10,
   sendAndArchive: false,
+  composeFullScreen: false,
   defaultReply: 'reply',
   externalImages: 'always',
   keyboardShortcuts: true,

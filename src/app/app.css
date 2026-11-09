@@ -2578,6 +2578,10 @@ button.att-chip:focus-visible {
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+/* It takes focus so arrow keys scroll it; a ring around the whole pane would mark nothing. */
+.thread-scroll:focus {
+  outline: none;
+}
 .thread-loading {
   display: grid;
   place-items: center;

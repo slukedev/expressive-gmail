@@ -5,6 +5,7 @@ vi.mock('../../src/app/ui/Snackbar', () => ({ snack: () => 0, snackbarManager: {
 
 const { keys, queryClient, setBackend } = await import('../../src/app/data/client');
 const { useUi } = await import('../../src/app/state/ui');
+const { useSettingsStore, DEFAULT_SETTINGS } = await import('../../src/app/state/settings');
 const { composeFromMailto, switchMode } = await import('../../src/app/features/compose/open');
 const { saveAndClose } = await import('../../src/app/features/compose/status');
 const { scheduleDraftSave, resetDraftTimers } = await import('../../src/app/features/compose/send');
@@ -13,6 +14,7 @@ const { appendQuote, signatureBlock, withoutQuotes } = await import('../../src/a
 
 afterEach(() => {
   useUi.setState({ composes: [] });
+  useSettingsStore.setState({ settings: DEFAULT_SETTINGS });
   resetDraftTimers();
   vi.useRealTimers();
 });
@@ -125,5 +127,39 @@ describe('forward then reply', () => {
     release();
     await new Promise((r) => setTimeout(r, 0));
     expect(useUi.getState().composes.find((c) => c.key === key)!.attachments).toEqual([]);
+  });
+});
+
+describe('composing full screen by default', () => {
+  const on = () => useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, composeFullScreen: true } });
+  const windows = () => useUi.getState().composes.map((c) => c.window);
+
+  it('opens new windows full screen, one at a time, folding the last page into the dock', () => {
+    on();
+    const open = useUi.getState().openCompose;
+    open({ mode: 'new' });
+    open({ mode: 'forward', threadId: 't1', window: 'open' });
+    expect(windows()).toEqual(['minimized', 'full']);
+    open({ mode: 'new' });
+    expect(windows()).toEqual(['minimized', 'minimized', 'full']);
+  });
+
+  it('leaves inline replies, and windows asked for minimized, where they were put', () => {
+    on();
+    const open = useUi.getState().openCompose;
+    open({ mode: 'reply', threadId: 't1', inline: true });
+    open({ mode: 'new', window: 'minimized' });
+    expect(windows()).toEqual(['open', 'minimized']);
+  });
+
+  it("is off by default, and a full window opened by hand doesn't count against the dock's three", () => {
+    const open = useUi.getState().openCompose;
+    open({ mode: 'new', window: 'full' });
+    open({ mode: 'new' });
+    open({ mode: 'new' });
+    open({ mode: 'new' });
+    expect(windows()).toEqual(['full', 'open', 'open', 'open']);
+    open({ mode: 'new' });
+    expect(windows()).toEqual(['full', 'minimized', 'open', 'open', 'open']);
   });
 });

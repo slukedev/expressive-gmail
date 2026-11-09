@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Address, OutgoingAttachment } from '../data/types';
 import type { ListFilter } from '../features/list/filters';
+import { useSettingsStore } from './settings';
 
 export interface ComposeDraft {
   key: string;
@@ -96,10 +97,17 @@ export const useUi = create<UiState>((set, get) => ({
       window: 'open',
       ...d,
     };
-    // Gmail keeps at most three docked windows; the oldest minimizes.
-    const docked = get().composes.filter((c) => !c.inline);
+    if (!draft.inline && draft.window === 'open' && useSettingsStore.getState().settings.composeFullScreen) draft.window = 'full';
+    // Gmail keeps at most three docked windows; the oldest minimizes. Only one window is full screen at a time.
+    const docked = get().composes.filter((c) => !c.inline && c.window !== 'full');
     const composes = get().composes.map((c) =>
-      !c.inline && docked.length >= 3 && c.key === docked[0].key ? { ...c, window: 'minimized' as const } : c,
+      c.inline
+        ? c
+        : draft.window === 'full' && c.window === 'full'
+          ? { ...c, window: 'minimized' as const }
+          : draft.window !== 'full' && docked.length >= 3 && c.key === docked[0].key
+            ? { ...c, window: 'minimized' as const }
+            : c,
     );
     set({ composes: [...composes, draft] });
     return key;

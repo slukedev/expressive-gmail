@@ -282,7 +282,7 @@ export function ThreadPane({ threadId, single }: { threadId: string; single?: bo
         )}
       </div>
 
-      <div className="thread-scroll" ref={scrollRef} onScroll={(e) => {
+      <div className="thread-scroll" ref={scrollRef} tabIndex={-1} onScroll={(e) => {
           scrollTop.current = e.currentTarget.scrollTop;
           setScrolled(scrollTop.current > 4);
         }}>

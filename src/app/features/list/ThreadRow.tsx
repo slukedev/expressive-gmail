@@ -11,6 +11,7 @@ import { openThread } from '../../router/useRoute';
 import { openDraftOf } from '../compose/open';
 import { useSettings } from '../../state/settings';
 import { useUi } from '../../state/ui';
+import { focusThread } from '../shortcuts/focus';
 import { Avatar } from '../../ui/Avatar';
 import { IconButton, cx } from '../../ui/Button';
 import { Icon, type IconName } from '../../ui/Icon';
@@ -228,8 +229,9 @@ export const ThreadRow = memo(function ThreadRow({ thread, index, view, active, 
             if (e.key !== 'Enter' || e.target !== e.currentTarget || isComposing(e)) return;
             // The list-wide Enter would open the cursor's row as well.
             e.preventDefault();
-            if (inDrafts) openDraft();
-            else openThread(thread.id, view);
+            if (inDrafts) return openDraft();
+            openThread(thread.id, view);
+            focusThread();
           }}
         >
           <button

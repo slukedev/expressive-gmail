@@ -122,4 +122,114 @@ test.describe('keyboard and focus', () => {
     await page.waitForTimeout(900);
     await expect(page.locator('.m3-tooltip')).toHaveCount(0);
   });
+
+  test('arrow keys walk the list and up into the category rows, and Enter opens one', async ({ mail, page }) => {
+    await mail.open('inbox', 'latency=0');
+    const bodies = mail.list.locator('[data-row-index]');
+    await expect(bodies.nth(2)).toBeVisible();
+
+    await page.keyboard.press('ArrowDown');
+    await expect(bodies.nth(0)).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await expect(bodies.nth(1)).toBeFocused();
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('ArrowUp');
+    // A list beside the reading pane shows the categories as rows above the mail.
+    const categories = page.getByRole('list', { name: 'Inbox categories' }).getByRole('button');
+    const count = await categories.count();
+    expect(count).toBeGreaterThan(1);
+    await expect(categories.last()).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await expect(bodies.nth(0)).toBeFocused();
+    await page.keyboard.press('ArrowUp');
+    for (let i = 1; i < count; i++) await page.keyboard.press('ArrowUp');
+    await expect(categories.first()).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/#category\/\w+$/);
+    await page.keyboard.press('ArrowDown');
+    await expect(bodies.nth(0)).toBeFocused();
+    await page.keyboard.press('End');
+    await expect(bodies.last()).toBeFocused();
+    await page.keyboard.press('Home');
+    await expect(bodies.nth(0)).toBeFocused();
+  });
+
+  test.describe('with a wide list', () => {
+    test.use({ seed: { onboarded: true, undoSendSeconds: 0, readingPane: 'none' } });
+
+    test('Up from the first conversation reaches the open tab; Left, Right and Enter pick another', async ({ mail, page }) => {
+      await mail.open('inbox', 'latency=0');
+      const bodies = mail.list.locator('[data-row-index]');
+      await expect(bodies.nth(1)).toBeVisible();
+      await page.keyboard.press('ArrowDown');
+      await page.keyboard.press('ArrowUp');
+      const tabs = page.getByRole('tablist', { name: 'Inbox categories' });
+      await expect(tabs.getByRole('tab', { name: /^Primary/ })).toBeFocused();
+      await page.keyboard.press('ArrowRight');
+      // Moving along the tabs opens nothing until Enter.
+      await expect(page).toHaveURL(/#inbox$/);
+      await expect(tabs.getByRole('tab').nth(1)).toBeFocused();
+      await page.keyboard.press('Enter');
+      await expect(page).toHaveURL(/#category\/\w+$/);
+      await page.keyboard.press('ArrowDown');
+      await expect(bodies.nth(0)).toBeFocused();
+    });
+
+    test('Enter opens the conversation full screen and arrows scroll it; Esc comes back to its row', async ({ mail, page }) => {
+      await mail.open('inbox', 'latency=0');
+      const long = mail.rowBody('Onboarding v4: final review before handoff');
+      await expect(long).toBeVisible();
+      await long.focus();
+      await page.keyboard.press('Enter');
+      await expect(mail.threadHeading).toContainText('Onboarding v4');
+      const scroller = mail.thread.locator('.thread-scroll');
+      await expect(scroller).toBeFocused();
+      await expect.poll(() => scroller.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+      for (let i = 0; i < 6; i++) await page.keyboard.press('ArrowDown');
+      await expect.poll(() => scroller.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+      // From the toolbar too, after a click moved focus off the conversation.
+      await mail.threadToolbar.getByRole('button').first().focus();
+      const at = await scroller.evaluate((el) => el.scrollTop);
+      await page.keyboard.press('ArrowUp');
+      await expect.poll(() => scroller.evaluate((el) => el.scrollTop)).toBeLessThan(at);
+      await expect(scroller).toBeFocused();
+      await page.keyboard.press('Escape');
+      await expect(page).toHaveURL(/#inbox$/);
+      await expect(long).toBeFocused();
+    });
+  });
+
+  test('with letter shortcuts off, arrows and Enter still move and open', async ({ mail, page }) => {
+    await mail.open('inbox', 'latency=0');
+    await page.evaluate(() => {
+      const s = JSON.parse(localStorage.getItem('bg.settings.v1') ?? '{}');
+      localStorage.setItem('bg.settings.v1', JSON.stringify({ ...s, keyboardShortcuts: false }));
+    });
+    await page.reload();
+    const bodies = mail.list.locator('[data-row-index]');
+    await expect(bodies.nth(1)).toBeVisible();
+    await page.keyboard.press('j');
+    await expect(bodies.nth(0)).not.toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    await expect(bodies.nth(1)).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(/#inbox\/.+/);
+    await page.keyboard.press('Escape');
+    await expect(page).toHaveURL(/#inbox$/);
+    await expect(bodies.nth(1)).toBeFocused();
+  });
+
+  test('in the sidebar, Up and Down move between destinations and Right goes to the list', async ({ mail, page }) => {
+    await mail.open('inbox', 'latency=0');
+    await expect(mail.rows.first()).toBeVisible();
+    const items = mail.nav.locator('.rail-item');
+    await mail.inboxLink.focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(items.nth(1)).toBeFocused();
+    await page.keyboard.press('ArrowUp');
+    await expect(mail.inboxLink).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect(mail.list.locator('[data-row-index]').first()).toBeFocused();
+  });
 });

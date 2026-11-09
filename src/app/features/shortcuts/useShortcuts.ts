@@ -13,6 +13,7 @@ import { aside, isAside, useAside } from '../replylater/store';
 import { nextUnread } from './nextUnread';
 import { selectRangeTo, toggleOne } from '../list/select';
 import { snack } from '../../ui/Snackbar';
+import { focusRow, focusThread, isThreadScroller, scrollThread } from './focus';
 
 const GO: Record<string, Folder> = { i: 'inbox', s: 'starred', b: 'snoozed', t: 'sent', d: 'drafts', a: 'all' };
 
@@ -32,30 +33,107 @@ function targets(): string[] {
   return ui.cursor >= 0 && ids[ui.cursor] ? [ids[ui.cursor]] : [];
 }
 
-function focusRow(i: number) {
-  const ids = getVisibleThreadIds();
-  if (!ids.length) return;
-  const index = Math.max(0, Math.min(ids.length - 1, i));
-  useUi.getState().setCursor(index);
-  // A list coming back from a full-screen thread takes a few frames to show its rows.
-  let tries = 0;
-  const attempt = () => {
-    const el = document.querySelector<HTMLElement>(`.list-scroll [data-row-index="${index}"]`);
-    if (!el || !el.getClientRects().length) {
-      if (++tries < 30) requestAnimationFrame(attempt);
-      return;
-    }
-    el.focus({ preventScroll: true });
-    el.scrollIntoView({ block: 'nearest' });
-  };
-  requestAnimationFrame(attempt);
-}
-
 /** Like Gmail's u: focus goes back to the thread's row. */
 function backToList(threadId: string) {
   closeThread();
   const index = getVisibleThreadIds().indexOf(threadId);
   if (index >= 0) focusRow(index);
+}
+
+type Zone = 'list' | 'tabs' | 'rail' | 'thread';
+
+/** Widgets that already use arrow keys for themselves. */
+const OWN_ARROWS = '[role="radiogroup"], [role="listbox"], [role="slider"], [role="separator"], [role="menu"], [role="combobox"], [role="tree"], [role="grid"], [role="spinbutton"]';
+
+/** Where arrow keys act: the list, the category tabs above it, the sidebar, or the open conversation. */
+function arrowZone(target: EventTarget | null, threadOpen: boolean): Zone | null {
+  const el = target instanceof Element ? target : null;
+  if (!el || el === document.body || el === document.documentElement) return threadOpen ? 'thread' : 'list';
+  if (el.closest(OWN_ARROWS)) return null;
+  if (el.closest('.category-tabs')) return 'tabs';
+  if (el.closest('.list-pane')) return 'list';
+  if (el.closest('nav.rail')) return 'rail';
+  // An email's frame passes its keys up from inside the conversation.
+  if (el.closest('.detail-pane')) return 'thread';
+  return null;
+}
+
+const visible = (el: HTMLElement) => el.getClientRects().length > 0 && el.tabIndex >= 0;
+
+/** Up and Down step through the sidebar's destinations; Right goes to the list. */
+function railArrow(key: string, from: Element): boolean {
+  const rail = from.closest('nav.rail');
+  const items = [...(rail?.querySelectorAll<HTMLElement>('.rail-item') ?? [])].filter(visible);
+  if (!items.length) return false;
+  if (key === 'ArrowRight') {
+    if (!getVisibleThreadIds().length) return false;
+    focusRow(Math.max(useUi.getState().cursor, 0));
+    return true;
+  }
+  const at = items.indexOf(from.closest<HTMLElement>('.rail-item')!);
+  const next =
+    key === 'Home' ? 0 : key === 'End' ? items.length - 1 : at < 0 ? 0 : at + (key === 'ArrowDown' ? 1 : -1);
+  items[Math.max(0, Math.min(items.length - 1, next))]!.focus();
+  return true;
+}
+
+/** Narrow lists show the categories as rows above the conversations instead of tabs. */
+const bundleRows = () => [...document.querySelectorAll<HTMLElement>('.list-pane .bundles .bundle')].filter(visible);
+
+/** Up past the first conversation reaches the categories: the last category row, or the open category's tab. */
+function focusCategories(): boolean {
+  const last = bundleRows().at(-1);
+  const tab = last ?? document.querySelector<HTMLElement>('.category-tabs [role="tab"][aria-selected="true"]');
+  if (!tab?.getClientRects().length) return false;
+  tab.focus();
+  return true;
+}
+
+/** Arrow keys and Home/End. They type nothing, so they work with letter shortcuts turned off. */
+function arrowKey(e: KeyboardEvent): boolean {
+  const { key } = e;
+  if (key !== 'ArrowUp' && key !== 'ArrowDown' && key !== 'ArrowLeft' && key !== 'ArrowRight' && key !== 'Home' && key !== 'End') return false;
+  const route = getRoute();
+  const zone = arrowZone(e.target, !!route.threadId);
+  if (!zone) return false;
+  const vertical = key === 'ArrowUp' || key === 'ArrowDown' || key === 'Home' || key === 'End';
+
+  if (zone === 'rail') return (vertical || key === 'ArrowRight') && railArrow(key, e.target as Element);
+
+  if (zone === 'tabs') {
+    // Left and Right belong to the tabs themselves.
+    if (key !== 'ArrowDown' || !getVisibleThreadIds().length) return false;
+    focusRow(Math.max(useUi.getState().cursor, 0));
+    return true;
+  }
+
+  if (!vertical) return false;
+
+  if (zone === 'thread') {
+    // A focused conversation scrolls the browser's own way, smooth and with key repeat.
+    if (isThreadScroller(document.activeElement)) return false;
+    return scrollThread(key);
+  }
+
+  const ids = getVisibleThreadIds();
+  const bundle = e.target instanceof Element ? e.target.closest<HTMLElement>('.bundles .bundle') : null;
+  if (bundle && (key === 'ArrowUp' || key === 'ArrowDown')) {
+    const all = bundleRows();
+    const next = all[all.indexOf(bundle) + (key === 'ArrowDown' ? 1 : -1)];
+    if (next) next.focus();
+    else if (key === 'ArrowDown' && ids.length) focusRow(0);
+    return true;
+  }
+  if (!ids.length) return key === 'ArrowUp' && focusCategories();
+  const row = e.target instanceof Element ? e.target.closest<HTMLElement>('[data-row-index]') : null;
+  const ui = useUi.getState();
+  const from = row ? Number(row.dataset.rowIndex) : ui.cursor;
+  if (key === 'Home') focusRow(0);
+  else if (key === 'End') focusRow(ids.length - 1);
+  else if (key === 'ArrowDown') focusRow(from < 0 ? 0 : from + 1);
+  else if (from <= 0) return focusCategories();
+  else focusRow(from - 1);
+  return true;
 }
 
 export function useShortcuts() {
@@ -71,9 +149,11 @@ export function useShortcuts() {
         useUi.getState().set({ palette: !useUi.getState().palette });
         return;
       }
-      if (!useSettingsStore.getState().settings.keyboardShortcuts) return;
       if (e.defaultPrevented || editable(e.target) || mod || e.altKey) return;
       if (document.querySelector('[role="dialog"][data-open], [role="menu"]')) return;
+      if (!e.shiftKey && arrowKey(e)) return e.preventDefault();
+      // Enter and Esc type nothing either.
+      if (!useSettingsStore.getState().settings.keyboardShortcuts && e.key !== 'Enter' && e.key !== 'Escape') return;
 
       const key = e.key;
       const route = getRoute();
@@ -146,9 +226,15 @@ export function useShortcuts() {
         }
         case 'o':
         case 'Enter': {
-          if (route.threadId || e.target instanceof HTMLButtonElement) return;
+          // A focused row opens itself, and Enter on any control presses that control.
+          const onPage = e.target === document.body || e.target === document.documentElement;
+          if (route.threadId || (key === 'Enter' ? !onPage : (e.target as Element).closest?.('button, a'))) return;
           const id = getVisibleThreadIds()[Math.max(ui.cursor, 0)];
-          if (id) run(() => openThread(id, route.view));
+          if (id)
+            run(() => {
+              openThread(id, route.view);
+              focusThread();
+            });
           return;
         }
         case 'u':

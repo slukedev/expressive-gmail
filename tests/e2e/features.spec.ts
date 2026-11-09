@@ -230,3 +230,20 @@ test('Move to Inbox from All mail, where the row stays, answers with a tint and 
   await expect(mail.rows.first()).toBeVisible();
   await expect(mail.rows.first()).toContainText('Inbox');
 });
+
+test('a category counts only its unread mail in the inbox, the mail it lists', async ({ mail, page }) => {
+  // The category labels count thousands more unread that were archived long ago, none of it in the inbox.
+  await mail.open('inbox', 'latency=0&unread=14000');
+  await expect(mail.rows.first()).toBeVisible();
+  const promotions = page.getByRole('list', { name: 'Inbox categories' }).getByRole('button', { name: /^Promotions/ });
+  const badge = promotions.locator('.bundle__badge');
+  await expect(badge).toHaveText(/^\d+ new$/);
+  const shown = Number(/\d+/.exec(await badge.innerText())![0]);
+  expect(shown).toBeLessThan(100);
+
+  await promotions.click();
+  await expect(page).toHaveURL(/#category\/promotions$/);
+  await expect(mail.rows.first()).toBeVisible();
+  await expect(mail.rows.locator('.row--unread')).toHaveCount(shown);
+  await expect(page.getByText(`${shown} unread`, { exact: true })).toBeVisible();
+});

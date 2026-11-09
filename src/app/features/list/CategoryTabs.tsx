@@ -12,16 +12,34 @@ import { Tabs, type TabItem } from '../../ui/Tabs';
 import { ShapeIcon } from '../../ui/ShapeIcon';
 import { CATEGORY_TABS, viewIdentity } from './viewIdentity';
 
-// Searches again only when the category's unread count moves (label counts already poll), not on every new mail.
-function useNewSenders(category: string, unread: number, enabled: boolean) {
-  return useQuery({
-    queryKey: ['category-peek', category, unread],
+/**
+ * The category's unread mail in the inbox, which is what its tab lists. The category label's own count also takes in
+ * archived mail, so someone who archives promotions unread would see "14,000 new" over an empty tab.
+ * Searches again only when that label count moves (label counts already poll), not on every new mail.
+ */
+export function useCategoryUnread(category: string, labelUnread: number, enabled: boolean) {
+  const query = useQuery({
+    queryKey: ['category-peek', category, labelUnread],
     queryFn: () => backend().listThreads({ q: `in:inbox category:${category} is:unread`, pageSize: 4 }),
-    enabled: enabled && unread > 0,
+    enabled: enabled && labelUnread > 0,
     staleTime: Infinity,
     gcTime: 10 * 60_000,
     placeholderData: keepPreviousData,
   });
+  const page = labelUnread > 0 ? query.data : undefined;
+  const count = page ? (page.resultSizeEstimate ?? page.threads.length) : 0;
+  return {
+    /** Undefined until the search answers, so nothing shows a guess. */
+    count: labelUnread === 0 ? 0 : page ? count : undefined,
+    /** More than the count says: Gmail stopped counting, or gave no total past the first page. */
+    more: !!page && (!!page.resultSizeAtLeast || (page.resultSizeEstimate === undefined && !!page.nextPageToken)),
+    threads: page?.threads,
+  };
+}
+
+/** "99+" past 99, "4+" when the count is only a floor. */
+export function unreadBadge(count: number, more: boolean) {
+  return count > 99 ? '99+' : more ? `${count}+` : String(count);
 }
 
 export function CategoryTabs({ bundles }: { bundles?: boolean }) {
@@ -34,10 +52,10 @@ export function CategoryTabs({ bundles }: { bundles?: boolean }) {
 
   const unreadOf = (category: string) => labels.find((l) => l.id === CATEGORY_LABEL[category])?.unreadCount ?? 0;
   const peeks = {
-    promotions: useNewSenders('promotions', unreadOf('promotions'), categories.promotions && current !== 'promotions'),
-    social: useNewSenders('social', unreadOf('social'), categories.social && current !== 'social'),
-    updates: useNewSenders('updates', unreadOf('updates'), categories.updates && current !== 'updates'),
-    forums: useNewSenders('forums', unreadOf('forums'), categories.forums && current !== 'forums'),
+    promotions: useCategoryUnread('promotions', unreadOf('promotions'), categories.promotions && current !== 'promotions'),
+    social: useCategoryUnread('social', unreadOf('social'), categories.social && current !== 'social'),
+    updates: useCategoryUnread('updates', unreadOf('updates'), categories.updates && current !== 'updates'),
+    forums: useCategoryUnread('forums', unreadOf('forums'), categories.forums && current !== 'forums'),
   };
 
   if (enabled.length < 2) return null;
@@ -50,9 +68,8 @@ export function CategoryTabs({ bundles }: { bundles?: boolean }) {
         {enabled
           .filter((t) => t.value !== 'primary')
           .map((t) => {
-            const unread = unreadOf(t.value);
+            const { count: unread = 0, more, threads: peek } = peeks[t.value as keyof typeof peeks];
             const colors = labelChipColors(t.hue, dark);
-            const peek = peeks[t.value as keyof typeof peeks].data?.threads;
             // Quiet when there's nothing new: just the name, not "No new mail" three times over.
             const senders = unread > 0 && peek?.length ? participantsLine(uniqueSenders(peek)) : null;
             return (
@@ -74,7 +91,7 @@ export function CategoryTabs({ bundles }: { bundles?: boolean }) {
                   </span>
                   {unread > 0 && (
                     <span className="tab-badge bundle__badge" style={{ background: colors.bg, color: colors.fg }}>
-                      {unread > 99 ? '99+' : unread} new
+                      {unreadBadge(unread, more)} new
                     </span>
                   )}
                 </button>
@@ -86,9 +103,8 @@ export function CategoryTabs({ bundles }: { bundles?: boolean }) {
   }
 
   const items: TabItem[] = enabled.map((t) => {
-    const unread = t.value === 'primary' ? 0 : unreadOf(t.value);
+    const { count: unread = 0, more = false, threads: peek } = t.value === 'primary' ? {} : peeks[t.value];
     const colors = labelChipColors(t.hue, dark);
-    const peek = t.value !== 'primary' ? peeks[t.value].data?.threads : undefined;
     const senders = unread > 0 && peek?.length ? participantsLine(uniqueSenders(peek)) : undefined;
     return {
       value: t.value,
@@ -97,8 +113,8 @@ export function CategoryTabs({ bundles }: { bundles?: boolean }) {
       supporting: unread > 0 && t.value !== current ? senders : undefined,
       badge:
         unread > 0 && t.value !== current ? (
-          <span className="tab-badge" style={{ background: colors.bg, color: colors.fg }} aria-label={`${unread} new`}>
-            {unread > 99 ? '99+' : unread}
+          <span className="tab-badge" style={{ background: colors.bg, color: colors.fg }} aria-label={`${unreadBadge(unread, more)} new`}>
+            {unreadBadge(unread, more)}
             <span className="tab-badge__suffix" aria-hidden="true"> new</span>
           </span>
         ) : undefined,
