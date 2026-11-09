@@ -111,7 +111,7 @@ function mount(bg: string, systemDark: boolean, hide: HTMLStyleElement, rest: HT
   const host = document.createElement('div');
   host.id = 'better-gmail-root';
   // The safe area (a phone's notch and home indicator) is padded here: inside the frame env() reads zero.
-  host.style.cssText = `position:fixed;inset:0;z-index:2147483646;background:${bg};visibility:visible;box-sizing:border-box;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);`;
+  host.style.cssText = `position:fixed;inset:0;z-index:2147483646;background:${bg};visibility:visible;box-sizing:border-box;overflow:clip;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);`;
   const frame = document.createElement('iframe');
   // The frame can't always see the system scheme at first paint; tell it.
   frame.src = `${browser.runtime.getURL('/app.html')}?dark=${systemDark ? 1 : 0}${mapHash(location.hash)}`;
@@ -187,7 +187,7 @@ function mount(bg: string, systemDark: boolean, hide: HTMLStyleElement, rest: HT
         setFavicon(Number(data.unread) || 0);
         break;
       case 'scale':
-        serveFrameScale(frame, data.scale, extOrigin);
+        serveFrameScale(frame, data.scale);
         break;
       case 'theme':
         if (typeof data.background === 'string') {

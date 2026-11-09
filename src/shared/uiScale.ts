@@ -24,25 +24,20 @@ export function readHostUiScale(): UiScale {
 }
 
 /**
- * Zooms the frame the way the browser's own zoom would: the box keeps filling the host and the
- * app lays out in the room the zoom leaves. Chromium and Firefox keep a zoomed frame's box at its
- * size; WebKit shrinks it with the zoom, so there the box is grown back by the same factor.
+ * Scales the frame the way the browser's own zoom would: the app lays out in the window's size over
+ * the scale, and the frame is scaled from its top left corner to fill the window. A transform, not
+ * CSS zoom: every engine draws a transformed frame the way it lays it out, while zoom on a frame
+ * differs (WebKit paints the box smaller a second time, Firefox measures it unzoomed).
  */
 export function applyFrameScale(frame: HTMLIFrameElement, scale: UiScale) {
-  const zoom = scale === 1 ? '' : String(scale);
-  if (frame.style.zoom !== zoom || frame.style.width !== '100%' || frame.style.height !== '100%') {
-    frame.style.zoom = zoom;
-    frame.style.width = '100%';
-    frame.style.height = '100%';
-    const host = frame.parentElement;
-    if (zoom && host) {
-      const shrunk = frame.getBoundingClientRect().width / Math.max(1, host.clientWidth - padding(host));
-      if (Math.abs(shrunk - scale) < 0.02) {
-        frame.style.width = `${100 / scale}%`;
-        frame.style.height = `${100 / scale}%`;
-      }
-    }
-  }
+  const scaled = scale !== 1;
+  const size = scaled ? `${100 / scale}%` : '100%';
+  frame.style.transform = scaled ? `scale(${scale})` : '';
+  frame.style.transformOrigin = scaled ? '0 0' : '';
+  frame.style.width = size;
+  frame.style.height = size;
+  if (scaled) frame.dataset.scale = String(scale);
+  else delete frame.dataset.scale;
   try {
     if (scale === 1) localStorage.removeItem(UI_SCALE_KEY);
     else localStorage.setItem(UI_SCALE_KEY, String(scale));
@@ -51,17 +46,6 @@ export function applyFrameScale(frame: HTMLIFrameElement, scale: UiScale) {
   }
 }
 
-function padding(el: Element) {
-  const cs = getComputedStyle(el);
-  return parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+export function serveFrameScale(frame: HTMLIFrameElement, requested: unknown) {
+  if (isUiScale(requested)) applyFrameScale(frame, requested);
 }
-
-/** Answers with the size applied and the frame's width on screen to check it by. */
-export function serveFrameScale(frame: HTMLIFrameElement, requested: unknown, targetOrigin: string) {
-  if (!isUiScale(requested)) return;
-  applyFrameScale(frame, requested);
-  frame.contentWindow?.postMessage({ source: 'better-gmail/content', type: 'scale', scale: requested, width: frame.getBoundingClientRect().width }, targetOrigin);
-}
-
-/** The zoom took when the frame lays out at its width on screen over the zoom, as the browser's own zoom does. */
-export const scaleTookEffect = (frameWidth: number, hostWidth: number, scale: number) => Math.abs(frameWidth * scale - hostWidth) < 2;

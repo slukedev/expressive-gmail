@@ -1,4 +1,4 @@
-import { applyFrameScale, isUiScale, scaleTookEffect, stepUiScale, uiScaleLabel, UI_SCALES } from '../../src/shared/uiScale';
+import { applyFrameScale, isUiScale, readHostUiScale, serveFrameScale, stepUiScale, uiScaleLabel, UI_SCALES } from '../../src/shared/uiScale';
 
 describe('interface size', () => {
   it('steps through the sizes and holds at the ends', () => {
@@ -20,47 +20,28 @@ describe('interface size', () => {
     expect(UI_SCALES.map(uiScaleLabel)).toEqual(['80%', '90%', '100%', '110%', '125%']);
   });
 
-  it('tells a zoomed frame from one the engine left alone by its viewport width', () => {
-    // A 1366px wide frame at 80% lays out at 1707.5px.
-    expect(scaleTookEffect(1707.5, 1366, 0.8)).toBe(true);
-    expect(scaleTookEffect(1093, 1366, 1.25)).toBe(true);
-    // Left at the host's width, or a smaller box with the app laid out unzoomed inside it.
-    expect(scaleTookEffect(1366, 1366, 0.8)).toBe(false);
-    expect(scaleTookEffect(1092.8, 1092.8, 0.8)).toBe(false);
-  });
-
   describe('sizing the frame', () => {
-    function hosted(shrinks: boolean) {
-      const host = document.createElement('div');
-      const frame = document.createElement('iframe');
-      host.append(frame);
-      document.body.append(host);
-      Object.defineProperty(host, 'clientWidth', { value: 1200 });
-      // WebKit shrinks a zoomed frame's box with the zoom; Chromium and Firefox keep it.
-      frame.getBoundingClientRect = () => {
-        const zoom = Number(frame.style.zoom) || 1;
-        const grown = parseFloat(frame.style.width || '100') / 100;
-        return { width: 1200 * grown * (shrinks ? zoom : 1) } as DOMRect;
-      };
-      return frame;
-    }
+    const style = (f: HTMLIFrameElement) => [f.style.transform, f.style.transformOrigin, f.style.width, f.style.height, f.dataset.scale];
 
-    it('leaves the box alone where the engine keeps it at size', () => {
-      const frame = hosted(false);
+    it('lays the frame out larger and scales it down from its corner to fill the host, and back', () => {
+      const frame = document.createElement('iframe');
       applyFrameScale(frame, 0.8);
-      expect([frame.style.zoom, frame.style.width, frame.style.height]).toEqual(['0.8', '100%', '100%']);
+      expect(style(frame)).toEqual(['scale(0.8)', '0 0', '125%', '125%', '0.8']);
+      applyFrameScale(frame, 1.25);
+      expect(style(frame)).toEqual(['scale(1.25)', '0 0', '80%', '80%', '1.25']);
+      // A new tab opens at the last size before the app has loaded.
+      expect(readHostUiScale()).toBe(1.25);
+      applyFrameScale(frame, 1);
+      expect(style(frame)).toEqual(['', '', '100%', '100%', undefined]);
+      expect(readHostUiScale()).toBe(1);
     });
 
-    it('grows the box back where the engine shrinks it, and undoes that on the way back', () => {
-      const frame = hosted(true);
-      applyFrameScale(frame, 0.8);
-      expect([frame.style.zoom, frame.style.width, frame.style.height]).toEqual(['0.8', '125%', '125%']);
-      expect(frame.getBoundingClientRect().width).toBe(1200);
-      applyFrameScale(frame, 1.25);
-      expect([frame.style.width, frame.style.height]).toEqual(['80%', '80%']);
-      expect(frame.getBoundingClientRect().width).toBe(1200);
-      applyFrameScale(frame, 1);
-      expect([frame.style.zoom, frame.style.width, frame.style.height]).toEqual(['', '100%', '100%']);
+    it('takes only the sizes on offer from the app', () => {
+      const frame = document.createElement('iframe');
+      for (const asked of [0.5, '0.8', null]) serveFrameScale(frame, asked);
+      expect(frame.style.transform).toBe('');
+      serveFrameScale(frame, 0.9);
+      expect(frame.style.transform).toBe('scale(0.9)');
     });
   });
 });

@@ -11,7 +11,7 @@ import { applyPictureColors, usePictureChoice } from '../wallpaper/colors';
 import { CustomSwatch, RandomSwatch } from './ColorChoices';
 import { openAllSettings } from './lazy';
 import { UiScaleSlider } from './UiScaleChoice';
-import { useUiScaleAvailable } from '../../theme/uiScale';
+import { uiScaleAvailable } from '../../theme/uiScale';
 
 function Radio<T extends string>({ name, value, current, onChange, children }: { name: string; value: T; current: T; onChange: (v: T) => void; children: React.ReactNode }) {
   return (
@@ -26,7 +26,7 @@ export function QuickSettings() {
   const open = useUi((s) => s.quickSettings);
   const s = useSettings((x) => x);
   const picture = usePictureChoice();
-  const scalable = useUiScaleAvailable();
+  const scalable = uiScaleAvailable();
   return (
     <BaseDialog.Root open={open} onOpenChange={(o) => useUi.getState().set({ quickSettings: o })}>
       <BaseDialog.Portal>

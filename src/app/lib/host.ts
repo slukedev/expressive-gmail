@@ -37,7 +37,7 @@ export function setHostFavicon(unread: number) {
   post('favicon', { unread });
 }
 
-/** Asks the host page to zoom this frame (`shared/uiScale.ts`). */
+/** Asks the host page to scale this frame (`shared/uiScale.ts`). */
 export function setHostScale(scale: number) {
   post('scale', { scale });
 }

@@ -31,7 +31,7 @@ import { applyPictureColors, usePictureChoice } from '../wallpaper/colors';
 import { keyLabel } from '../../ui/keys';
 import { SidebarSettings } from './SidebarSettings';
 import { UiScaleChoice } from './UiScaleChoice';
-import { useUiScaleAvailable } from '../../theme/uiScale';
+import { uiScaleAvailable } from '../../theme/uiScale';
 import { captureListPlace, restoreListPlace, type ListPlace } from './listPlace';
 import { geminiAvailable, geminiOn, type GeminiStatus } from '../../data/gemini';
 import { useGeminiStatus } from '../gemini/useGemini';
@@ -474,7 +474,7 @@ function General() {
 function Appearance() {
   const s = useSettings((x) => x);
   const picture = usePictureChoice();
-  const scalable = useUiScaleAvailable();
+  const scalable = uiScaleAvailable();
   return (
     <div className="settings-group">
       <Block title="Theme and color">
