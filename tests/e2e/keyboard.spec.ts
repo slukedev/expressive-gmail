@@ -122,4 +122,53 @@ test.describe('keyboard and focus', () => {
     await page.waitForTimeout(900);
     await expect(page.locator('.m3-tooltip')).toHaveCount(0);
   });
+
+  test('a key changed in the shortcuts dialog runs its action, and the old one stops', async ({ mail, page }) => {
+    await mail.open('inbox', 'latency=0');
+    await expect(mail.rows.first()).toBeVisible();
+    await page.keyboard.press('?');
+    const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+    await expect(dialog).toBeVisible();
+
+    const archive = dialog.getByRole('button', { name: /^Change the key for Archive,/ });
+    await archive.click();
+    await expect(dialog.getByRole('button', { name: 'Press a key for Archive' })).toBeFocused();
+    // Esc while listening cancels instead of closing the dialog.
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeVisible();
+    await expect(archive).toHaveAccessibleName('Change the key for Archive, now e or y');
+
+    await archive.click();
+    // Sequence starters are refused; the key keeps listening.
+    await page.keyboard.press('g');
+    await expect(dialog.getByText('Not g or *')).toBeVisible();
+    // Star's key: Star is left without one.
+    await page.keyboard.press('s');
+    await expect(archive).toHaveAccessibleName('Change the key for Archive, now s');
+    await expect(dialog.getByRole('button', { name: 'Change the key for Star or unstar, now none' })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Reset keys' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+
+    await page.keyboard.press('j');
+    await expect(mail.rows.first().locator('[data-row-index]')).toBeFocused();
+    const label = await mail.rows.first().locator('[data-row-index]').getAttribute('aria-label');
+    const before = await mail.rows.count();
+    await page.keyboard.press('e');
+    await page.keyboard.press('j');
+    await page.keyboard.press('k');
+    // e is no longer Archive: the row is still there.
+    await expect(page.getByLabel(label!, { exact: true })).toBeVisible();
+    await expect(mail.rows).toHaveCount(before);
+    await page.keyboard.press('s');
+    await expect(mail.snackbar).toContainText('Conversation archived');
+    await expect(page.getByLabel(label!, { exact: true })).toHaveCount(0);
+    await expect(mail.rows).toHaveCount(before - 1);
+
+    // Reset brings Gmail's keys back.
+    await page.keyboard.press('?');
+    await dialog.getByRole('button', { name: 'Reset keys' }).click();
+    await expect(archive).toHaveAccessibleName('Change the key for Archive, now e or y');
+    await expect(dialog.getByRole('button', { name: 'Reset keys' })).toHaveCount(0);
+  });
 });

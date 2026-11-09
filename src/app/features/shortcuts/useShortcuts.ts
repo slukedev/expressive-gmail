@@ -11,6 +11,7 @@ import { accountScope, useAccounts } from '../../data/accounts/store';
 import { switchScope } from '../accounts/switch';
 import { aside, isAside, useAside } from '../replylater/store';
 import { nextUnread } from './nextUnread';
+import { canonicalKey } from './bindings';
 import { selectRangeTo, toggleOne } from '../list/select';
 import { snack } from '../../ui/Snackbar';
 
@@ -71,15 +72,16 @@ export function useShortcuts() {
         useUi.getState().set({ palette: !useUi.getState().palette });
         return;
       }
-      if (!useSettingsStore.getState().settings.keyboardShortcuts) return;
+      const settings = useSettingsStore.getState().settings;
+      if (!settings.keyboardShortcuts) return;
       if (e.defaultPrevented || editable(e.target) || mod || e.altKey) return;
       if (document.querySelector('[role="dialog"][data-open], [role="menu"]')) return;
 
-      const key = e.key;
       const route = getRoute();
       const ui = useUi.getState();
 
       if (prefix) {
+        const key = e.key;
         const p = prefix;
         prefix = null;
         window.clearTimeout(prefixTimer);
@@ -114,6 +116,9 @@ export function useShortcuts() {
         return;
       }
 
+      // From here on keys are read as Gmail's defaults, so a rebound key runs its action and a key given away does nothing.
+      const key = canonicalKey(e.key, settings.shortcutKeys);
+      if (key === null) return;
       const t = targets();
       const run = (fn: () => void) => {
         e.preventDefault();
