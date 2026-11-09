@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { cleanShortcutKeys, type ShortcutKeys } from '../features/shortcuts/bindings';
 import { DEFAULT_SIDEBAR, type SidebarPrefs } from '../features/shell/sidebarLayout';
 import { PICTURE_SHAPES, type PictureShape } from '../features/wallpaper/shapes';
 import { DEFAULT_SEED, isPresetSeed, normalizeHex, randomSeed, type SchemeVariant } from '../theme/color';
@@ -82,6 +83,8 @@ export interface Settings {
   defaultReply: 'reply' | 'reply-all';
   externalImages: 'always' | 'ask';
   keyboardShortcuts: boolean;
+  /** Keys the person chose in place of Gmail's, by action. */
+  shortcutKeys: ShortcutKeys;
   hoverActions: boolean;
   railExpanded: boolean;
   /** Read through `resolveSidebar`. */
@@ -156,6 +159,7 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultReply: 'reply',
   externalImages: 'always',
   keyboardShortcuts: true,
+  shortcutKeys: {},
   hoverActions: true,
   railExpanded: true,
   sidebar: DEFAULT_SIDEBAR,
@@ -239,6 +243,7 @@ export function fromStorage(stored: unknown): Settings {
   const seed = out.seed as string;
   if (!('customSeed' in stored) && !isPresetSeed(seed) && !(out.wallpaperColors as string[]).includes(seed)) out.customSeed = normalizeHex(seed) ?? '';
   if (out.startView !== 'inbox' && out.startView !== 'all') out.startView = DEFAULT_SETTINGS.startView;
+  out.shortcutKeys = cleanShortcutKeys(out.shortcutKeys);
   if (!isUiScale(out.uiScale)) out.uiScale = 1;
   if (!PICTURE_SHAPES.some((p) => p.shape === out.pictureShape)) out.pictureShape = DEFAULT_SETTINGS.pictureShape;
   // `gemini` was on by default, so only an off was ever a choice; an on follows Gmail.

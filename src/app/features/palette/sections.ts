@@ -11,6 +11,7 @@ import { threadLink } from './links';
 import { byUse, dedupe, groupRanked, prepareAll, rank, verbPage, type Entry, type Ranked, type RankedSection } from './resolve';
 import type { Item, PageRef } from './types';
 import type { LastRun, Use } from './usage';
+import { currentShortcut } from '../../ui/shortcut';
 
 export interface Sources {
   ctx: Context;
@@ -138,7 +139,7 @@ function help(src: Sources, q: string): RankedSection[] {
   const info = prepareAll(
     KEYS.map(([keys, title]) => ({ id: `help:${title}`, title, group: 'Moving around', icon: 'keyboard' as const, shortcut: keys, ephemeral: true, run: () => undefined })),
   );
-  const entries = [...withKeys, ...info].map((e) => ({ ...e, item: { ...e.item, keywords: `${e.item.keywords ?? ''} ${e.item.shortcut}` } }));
+  const entries = [...withKeys, ...info].map((e) => ({ ...e, item: { ...e.item, keywords: `${e.item.keywords ?? ''} ${currentShortcut(e.item.shortcut) ?? ''}` } }));
   const ranked = q ? rank(entries, q, {}, src.now) : plain(entries.map((e) => e.item));
   return groupRanked(ranked, { perGroup: 40, firstGroup: 40, total: 200 });
 }

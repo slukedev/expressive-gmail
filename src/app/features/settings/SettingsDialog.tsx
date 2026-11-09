@@ -461,6 +461,11 @@ function General() {
         />
       </Row>
       <Toggle k="keyboardShortcuts" title="Keyboard shortcuts" keywords="hotkeys keys" description={`Gmail's shortcuts, plus ${keyLabel('Ctrl K')} for the command palette.`} />
+      <Row title="Custom keys" keywords="keyboard shortcuts hotkeys remap rebind change keys">
+        <Button variant="tonal" icon="keyboard" onClick={() => useUi.getState().set({ shortcutsHelp: true })}>
+          Change keys
+        </Button>
+      </Row>
       </Block>
     </div>
   );

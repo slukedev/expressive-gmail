@@ -4967,7 +4967,7 @@ button.att-chip:focus-visible {
 .shortcuts__toggle {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
   padding: 8px 16px;
   margin-bottom: 16px;
   border-radius: 16px;
@@ -4980,6 +4980,10 @@ button.att-chip:focus-visible {
 .shortcuts__group {
   break-inside: avoid;
   margin-bottom: 24px;
+}
+.shortcuts__toggle-label {
+  flex: 1;
+  cursor: pointer;
 }
 .shortcuts__title {
   margin: 0 0 8px;
@@ -4995,14 +4999,55 @@ button.att-chip:focus-visible {
   min-height: 36px;
 }
 .shortcuts__row dt {
-  width: 140px;
+  width: clamp(104px, 34%, 140px);
   flex: none;
   display: flex;
   align-items: center;
   gap: 4px;
 }
 .shortcuts__row dd {
+  flex: 1;
   margin: 0;
+  color: var(--md-sys-color-on-surface-variant);
+}
+/* The key itself is the control: a quiet chip that turns into a prompt while it listens. */
+.shortcuts__key {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  margin-inline-start: -4px;
+  padding: 0 4px;
+  border: none;
+  border-radius: var(--md-sys-shape-corner-small);
+  background: transparent;
+  color: var(--md-sys-color-on-surface);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background-color var(--md-sys-motion-effects-fast),
+    color var(--md-sys-motion-effects-fast);
+}
+.shortcuts__key > :not(.m3-ripple) {
+  position: relative;
+  z-index: 1;
+}
+.shortcuts__key[data-editing] {
+  padding: 0 12px;
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+.shortcuts__key:disabled {
+  cursor: default;
+  opacity: 0.38;
+}
+.shortcuts__none {
+  color: var(--md-sys-color-on-surface-variant);
+}
+.shortcuts__reset {
+  flex: none;
   color: var(--md-sys-color-on-surface-variant);
 }
 kbd {

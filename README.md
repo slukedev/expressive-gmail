@@ -82,7 +82,7 @@ Settings > Connection picks the source:
 - **Tracker blocking**: open-tracking pixels are stripped from every message.
 - Date sections, quick filters, a resizable reading pane, swipe actions and pull to refresh on touch, and undo for every action (`z`).
 
-Everything Gmail web does day to day is still there: categories, labels, search operators, threads, compose with formatting and attachments, drafts, undo send, schedule send, snooze, mute, multi-select and Gmail's keyboard shortcuts.
+Everything Gmail web does day to day is still there: categories, labels, search operators, threads, compose with formatting and attachments, drafts, undo send, schedule send, snooze, mute, multi-select and Gmail's keyboard shortcuts. Like Gmail's custom keyboard shortcuts, any single-key shortcut can take a different key: press `?` and click a key to change it.
 
 ## Develop
 

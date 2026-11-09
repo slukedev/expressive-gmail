@@ -13,7 +13,7 @@ import { useResolvedDark } from '../../theme/ThemeProvider';
 import { Avatar } from '../../ui/Avatar';
 import { IconButton } from '../../ui/Button';
 import { Icon } from '../../ui/Icon';
-import { ariaShortcut } from '../../ui/shortcut';
+import { ariaShortcut, currentShortcut } from '../../ui/shortcut';
 import { snack } from '../../ui/Snackbar';
 import { DateTimeDialog } from '../snooze/DateTimeDialog';
 import { findThread } from '../../data/client';
@@ -382,6 +382,7 @@ interface RowProps {
 const Row = memo(function Row({ r, index, active, onRun, onHover }: RowProps) {
   const { item, hits } = r;
   const checked = item.toggle ?? (item.current !== undefined ? item.current : undefined);
+  const shortcut = currentShortcut(item.shortcut);
   return (
     <div
       id={`palette-opt-${index}`}
@@ -435,9 +436,9 @@ const Row = memo(function Row({ r, index, active, onRun, onHover }: RowProps) {
           {MOD_ENTER}: {item.alt.label}
         </span>
       )}
-      {item.shortcut && !(active && item.alt) && (
+      {shortcut && !(active && item.alt) && (
         <span className="palette__shortcut md-label-large" aria-hidden="true">
-          {keyLabel(item.shortcut)}
+          {keyLabel(shortcut)}
         </span>
       )}
       {item.toggle !== undefined ? (
