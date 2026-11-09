@@ -4,11 +4,12 @@ import { useUi } from '../../state/ui';
 
 /** Runs `fn` with the first match once it's laid out; a pane that just mounted, or a list coming back from a full-screen thread, takes a few frames. */
 function whenShown(selector: string, fn: (el: HTMLElement) => void) {
-  let tries = 0;
+  // By time, not frames: a busy machine draws far fewer of them.
+  const until = performance.now() + 1000;
   const attempt = () => {
     const el = document.querySelector<HTMLElement>(selector);
     if (!el || !el.getClientRects().length) {
-      if (++tries < 30) requestAnimationFrame(attempt);
+      if (performance.now() < until) requestAnimationFrame(attempt);
       return;
     }
     fn(el);
