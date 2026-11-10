@@ -1,6 +1,6 @@
 cask "expressive-gmail" do
-  version "0.1.0"
-  sha256 "6a1224c404c4ca2ae914468621998d4bb02cb4ef78c1d939941ddff97f1deecc"
+  version "0.1.5"
+  sha256 "8d186790dedd8fdabace00f6b2eb2e8c363c565c7b5a33b7243709a4aac9bcee"
 
   url "https://github.com/slukedev/expressive-gmail/releases/download/v#{version}/Expressive-Gmail-#{version}.zip"
   name "Expressive Gmail"
