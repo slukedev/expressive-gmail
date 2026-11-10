@@ -245,6 +245,14 @@ export function ComposeForm({ draft, variant, onEscape, compact }: { draft: Comp
     if (failed) snack(failed === 1 ? "Couldn't read one file. Try attaching it again." : `Couldn't read ${failed} files. Try attaching them again.`);
   };
 
+  // Files the installed app was opened with or shared: attached the same way as picked ones.
+  useEffect(() => {
+    const files = draft.incomingFiles;
+    if (!files?.length) return;
+    useUi.getState().updateCompose(draft.key, { incomingFiles: undefined });
+    void addFiles(files);
+  }, [draft.incomingFiles]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // A reply in a merged inbox can only go out from the account that has the thread.
   const owner = draft.threadId || draft.draftId ? account?.members?.find((m) => m.key === splitId(draft.threadId ?? draft.draftId!).key) : undefined;
   const fromOptions = owner ? (owner.sendAs?.length ? owner.sendAs : [{ name: owner.name, email: owner.email }]) : (account?.sendAs ?? []);

@@ -2,6 +2,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useAccount, useLabels, useMailSync } from '../../data/hooks';
 import { useBackendKind } from '../../data/useBackendKind';
 import { setHostFavicon, setHostTitle } from '../../lib/host';
+import { useAppLaunches } from './useAppLaunches';
 import { useRoute } from '../../router/useRoute';
 import { useSettings, updateSettings } from '../../state/settings';
 import { useUi } from '../../state/ui';
@@ -102,6 +103,7 @@ export function Shell() {
     setHostTitle(`${title}${count}${who ? ` - ${who}` : ''} - Gmail`);
   }, [route.view, inboxUnread, account, splits, scopeTitle]);
   useEffect(() => setHostFavicon(inboxUnread), [inboxUnread]);
+  useAppLaunches(inboxUnread);
 
   const rail = compact ? 'hidden' : medium || !railExpanded ? 'collapsed' : 'expanded';
 

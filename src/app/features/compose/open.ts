@@ -46,6 +46,16 @@ export function newCompose(partial: Partial<ComposeDraft> = {}) {
   return useUi.getState().openCompose({ mode: 'new', html: partial.html ?? signatureHtml(partial.from?.email, 'new'), ...partial });
 }
 
+/** Something shared to the installed app, or files opened with it. Shared text goes in as text. */
+export function composeShared({ subject = '', text = '', files }: { subject?: string; text?: string; files?: File[] }) {
+  const body = text ? escapeHtml(text).replace(/\r?\n/g, '<br>') : '';
+  return newCompose({
+    subject,
+    ...(body ? { html: body + signatureHtml(undefined, 'new') } : {}),
+    ...(files?.length ? { incomingFiles: files } : {}),
+  });
+}
+
 /** Its body is text the sender chose, so it goes in as text (never markup). */
 export function composeFromMailto(href: string) {
   let url: URL;

@@ -19,3 +19,27 @@ window.addEventListener('message', (e) => {
   if (e.source !== frame.contentWindow || d?.source !== 'better-gmail/app') return;
   if (d.type === 'scale') serveFrameScale(frame, d.scale);
 });
+
+// The installed app's host side (src/shared/pwa-host.ts), faked: `?app=install` offers to install,
+// `?app=standalone` runs as the installed app. Tests drive launches through window.__launch.
+const appFlag = new URLSearchParams(location.search).get('app');
+if (appFlag) {
+  const w = window as unknown as { __launch?: (launch: unknown) => void; __appBadge?: unknown; __appCalls?: string[] };
+  const state = { installable: appFlag === 'install', standalone: appFlag === 'standalone', badge: true, mailto: true };
+  w.__appCalls = [];
+  const send = (message: Record<string, unknown>) => frame.contentWindow?.postMessage({ source: 'better-gmail/content', ...message }, location.origin);
+  w.__launch = (launch) => send({ type: 'launch', launch });
+  window.addEventListener('message', (e) => {
+    const d = e.data as { source?: string; type?: string; value?: unknown };
+    if (e.source !== frame.contentWindow || d?.source !== 'better-gmail/app' || !d.type?.startsWith('app-')) return;
+    w.__appCalls!.push(d.type);
+    if (d.type === 'app-hello') send({ type: 'app-state', state });
+    if (d.type === 'app-badge') w.__appBadge = d.value;
+    if (d.type === 'app-mailto') send({ type: 'app-mailto-result', ok: true });
+    if (d.type === 'app-install') {
+      state.installable = false;
+      send({ type: 'app-install-result', outcome: 'accepted' });
+      send({ type: 'app-state', state });
+    }
+  });
+}

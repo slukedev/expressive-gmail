@@ -26,6 +26,8 @@ export interface ComposeDraft {
   quoteHtml?: string;
   /** Send schedules it for then. */
   sendAt?: number;
+  /** Files to attach once the window opens (shared to or opened with the installed app). Taken once. */
+  incomingFiles?: File[];
 }
 
 interface UiState {

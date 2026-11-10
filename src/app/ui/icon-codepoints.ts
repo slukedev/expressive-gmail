@@ -126,6 +126,7 @@ export const ICONS = {
   inbox_customize: 0xf859,
   indeterminate_check_box: 0xe909,
   info: 0xe88e,
+  install_desktop: 0xeb71,
   inventory_2: 0xe1a1,
   join: 0xf84f,
   keep: 0xf027,

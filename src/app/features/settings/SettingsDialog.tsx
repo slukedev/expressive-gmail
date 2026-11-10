@@ -35,6 +35,7 @@ import { uiScaleAvailable } from '../../theme/uiScale';
 import { captureListPlace, restoreListPlace, type ListPlace } from './listPlace';
 import { geminiAvailable, geminiOn, type GeminiStatus } from '../../data/gemini';
 import { useGeminiStatus } from '../gemini/useGemini';
+import { appFeatures, installApp, openEmailLinksHere, useAppHost } from '../../lib/appHost';
 
 const SECTIONS: { id: string; label: string; icon: IconName }[] = [
   { id: 'general', label: 'General', icon: 'tune' },
@@ -47,6 +48,7 @@ const SECTIONS: { id: string; label: string; icon: IconName }[] = [
   { id: 'splits', label: 'Splits', icon: 'filter_alt' },
   { id: 'templates', label: 'Templates', icon: 'text_snippet' },
   { id: 'signatures', label: 'Signatures', icon: 'signature' },
+  { id: 'app', label: 'App', icon: 'install_desktop' },
   { id: 'connection', label: 'Connection', icon: 'sync' },
 ];
 
@@ -96,8 +98,9 @@ export function SettingsDialog() {
   const searching = words.length > 0;
   const searchRef = useRef<HTMLInputElement>(null);
   const caps = useCapabilities();
-  // Labels is only for editing them.
-  const sections = SECTIONS.filter((s) => s.id !== 'labels' || caps.labelsEdit);
+  const appHost = useAppHost();
+  // Labels is only for editing them. App only where the browser can install, badge or take email links.
+  const sections = SECTIONS.filter((s) => (s.id !== 'labels' || caps.labelsEdit) && (s.id !== 'app' || appFeatures(appHost)));
   const current = sections.some((s) => s.id === section) ? section : 'general';
   const goTo = (id: string) => {
     setQuery('');
@@ -206,6 +209,7 @@ export function SettingsDialog() {
               {current === 'splits' && <SplitsSettings />}
               {current === 'templates' && <TemplatesSettings fromDraft={extra} />}
               {current === 'signatures' && <SignatureSettings />}
+              {current === 'app' && <AppSettings />}
               {current === 'connection' && <Connection />}
               </div>
             </div>
@@ -279,6 +283,12 @@ function SearchResults({ words, query, goTo, sections }: { words: string[]; quer
         <h3 className="md-label-large settings-results__head">Gemini</h3>
         <GeminiSettings />
       </section>
+      {sections.some((s) => s.id === 'app') && (
+        <section className="settings-results__group" aria-label="App">
+          <h3 className="md-label-large settings-results__head">App</h3>
+          <AppSettings />
+        </section>
+      )}
       {(jumps.length > 0 || classic) && (
         <section className="settings-results__group" aria-label="Other sections">
           <h3 className="md-label-large settings-results__head">Sections</h3>
@@ -876,6 +886,65 @@ function hasSignInApi() {
   if (import.meta.env.BROWSER === 'safari') return false;
   const ext = (globalThis as { browser?: { runtime?: { id?: string }; identity?: unknown } }).browser;
   return !ext?.runtime?.id || !!ext.identity;
+}
+
+/** The installed app. Each row shows only where this browser offers it. */
+function AppSettings() {
+  const host = useAppHost();
+  const badge = useSettings((s) => s.appBadge);
+  const [installing, setInstalling] = useState(false);
+  const install = async () => {
+    setInstalling(true);
+    const outcome = await installApp();
+    setInstalling(false);
+    if (outcome === 'unavailable') snack('Install it from your browser’s menu instead.');
+  };
+  return (
+    <div className="settings-group">
+      {((host.installable && !host.standalone) || host.badge) && (
+        <Block title="Window and icon">
+          {host.installable && !host.standalone && (
+            <Row title="Install app" description="Its own window, with unread mail on its icon." keywords="pwa install desktop window dock taskbar launcher standalone progressive web app">
+              <Button variant="tonal" icon="install_desktop" disabled={installing} onClick={() => void install()}>
+                Install
+              </Button>
+            </Row>
+          )}
+          {host.badge && (
+            <Row title="Icon badge" keywords="app badge unread count dot dock taskbar icon number">
+              <Select
+                align="end"
+                label="Icon badge"
+                value={badge}
+                onChange={(appBadge) => updateSettings({ appBadge })}
+                options={[
+                  ['count', 'Unread count'],
+                  ['dot', 'Dot'],
+                  ['off', 'Off'],
+                ]}
+              />
+            </Row>
+          )}
+        </Block>
+      )}
+      {host.mailto && (
+        <Block title="Email links">
+          <Row title="Open email links here" description="Email addresses on other sites start a new message here." keywords="mailto default mail app handler protocol links">
+            <Button
+              variant="tonal"
+              icon="mail"
+              onClick={async () => {
+                if (await openEmailLinksHere()) snack('Confirm in your browser to finish.');
+                else snack('Your browser didn’t allow it. Try again.');
+              }}
+            >
+              Allow
+            </Button>
+          </Row>
+        </Block>
+      )}
+    </div>
+  );
 }
 
 function Connection() {

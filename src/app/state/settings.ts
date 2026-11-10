@@ -107,6 +107,8 @@ export interface Settings {
   /** Searches that read as questions get Gemini's answer above the results. */
   geminiSearch: boolean;
   notifications: boolean;
+  /** The installed app's icon: the inbox's unread count, a plain dot, or nothing. */
+  appBadge: 'count' | 'dot' | 'off';
   /** The empty reading pane shows what wants a look today. */
   glance: boolean;
   /** Like Inbox by Gmail. */
@@ -176,6 +178,7 @@ export const DEFAULT_SETTINGS: Settings = {
   geminiReplies: true,
   geminiSearch: true,
   notifications: false,
+  appBadge: 'count',
   glance: true,
   groupByDate: true,
   onboarded: false,
@@ -243,6 +246,7 @@ export function fromStorage(stored: unknown): Settings {
   const seed = out.seed as string;
   if (!('customSeed' in stored) && !isPresetSeed(seed) && !(out.wallpaperColors as string[]).includes(seed)) out.customSeed = normalizeHex(seed) ?? '';
   if (out.startView !== 'inbox' && out.startView !== 'all') out.startView = DEFAULT_SETTINGS.startView;
+  if (!['count', 'dot', 'off'].includes(out.appBadge as string)) out.appBadge = DEFAULT_SETTINGS.appBadge;
   out.shortcutKeys = cleanShortcutKeys(out.shortcutKeys);
   if (!isUiScale(out.uiScale)) out.uiScale = 1;
   if (!PICTURE_SHAPES.some((p) => p.shape === out.pictureShape)) out.pictureShape = DEFAULT_SETTINGS.pictureShape;

@@ -78,6 +78,8 @@ export default defineConfig({
 					"assets/*",
 					"chunks/*",
 					"fonts/*",
+					// The installed app's icons, read into its manifest (src/shared/pwa-host.ts).
+					"icon/*",
 					...(browser === "safari"
 						? ["content-scripts/*", "gmail-main-safari.js"]
 						: []),

@@ -19,6 +19,7 @@ import { fitsDelegated, takesOver } from '../shared/takeover';
 import { discoverDelegated } from '../session/delegated';
 import type { DelegatedMailbox } from '../shared/accounts-rpc';
 import { applyFrameScale, readHostUiScale, serveFrameScale } from '../shared/uiScale';
+import { startAppHost, type AppHost } from '../shared/pwa-host';
 
 // Gmail keeps running hidden underneath so its session stays alive; the app runs in an
 // extension frame on top and reaches mail through a MessagePort this script hands it.
@@ -80,6 +81,8 @@ export default defineContentScript({
     rest.textContent = 'body>*{content-visibility:hidden!important}';
     document.documentElement.append(hide, rest);
     const viewport = fitViewport(ctx.signal);
+    // Safari's web apps run no extensions: one installed from here would open plain Gmail.
+    const app = startAppHost(ctx.signal, { manifest: import.meta.env.BROWSER !== 'safari' });
     // Updated or removed under an open tab, the app frame goes blank: give the tab back to Gmail.
     // WXT's interval is what notices the loss and aborts the context.
     ctx.onInvalidated(() => {
@@ -94,6 +97,7 @@ export default defineContentScript({
         hide.remove();
         rest.remove();
         viewport.remove();
+        app.release();
         // Turned off: don't keep a copy of the inbox or any saved session around.
         void browser.storage.local.remove([BOOT_CACHE_KEY, SESSIONS_KEY]);
         showReturnButton('off');
@@ -101,12 +105,20 @@ export default defineContentScript({
       }
       // So the way back shows the next time it's turned off.
       void browser.storage.local.remove(RETURN_HIDDEN_STORE);
-      mount(bg, systemDark, hide, rest, viewport, ctx.signal);
+      mount(bg, systemDark, hide, rest, viewport, app, ctx.signal);
     });
   },
 });
 
-function mount(bg: string, systemDark: boolean, hide: HTMLStyleElement, rest: HTMLStyleElement, viewport: { remove(): void }, signal: AbortSignal) {
+function mount(
+  bg: string,
+  systemDark: boolean,
+  hide: HTMLStyleElement,
+  rest: HTMLStyleElement,
+  viewport: { remove(): void },
+  app: AppHost,
+  signal: AbortSignal,
+) {
   const extOrigin = new URL(browser.runtime.getURL('/')).origin;
   const host = document.createElement('div');
   host.id = 'better-gmail-root';
@@ -148,10 +160,15 @@ function mount(bg: string, systemDark: boolean, hide: HTMLStyleElement, rest: HT
     if (wantedTitle && document.title !== wantedTitle) document.title = wantedTitle;
   });
 
+  // Every app frame (a reloaded one too) says hello before it asks for anything.
+  app.attach((message) => frame.contentWindow?.postMessage({ source: 'better-gmail/content', ...message }, extOrigin));
+  app.setColor(bg);
+
   const onMessage = (event: MessageEvent) => {
     if (event.source !== frame.contentWindow || event.origin !== extOrigin) return;
     const data = event.data as { source?: string; type?: string; [k: string]: unknown };
     if (data?.source !== APP_SOURCE) return;
+    if (app.handle(data)) return;
     switch (data.type) {
       case 'ready': {
         // A reloaded frame says "ready" again; only its new port is served.
@@ -192,6 +209,7 @@ function mount(bg: string, systemDark: boolean, hide: HTMLStyleElement, rest: HT
       case 'theme':
         if (typeof data.background === 'string') {
           host.style.background = data.background;
+          app.setColor(data.background);
           localStorage.setItem(
             FRAME_BG_KEY,
             JSON.stringify({ background: data.background, light: data.light, dark: data.dark, system: data.system, isDark: data.isDark }),
@@ -212,6 +230,7 @@ function mount(bg: string, systemDark: boolean, hide: HTMLStyleElement, rest: HT
         hide.remove();
         rest.remove();
         viewport.remove();
+        app.release();
         titleObserver.disconnect();
         if (typeof data.hash === 'string' && /^#[\w/-]+$/.test(data.hash)) {
           // The app's routes reach this URL by replaceState, which Gmail never sees; clear it so Gmail gets a real hashchange.

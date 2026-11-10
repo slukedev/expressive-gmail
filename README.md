@@ -81,6 +81,7 @@ Settings > Connection picks the source:
 - **Subscriptions** by sender with one-click unsubscribe, an **attachments** gallery, and **Free up space** for big and old mail.
 - **Material You themes** from any color or your own photo, Google's palette by default, light, dark and system, three contrast levels, dark emails that match the dark theme, and an **interface size** setting for smaller screens.
 - **Tracker blocking**: open-tracking pixels are stripped from every message.
+- **Install it as an app** in Chrome, Edge and other Chromium browsers (Settings > App, or the install button in the address bar): its own window colored to your theme, the unread count on its icon, shortcuts to a new message, Inbox, Starred and Drafts, `mailto:` links from other sites and apps, sharing to it from other apps, and opening files with it to attach them to a new message.
 - Date sections, quick filters, a resizable reading pane, swipe actions and pull to refresh on touch, and undo for every action (`z`).
 
 Everything Gmail web does day to day is still there: categories, labels, search operators, threads, compose with formatting and attachments, drafts, undo send, schedule send, snooze, mute, multi-select and Gmail's keyboard shortcuts. Like Gmail's custom keyboard shortcuts, any single-key shortcut can take a different key: press `?` and click a key to change it.

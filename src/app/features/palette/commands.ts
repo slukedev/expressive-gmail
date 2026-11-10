@@ -37,6 +37,7 @@ import { applyPictureColors, hasPicture } from '../wallpaper/colors';
 import { geminiAvailable, geminiOn, type GeminiFeature, type GeminiStatus } from '../../data/gemini';
 import { useGeminiPanel } from '../gemini/panel';
 import { geminiKeys } from '../gemini/useGemini';
+import { getAppHost, installApp } from '../../lib/appHost';
 
 export interface Env {
   dark: boolean;
@@ -292,6 +293,7 @@ const CHOICES: ChoiceDef[] = [
   { key: 'afterAction', title: 'After archiving or deleting', icon: 'arrow_forward', keywords: 'advance next older newer', options: [['auto', 'Automatic'], ['older', 'Go to the older conversation'], ['newer', 'Go to the newer conversation'], ['list', 'Go back to the list']] },
   { key: 'externalImages', title: 'Images from senders', icon: 'image', keywords: 'pictures remote external', options: [['always', 'Always show'], ['ask', 'Ask first']] },
   { key: 'pageSize', title: 'Conversations per page', icon: 'view_list', keywords: 'page size load', options: [[25, '25'], [50, '50'], [100, '100']] },
+  { key: 'appBadge', title: 'Icon badge', icon: 'notifications_active', keywords: 'app badge unread count dot dock taskbar', options: [['count', 'Unread count'], ['dot', 'Dot'], ['off', 'Off']], available: () => getAppHost().badge },
   { key: 'accountMarker', title: 'Account marker', icon: 'all_inbox', keywords: 'badge dot chip all inboxes', options: [['badge', 'Badge on the photo'], ['dot', 'Dot'], ['chip', 'Chip'], ['off', 'None']] },
 ];
 
@@ -387,6 +389,18 @@ export function settingItems(s: Settings): Item[] {
       });
     }
   }
+  if (getAppHost().installable && !getAppHost().standalone)
+    out.push({
+      id: 'setting:install-app',
+      title: 'Install app',
+      group: 'Settings',
+      icon: 'install_desktop',
+      keywords: 'setting pwa install app window desktop dock taskbar launcher',
+      run: () =>
+        void installApp().then((outcome) => {
+          if (outcome === 'unavailable') snack('Install it from your browser’s menu instead.');
+        }),
+    });
   for (const c of CHOICES) {
     if (c.available && !c.available()) continue;
     const current = c.options.find(([v]) => v === s[c.key]);
