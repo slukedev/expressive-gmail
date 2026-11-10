@@ -2,6 +2,20 @@ import { BackendError } from '../../src/app/data/backend';
 import { mapLabels, parseLabels, toInternalChange } from '../../src/session/labels';
 import { fixture } from './helpers';
 
+describe('category inbox tabs', () => {
+  it("reads each tab's unread count from Gmail's ^sq_ig_i labels, apart from the category's own", () => {
+    // A real /i/s response: Promotions has 1,098 unread in all, 1,048 of them still in the inbox.
+    const root = fixture<unknown[]>('s-send-response-2022.json') as any;
+    const labels = parseLabels(undefined, root[2]);
+    const of = (id: string) => labels.find((l) => l.id === id);
+    expect(of('CATEGORY_PROMOTIONS')).toMatchObject({ unreadCount: 1098, inboxUnreadCount: 1048 });
+    expect(of('CATEGORY_SOCIAL')).toMatchObject({ unreadCount: 0, inboxUnreadCount: 0 });
+    // Gmail sent no unread number for the Updates tab: it stays unknown, not 0.
+    expect(of('CATEGORY_UPDATES')?.inboxUnreadCount).toBeUndefined();
+    expect(of('INBOX')?.inboxUnreadCount).toBeUndefined();
+  });
+});
+
 describe('toInternalChange', () => {
   it('archives the way Gmail does: adds ^a and drops ^i', () => {
     // Gmail's own archive request (gmail.js test data) adds exactly ["^a"] and removes "^i".

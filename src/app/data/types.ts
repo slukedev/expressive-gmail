@@ -37,6 +37,8 @@ export interface Label {
   unreadCount?: number;
   /** Total threads in this label, when the backend knows it. */
   totalCount?: number;
+  /** Categories: unread threads in this category's inbox tab, when the backend keeps that count. */
+  inboxUnreadCount?: number;
   /** Gmail's "Show in label list: hide". */
   hidden?: boolean;
 }

@@ -493,6 +493,8 @@ class DemoBackend implements MailBackend {
     return this.run(() => {
       const total = new Map<string, number>();
       const unread = new Map<string, number>();
+      /** Each category's inbox tab, as Gmail counts it beside the label. */
+      const tab = new Map<string, number>();
       for (const t of this.threads.values()) {
         const idx = this.indexed(t);
         const isUnread = idx.labels.has('UNREAD');
@@ -502,6 +504,7 @@ class DemoBackend implements MailBackend {
           if (!counts) continue;
           total.set(l, (total.get(l) ?? 0) + 1);
           if (isUnread) unread.set(l, (unread.get(l) ?? 0) + 1);
+          if (isUnread && l.startsWith('CATEGORY_') && idx.labels.has('INBOX') && !idx.allTrash && !idx.allSpam) tab.set(l, (tab.get(l) ?? 0) + 1);
         }
       }
       if (this.unreadBoost) {
@@ -516,6 +519,7 @@ class DemoBackend implements MailBackend {
           ...l,
           totalCount: l.id === 'DRAFT' ? this.drafts.size : (total.get(l.id) ?? 0),
           unreadCount: l.id === 'DRAFT' ? 0 : (unread.get(l.id) ?? 0),
+          ...(l.id.startsWith('CATEGORY_') ? { inboxUnreadCount: tab.get(l.id) ?? 0 } : {}),
         });
       }
       const user = [...this.labels.values()].sort((a, b) => a.name.localeCompare(b.name));

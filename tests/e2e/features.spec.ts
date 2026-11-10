@@ -247,3 +247,22 @@ test('a category counts only its unread mail in the inbox, the mail it lists', a
   await expect(mail.rows.locator('.row--unread')).toHaveCount(shown);
   await expect(page.getByText(`${shown} unread`, { exact: true })).toBeVisible();
 });
+
+test("archiving unread mail in a category lowers its count at once, before Gmail's poll", async ({ mail, page }) => {
+  // A slow mailbox, so only the change made in this tab can lower the count in time.
+  await mail.open('inbox', 'latency=1500');
+  const updates = page.getByRole('list', { name: 'Inbox categories' }).getByRole('button', { name: /^Updates/ });
+  const badge = updates.locator('.bundle__badge');
+  await expect(badge).toHaveText(/^\d+ new$/);
+  const before = Number(/\d+/.exec(await badge.innerText())![0]);
+
+  await updates.click();
+  await expect(page.getByText(`${before} unread`, { exact: true })).toBeVisible();
+  const unread = mail.rows.filter({ has: page.locator('.row--unread') }).first();
+  await unread.hover();
+  await unread.getByRole('button', { name: 'Archive' }).first().click();
+  await expect(page.getByText(`${before - 1} unread`, { exact: true })).toBeVisible({ timeout: 1000 });
+
+  await page.goBack();
+  await expect(badge).toHaveText(`${before - 1} new`);
+});

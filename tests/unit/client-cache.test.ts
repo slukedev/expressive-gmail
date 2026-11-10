@@ -207,6 +207,23 @@ describe('withPendingUnread', () => {
     read('t1');
     expect(withPendingUnread(inbox(29), Date.now() + 60_000)[0]!.unreadCount).toBe(29);
   });
+
+  it("adjusts a category's inbox tab apart from its own count, and leaves an uncounted tab unknown", () => {
+    const updates = (unreadCount: number, inboxUnreadCount?: number): Label[] => [
+      { id: 'CATEGORY_UPDATES', name: 'CATEGORY_UPDATES', type: 'system', unreadCount, ...(inboxUnreadCount === undefined ? {} : { inboxUnreadCount }) },
+    ];
+    // Archiving an unread update: the tab drops by one, the label keeps it.
+    queryClient.setQueryData(keys.labels, updates(40, 5));
+    adjustUnread(new Map([['CATEGORY_UPDATES', -1]]), ['t1'], 'inboxUnreadCount');
+    expect(queryClient.getQueryData<Label[]>(keys.labels)![0]).toMatchObject({ unreadCount: 40, inboxUnreadCount: 4 });
+    expect(withPendingUnread(updates(40, 5))[0]).toMatchObject({ unreadCount: 40, inboxUnreadCount: 4 });
+    forgetChange(['t1']);
+    expect(withPendingUnread(updates(40, 5))[0]!.inboxUnreadCount).toBe(5);
+
+    queryClient.setQueryData(keys.labels, updates(40));
+    adjustUnread(new Map([['CATEGORY_UPDATES', -1]]), ['t2'], 'inboxUnreadCount');
+    expect(queryClient.getQueryData<Label[]>(keys.labels)![0]!.inboxUnreadCount).toBeUndefined();
+  });
 });
 
 describe('shareListById', () => {

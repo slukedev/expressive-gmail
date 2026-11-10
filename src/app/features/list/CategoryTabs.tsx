@@ -2,7 +2,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { backend } from '../../data/client';
 import { useLabels } from '../../data/hooks';
 import { CATEGORY_LABEL } from '../../data/views';
-import type { Address } from '../../data/types';
+import type { Address, Label } from '../../data/types';
 import { participantsLine } from '../../lib/format';
 import { navigate, useRoute } from '../../router/useRoute';
 import { useSettings } from '../../state/settings';
@@ -11,36 +11,43 @@ import { useResolvedDark } from '../../theme/ThemeProvider';
 import { Tabs, type TabItem } from '../../ui/Tabs';
 import { ShapeIcon } from '../../ui/ShapeIcon';
 import { CATEGORY_TABS, viewIdentity } from './viewIdentity';
+import { peekCount, unreadBadge } from './categoryCount';
 
 /**
  * The category's unread mail in the inbox, which is what its tab lists. The category label's own count also takes in
  * archived mail, so someone who archives promotions unread would see "14,000 new" over an empty tab.
- * Searches again only when that label count moves (label counts already poll), not on every new mail.
+ * Gmail keeps the inbox tab's count beside the label's, so that comes free with the label poll. Without it, a short
+ * search counts them, and runs again only when the label count moves.
  */
-export function useCategoryUnread(category: string, labelUnread: number, enabled: boolean) {
+export function useCategoryUnread(category: string, label: Label | undefined, enabled: boolean, { senders = true } = {}) {
+  const labelUnread = label?.unreadCount ?? 0;
+  const stored = label?.inboxUnreadCount;
+  const known = stored !== undefined;
   const query = useQuery({
-    queryKey: ['category-peek', category, labelUnread],
-    queryFn: () => backend().listThreads({ q: `in:inbox category:${category} is:unread`, pageSize: 4 }),
-    enabled: enabled && labelUnread > 0,
+    queryKey: ['category-peek', category, known ? `tab ${stored}` : labelUnread],
+    // Gmail's search total is unreliable past one page ("of many" reads as 200+ over six), so the fallback counts a
+    // page itself. Kept small: this runs per category and per account.
+    queryFn: () => backend().listThreads({ q: `in:inbox category:${category} is:unread`, pageSize: known ? SENDERS_PAGE : PEEK_PAGE }),
+    enabled: enabled && (known ? senders && stored > 0 : labelUnread > 0),
     staleTime: Infinity,
     gcTime: 10 * 60_000,
     placeholderData: keepPreviousData,
   });
-  const page = labelUnread > 0 ? query.data : undefined;
-  const count = page ? (page.resultSizeEstimate ?? page.threads.length) : 0;
+  const page = (known ? stored : labelUnread) > 0 ? query.data : undefined;
+  if (known) return { count: stored, more: false, threads: page?.threads };
+  const { count, more } = page ? peekCount(page) : { count: 0, more: false };
   return {
     /** Undefined until the search answers, so nothing shows a guess. */
     count: labelUnread === 0 ? 0 : page ? count : undefined,
-    /** More than the count says: Gmail stopped counting, or gave no total past the first page. */
-    more: !!page && (!!page.resultSizeAtLeast || (page.resultSizeEstimate === undefined && !!page.nextPageToken)),
+    /** More than the count says. */
+    more,
     threads: page?.threads,
   };
 }
 
-/** "99+" past 99, "4+" when the count is only a floor. */
-export function unreadBadge(count: number, more: boolean) {
-  return count > 99 ? '99+' : more ? `${count}+` : String(count);
-}
+const PEEK_PAGE = 10;
+/** Enough for three different senders. */
+const SENDERS_PAGE = 4;
 
 export function CategoryTabs({ bundles }: { bundles?: boolean }) {
   const route = useRoute();
@@ -50,12 +57,12 @@ export function CategoryTabs({ bundles }: { bundles?: boolean }) {
   const current = route.view.kind === 'category' ? route.view.category : 'primary';
   const enabled = CATEGORY_TABS.filter((t) => t.value === 'primary' || categories[t.value]);
 
-  const unreadOf = (category: string) => labels.find((l) => l.id === CATEGORY_LABEL[category])?.unreadCount ?? 0;
+  const labelOf = (category: string) => labels.find((l) => l.id === CATEGORY_LABEL[category]);
   const peeks = {
-    promotions: useCategoryUnread('promotions', unreadOf('promotions'), categories.promotions && current !== 'promotions'),
-    social: useCategoryUnread('social', unreadOf('social'), categories.social && current !== 'social'),
-    updates: useCategoryUnread('updates', unreadOf('updates'), categories.updates && current !== 'updates'),
-    forums: useCategoryUnread('forums', unreadOf('forums'), categories.forums && current !== 'forums'),
+    promotions: useCategoryUnread('promotions', labelOf('promotions'), categories.promotions && current !== 'promotions'),
+    social: useCategoryUnread('social', labelOf('social'), categories.social && current !== 'social'),
+    updates: useCategoryUnread('updates', labelOf('updates'), categories.updates && current !== 'updates'),
+    forums: useCategoryUnread('forums', labelOf('forums'), categories.forums && current !== 'forums'),
   };
 
   if (enabled.length < 2) return null;

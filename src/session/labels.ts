@@ -29,6 +29,15 @@ const SYSTEM: ReadonlyArray<readonly [string, SystemLabelId]> = [
 ];
 
 const TO_API = new Map<string, SystemLabelId>(SYSTEM);
+
+/** Each category's inbox tab: messages carry "^sq_ig_i_promo" beside "^smartlabel_promo", and the label counts include it. */
+const INBOX_SECTION: Partial<Record<SystemLabelId, string>> = {
+  CATEGORY_PERSONAL: '^sq_ig_i_personal',
+  CATEGORY_SOCIAL: '^sq_ig_i_social',
+  CATEGORY_PROMOTIONS: '^sq_ig_i_promo',
+  CATEGORY_UPDATES: '^sq_ig_i_notification',
+  CATEGORY_FORUMS: '^sq_ig_i_group',
+};
 const TO_INTERNAL = new Map<string, string>(SYSTEM.map(([internal, api]) => [api, internal]));
 
 /** User labels are "^x_<n>"; anything without a caret counts as one too. */
@@ -125,7 +134,9 @@ export function parseLabels(defsNode: unknown, countsNode: unknown): Label[] {
 
   for (const api of SYSTEM_ORDER) {
     const c = counts.get(toInternalLabel(api));
-    labels.set(api, { id: api, name: api, type: 'system', ...countFields(c) });
+    const sectionId = INBOX_SECTION[api];
+    const section = sectionId ? counts.get(sectionId)?.unread : undefined;
+    labels.set(api, { id: api, name: api, type: 'system', ...countFields(c), ...(section === undefined ? {} : { inboxUnreadCount: section }) });
   }
 
   for (const row of arr(defsNode) ?? []) {

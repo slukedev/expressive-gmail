@@ -203,6 +203,9 @@ class MergedBackend implements MailBackend {
           ...prev,
           unreadCount: sum(prev.unreadCount, l.unreadCount),
           totalCount: sum(prev.totalCount, l.totalCount),
+          // Only a sum when every account counts it; otherwise the tab falls back to searching.
+          inboxUnreadCount:
+            prev.inboxUnreadCount === undefined || l.inboxUnreadCount === undefined ? undefined : prev.inboxUnreadCount + l.inboxUnreadCount,
           color: prev.color ?? l.color,
           // Shown if any account shows it.
           hidden: prev.hidden && l.hidden ? true : undefined,

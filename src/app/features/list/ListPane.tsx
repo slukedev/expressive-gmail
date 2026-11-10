@@ -185,8 +185,8 @@ export function ListPane({ split }: { split: boolean }) {
 
   const showTabs = (isInbox && inboxType === 'categories') || view.kind === 'category';
   const heroCategory = view.kind === 'category' && view.category !== 'primary' ? view.category : null;
-  const categoryLabelUnread = heroCategory ? (labels.find((l) => l.id === CATEGORY_LABEL[heroCategory])?.unreadCount ?? 0) : 0;
-  const categoryUnread = useCategoryUnread(heroCategory ?? '', categoryLabelUnread, !!heroCategory);
+  const categoryLabel = heroCategory ? labels.find((l) => l.id === CATEGORY_LABEL[heroCategory]) : undefined;
+  const categoryUnread = useCategoryUnread(heroCategory ?? '', categoryLabel, !!heroCategory, { senders: false });
   const heroMeta = useHeroMeta(view, labels, list.data?.pages[0]?.resultSizeEstimate, list.data?.pages[0]?.resultSizeAtLeast, categoryUnread);
   const ptrRef = useRef<HTMLDivElement>(null);
   const ptrArrowRef = useRef<HTMLSpanElement>(null);

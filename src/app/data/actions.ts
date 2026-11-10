@@ -164,6 +164,10 @@ async function afterFreshMail(reapply: () => void) {
   reapply();
 }
 
+const CATEGORIES: LabelId[] = ['CATEGORY_PERSONAL', 'CATEGORY_SOCIAL', 'CATEGORY_PROMOTIONS', 'CATEGORY_UPDATES', 'CATEGORY_FORUMS'];
+const inTab = (t: ThreadSummary, category: LabelId) =>
+  Number(t.labelIds.includes('INBOX') && t.labelIds.includes('UNREAD') && t.labelIds.includes(category));
+
 async function modify(options: ModifyOptions): Promise<void> {
   const { ids, change, message, leaves, to, undoable = true, run, inverseRun, patch, failed = "Couldn't update." } = options;
   if (!ids.length) return;
@@ -184,6 +188,13 @@ async function modify(options: ModifyOptions): Promise<void> {
     }
     adjustUnread(deltas, ids);
   }
+  // A category's inbox tab counts unread threads in the inbox, so archiving or moving to the inbox moves it as well.
+  const section = new Map<LabelId, number>();
+  for (const t of before.values()) {
+    const after = apply(t);
+    for (const c of CATEGORIES) section.set(c, (section.get(c) ?? 0) + inTab(after, c) - inTab(t, c));
+  }
+  adjustUnread(section, ids, 'inboxUnreadCount');
   if (leaves) {
     // Only rows that stay in this list (All mail) slide; the others fold away, and sliding them too would fight that.
     const view = getRoute().view;
