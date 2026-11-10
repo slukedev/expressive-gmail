@@ -12,6 +12,7 @@ Read README.md first. PRODUCT.md holds product truth, DESIGN.md the visual syste
 - Design tokens only. Colors are `--md-sys-color-*` roles (Google's web palette by default, Material You dynamic schemes optionally); shape, motion and type come from `src/app/theme/tokens.css`.
 - No borders on one side of a container, no em dashes, no bounce easing (UI springs use the 0.8-damped curve), no AI-sounding copy.
 - Icons are a subset font. New icon names go in `src/app/ui/icon-names.json`, then `npm run fonts`.
+- Gmail never opens on its own: no tab, window or page on install, update, launch or any other event, in any browser or the Mac app. Only a click opens it (the popup, a notification, a button).
 - Demo content is fictional (example.com domains, invented brands). Never add real people or companies.
 - Test against the demo mailbox (`npm run preview`, port 5199). Never point automated tests at a real Gmail account.
 

@@ -6,12 +6,10 @@ import { isThumbnailUrl } from '../session/thumbnails';
 import { notificationId, notificationThread } from '../shared/notify';
 import { runsApp } from '../shared/takeover';
 import { DESKTOP_RULE_ID, desktopRule, isPhone } from '../shared/mobile';
-
 export default defineBackground(() => {
-  // Gmail tabs already open stay classic until reloaded, so a fresh install would otherwise show nothing.
+  // Nothing here opens a tab, window or page: Gmail opens only when someone clicks to open it.
   browser.runtime.onInstalled.addListener(({ reason }) => {
     if (import.meta.env.DEV) return;
-    if (reason === 'install') void browser.tabs.create({ url: 'https://mail.google.com/mail/u/0/#inbox' }).catch(() => undefined);
     // The old version's app is gone from open tabs. Popups and delegated mailboxes may hold typing.
     if (reason === 'update') {
       void browser.tabs
