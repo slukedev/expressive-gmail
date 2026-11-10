@@ -83,6 +83,8 @@ export interface Settings {
   defaultReply: 'reply' | 'reply-all';
   externalImages: 'always' | 'ask';
   keyboardShortcuts: boolean;
+  /** Arrow keys move through the list, categories and sidebar, and scroll an open conversation. */
+  arrowKeys: boolean;
   /** Keys the person chose in place of Gmail's, by action. */
   shortcutKeys: ShortcutKeys;
   hoverActions: boolean;
@@ -161,6 +163,7 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultReply: 'reply',
   externalImages: 'always',
   keyboardShortcuts: true,
+  arrowKeys: false,
   shortcutKeys: {},
   hoverActions: true,
   railExpanded: true,

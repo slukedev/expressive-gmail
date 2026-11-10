@@ -14,7 +14,7 @@ import { nextUnread } from './nextUnread';
 import { canonicalKey } from './bindings';
 import { selectRangeTo, toggleOne } from '../list/select';
 import { snack } from '../../ui/Snackbar';
-import { focusRow, focusThread, isThreadScroller, scrollThread } from './focus';
+import { focusRow, focusThread, isThreadScroller, pendingRow, scrollThread, supersedeFocus } from './focus';
 
 const GO: Record<string, Folder> = { i: 'inbox', s: 'starred', b: 'snoozed', t: 'sent', d: 'drafts', a: 'all' };
 
@@ -74,6 +74,7 @@ function railArrow(key: string, from: Element): boolean {
   const at = items.indexOf(from.closest<HTMLElement>('.rail-item')!);
   const next =
     key === 'Home' ? 0 : key === 'End' ? items.length - 1 : at < 0 ? 0 : at + (key === 'ArrowDown' ? 1 : -1);
+  supersedeFocus();
   items[Math.max(0, Math.min(items.length - 1, next))]!.focus();
   return true;
 }
@@ -86,11 +87,12 @@ function focusCategories(): boolean {
   const last = bundleRows().at(-1);
   const tab = last ?? document.querySelector<HTMLElement>('.category-tabs [role="tab"][aria-selected="true"]');
   if (!tab?.getClientRects().length) return false;
+  supersedeFocus();
   tab.focus();
   return true;
 }
 
-/** Arrow keys and Home/End. They type nothing, so they work with letter shortcuts turned off. */
+/** Arrow keys and Home/End, when turned on. They type nothing, so they work with letter shortcuts turned off. */
 function arrowKey(e: KeyboardEvent): boolean {
   const { key } = e;
   if (key !== 'ArrowUp' && key !== 'ArrowDown' && key !== 'ArrowLeft' && key !== 'ArrowRight' && key !== 'Home' && key !== 'End') return false;
@@ -121,14 +123,17 @@ function arrowKey(e: KeyboardEvent): boolean {
   if (bundle && (key === 'ArrowUp' || key === 'ArrowDown')) {
     const all = bundleRows();
     const next = all[all.indexOf(bundle) + (key === 'ArrowDown' ? 1 : -1)];
-    if (next) next.focus();
+    if (next) {
+      supersedeFocus();
+      next.focus();
+    }
     else if (key === 'ArrowDown' && ids.length) focusRow(0);
     return true;
   }
   if (!ids.length) return key === 'ArrowUp' && focusCategories();
   const row = e.target instanceof Element ? e.target.closest<HTMLElement>('[data-row-index]') : null;
   const ui = useUi.getState();
-  const from = row ? Number(row.dataset.rowIndex) : ui.cursor;
+  const from = pendingRow() ?? (row ? Number(row.dataset.rowIndex) : ui.cursor);
   if (key === 'Home') focusRow(0);
   else if (key === 'End') focusRow(ids.length - 1);
   else if (key === 'ArrowDown') focusRow(from < 0 ? 0 : from + 1);
@@ -153,9 +158,9 @@ export function useShortcuts() {
       const settings = useSettingsStore.getState().settings;
       if (e.defaultPrevented || editable(e.target) || mod || e.altKey) return;
       if (document.querySelector('[role="dialog"][data-open], [role="menu"]')) return;
-      if (!e.shiftKey && arrowKey(e)) return e.preventDefault();
-      // Enter and Esc type nothing either.
-      if (!settings.keyboardShortcuts && e.key !== 'Enter' && e.key !== 'Escape') return;
+      if (settings.arrowKeys && !e.shiftKey && arrowKey(e)) return e.preventDefault();
+      // With arrow keys on, Enter and Esc go with them: they type nothing, so they work with letter shortcuts off.
+      if (!settings.keyboardShortcuts && !(settings.arrowKeys && (e.key === 'Enter' || e.key === 'Escape'))) return;
 
       const route = getRoute();
       const ui = useUi.getState();

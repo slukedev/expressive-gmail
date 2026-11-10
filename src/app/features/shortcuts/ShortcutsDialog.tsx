@@ -15,6 +15,8 @@ const ACTION = new Map(SHORTCUT_ACTIONS.map((a) => [a.id, a]));
 const actions = (group: ShortcutGroup) => SHORTCUT_ACTIONS.filter((a) => a.group === group).map((a): Item => ({ action: a.id, also: ALSO[a.id] }));
 const ALSO: Record<string, string> = { open: 'Enter', back: 'Esc' };
 
+const ARROW_GROUP = 'Arrow keys';
+
 const GROUPS: { title: string; items: Item[] }[] = [
   {
     title: 'Jump around',
@@ -43,7 +45,7 @@ const GROUPS: { title: string; items: Item[] }[] = [
     ],
   },
   {
-    title: 'Arrow keys',
+    title: ARROW_GROUP,
     items: [
       { keys: '↑ / ↓', label: 'Move through categories and conversations' },
       { keys: '← / →', label: 'Move between category tabs' },
@@ -85,6 +87,7 @@ function Keys({ keys }: { keys: string }) {
 export function ShortcutsDialog() {
   const open = useUi((s) => s.shortcutsHelp);
   const enabled = useSettings((s) => s.keyboardShortcuts);
+  const arrows = useSettings((s) => s.arrowKeys);
   const custom = useSettings((s) => s.shortcutKeys);
   const [editing, setEditing] = useState<string | null>(null);
   const [refused, setRefused] = useState(false);
@@ -152,7 +155,7 @@ export function ShortcutsDialog() {
         {said}
       </p>
       <div className="shortcuts">
-        {GROUPS.map((g) => (
+        {GROUPS.filter((g) => arrows || g.title !== ARROW_GROUP).map((g) => (
           <section key={g.title} className="shortcuts__group">
             <h3 className="md-title-small shortcuts__title">{g.title}</h3>
             <dl>
