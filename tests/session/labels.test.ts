@@ -8,10 +8,11 @@ describe('category inbox tabs', () => {
     const root = fixture<unknown[]>('s-send-response-2022.json') as any;
     const labels = parseLabels(undefined, root[2]);
     const of = (id: string) => labels.find((l) => l.id === id);
-    expect(of('CATEGORY_PROMOTIONS')).toMatchObject({ unreadCount: 1098, inboxUnreadCount: 1048 });
-    expect(of('CATEGORY_SOCIAL')).toMatchObject({ unreadCount: 0, inboxUnreadCount: 0 });
-    // Gmail sent no unread number for the Updates tab: it stays unknown, not 0.
+    expect(of('CATEGORY_PROMOTIONS')).toMatchObject({ unreadCount: 1098, inboxUnreadCount: 1048, inboxTotalCount: 1180 });
+    expect(of('CATEGORY_SOCIAL')).toMatchObject({ unreadCount: 0, inboxUnreadCount: 0, inboxTotalCount: 1 });
+    // Gmail sent no unread number for the Updates tab: it stays unknown, not 0, while its total still comes through.
     expect(of('CATEGORY_UPDATES')?.inboxUnreadCount).toBeUndefined();
+    expect(of('CATEGORY_UPDATES')?.inboxTotalCount).toBe(4594);
     expect(of('INBOX')?.inboxUnreadCount).toBeUndefined();
   });
 });

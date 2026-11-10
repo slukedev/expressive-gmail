@@ -199,13 +199,14 @@ class MergedBackend implements MailBackend {
           continue;
         }
         const sum = (a?: number, b?: number) => (a === undefined && b === undefined ? undefined : (a ?? 0) + (b ?? 0));
+        const sumAll = (a?: number, b?: number) => (a === undefined || b === undefined ? undefined : a + b);
         merged.set(id, {
           ...prev,
           unreadCount: sum(prev.unreadCount, l.unreadCount),
           totalCount: sum(prev.totalCount, l.totalCount),
-          // Only a sum when every account counts it; otherwise the tab falls back to searching.
-          inboxUnreadCount:
-            prev.inboxUnreadCount === undefined || l.inboxUnreadCount === undefined ? undefined : prev.inboxUnreadCount + l.inboxUnreadCount,
+          // Only a sum when every account counts it; otherwise the tab counts by searching.
+          inboxUnreadCount: sumAll(prev.inboxUnreadCount, l.inboxUnreadCount),
+          inboxTotalCount: sumAll(prev.inboxTotalCount, l.inboxTotalCount),
           color: prev.color ?? l.color,
           // Shown if any account shows it.
           hidden: prev.hidden && l.hidden ? true : undefined,

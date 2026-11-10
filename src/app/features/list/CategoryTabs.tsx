@@ -1,8 +1,9 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { backend } from '../../data/client';
+import { backend, withRecentChanges } from '../../data/client';
 import { useLabels } from '../../data/hooks';
 import { CATEGORY_LABEL } from '../../data/views';
-import type { Address, Label } from '../../data/types';
+import type { Address, Label, ThreadSummary } from '../../data/types';
+import type { View } from '../../router/routes';
 import { participantsLine } from '../../lib/format';
 import { navigate, useRoute } from '../../router/useRoute';
 import { useSettings } from '../../state/settings';
@@ -11,41 +12,49 @@ import { useResolvedDark } from '../../theme/ThemeProvider';
 import { Tabs, type TabItem } from '../../ui/Tabs';
 import { ShapeIcon } from '../../ui/ShapeIcon';
 import { CATEGORY_TABS, viewIdentity } from './viewIdentity';
-import { peekCount, unreadBadge } from './categoryCount';
+import { countTab, unreadBadge } from './categoryCount';
 
 /**
  * The category's unread mail in the inbox, which is what its tab lists. The category label's own count also takes in
  * archived mail, so someone who archives promotions unread would see "14,000 new" over an empty tab.
- * Gmail keeps the inbox tab's count beside the label's, so that comes free with the label poll. Without it, a short
- * search counts them, and runs again only when the label count moves.
+ * Gmail usually keeps the inbox tab's count beside the label's, so that comes free with the label poll. When it leaves
+ * it out (Updates, on real accounts), the tab's unread threads are listed and counted, up to where the badge says 99+.
  */
-export function useCategoryUnread(category: string, label: Label | undefined, enabled: boolean, { senders = true } = {}) {
+export function useCategoryUnread(category: string, labels: Label[], enabled: boolean, { senders = true } = {}) {
+  const label = labels.find((l) => l.id === CATEGORY_LABEL[category]);
+  const inbox = labels.find((l) => l.id === 'INBOX');
   const labelUnread = label?.unreadCount ?? 0;
   const stored = label?.inboxUnreadCount;
   const known = stored !== undefined;
+  const q = `in:inbox category:${category} is:unread`;
+  // Counted again whenever the tab could have changed: mail read or unread (the label's count), archived, moved back
+  // or arrived (the tab's total, or the inbox's when Gmail sends no tab total).
+  const moved = label?.inboxTotalCount ?? `${inbox?.unreadCount} ${inbox?.totalCount}`;
   const query = useQuery({
-    queryKey: ['category-peek', category, known ? `tab ${stored}` : labelUnread],
-    // Gmail's search total is unreliable past one page ("of many" reads as 200+ over six), so the fallback counts a
-    // page itself. Kept small: this runs per category and per account.
-    queryFn: () => backend().listThreads({ q: `in:inbox category:${category} is:unread`, pageSize: known ? SENDERS_PAGE : PEEK_PAGE }),
+    queryKey: known ? ['category-peek', category, `tab ${stored}`] : ['category-peek', category, 'count', labelUnread, moved],
+    queryFn: known
+      ? () => backend().listThreads({ q, pageSize: SENDERS_PAGE }).then((p) => ({ threads: p.threads, more: false }))
+      : () => countTab((query) => backend().listThreads(query), q),
     enabled: enabled && (known ? senders && stored > 0 : labelUnread > 0),
     staleTime: Infinity,
     gcTime: 10 * 60_000,
     placeholderData: keepPreviousData,
   });
-  const page = (known ? stored : labelUnread) > 0 ? query.data : undefined;
-  if (known) return { count: stored, more: false, threads: page?.threads };
-  const { count, more } = page ? peekCount(page) : { count: 0, more: false };
-  return {
-    /** Undefined until the search answers, so nothing shows a guess. */
-    count: labelUnread === 0 ? 0 : page ? count : undefined,
-    /** More than the count says. */
-    more,
-    threads: page?.threads,
-  };
+  const data = (known ? stored : labelUnread) > 0 ? query.data : undefined;
+  if (known) return { count: stored, more: false, threads: data?.threads };
+  if (labelUnread === 0) return { count: 0, more: false, threads: undefined };
+  // Undefined until the first count answers, so nothing shows a guess.
+  if (!data) return { count: undefined, more: false, threads: undefined };
+  // What this tab read or archived since the count, ahead of Gmail's next answer. A full count is 99+ either way.
+  const threads = data.more ? data.threads : unreadIn(data.threads, category);
+  return { count: threads.length, more: data.more, threads };
 }
 
-const PEEK_PAGE = 10;
+function unreadIn(threads: ThreadSummary[], category: string) {
+  const view = { kind: 'category', category } as View;
+  return withRecentChanges({ threads }, view).threads.filter((t) => t.labelIds.includes('UNREAD'));
+}
+
 /** Enough for three different senders. */
 const SENDERS_PAGE = 4;
 
@@ -57,12 +66,11 @@ export function CategoryTabs({ bundles }: { bundles?: boolean }) {
   const current = route.view.kind === 'category' ? route.view.category : 'primary';
   const enabled = CATEGORY_TABS.filter((t) => t.value === 'primary' || categories[t.value]);
 
-  const labelOf = (category: string) => labels.find((l) => l.id === CATEGORY_LABEL[category]);
   const peeks = {
-    promotions: useCategoryUnread('promotions', labelOf('promotions'), categories.promotions && current !== 'promotions'),
-    social: useCategoryUnread('social', labelOf('social'), categories.social && current !== 'social'),
-    updates: useCategoryUnread('updates', labelOf('updates'), categories.updates && current !== 'updates'),
-    forums: useCategoryUnread('forums', labelOf('forums'), categories.forums && current !== 'forums'),
+    promotions: useCategoryUnread('promotions', labels, categories.promotions && current !== 'promotions'),
+    social: useCategoryUnread('social', labels, categories.social && current !== 'social'),
+    updates: useCategoryUnread('updates', labels, categories.updates && current !== 'updates'),
+    forums: useCategoryUnread('forums', labels, categories.forums && current !== 'forums'),
   };
 
   if (enabled.length < 2) return null;

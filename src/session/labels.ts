@@ -135,8 +135,16 @@ export function parseLabels(defsNode: unknown, countsNode: unknown): Label[] {
   for (const api of SYSTEM_ORDER) {
     const c = counts.get(toInternalLabel(api));
     const sectionId = INBOX_SECTION[api];
-    const section = sectionId ? counts.get(sectionId)?.unread : undefined;
-    labels.set(api, { id: api, name: api, type: 'system', ...countFields(c), ...(section === undefined ? {} : { inboxUnreadCount: section }) });
+    const section = sectionId ? counts.get(sectionId) : undefined;
+    labels.set(api, {
+      id: api,
+      name: api,
+      type: 'system',
+      ...countFields(c),
+      ...(section?.unread === undefined ? {} : { inboxUnreadCount: section.unread }),
+      // Gmail sometimes sends the tab's total without its unread count (Updates, on real accounts); the total still says when to count again.
+      ...(section?.total === undefined ? {} : { inboxTotalCount: section.total }),
+    });
   }
 
   for (const row of arr(defsNode) ?? []) {

@@ -248,21 +248,33 @@ test('a category counts only its unread mail in the inbox, the mail it lists', a
   await expect(page.getByText(`${shown} unread`, { exact: true })).toBeVisible();
 });
 
-test("archiving unread mail in a category lowers its count at once, before Gmail's poll", async ({ mail, page }) => {
-  // A slow mailbox, so only the change made in this tab can lower the count in time.
-  await mail.open('inbox', 'latency=1500');
-  const updates = page.getByRole('list', { name: 'Inbox categories' }).getByRole('button', { name: /^Updates/ });
-  const badge = updates.locator('.bundle__badge');
-  await expect(badge).toHaveText(/^\d+ new$/);
-  const before = Number(/\d+/.exec(await badge.innerText())![0]);
+// Gmail sends most tabs' unread counts with the labels; for Updates it often sends only the tab's total, and the tab is counted.
+for (const [name, query] of [
+  ['stored', ''],
+  ['counted', '&tabcount=missing'],
+] as const) {
+  test(`archiving unread mail in a category lowers its count at once, before Gmail's poll (${name} count)`, async ({ mail, page }) => {
+    // A slow mailbox that, like Gmail, keeps answering with the old state for a few seconds after a write: only the
+    // change made in this tab can lower the count in time.
+    await mail.open('inbox', `latency=1500&lag=3000${query}`);
+    const updates = page.getByRole('list', { name: 'Inbox categories' }).getByRole('button', { name: /^Updates/ });
+    const badge = updates.locator('.bundle__badge');
+    await expect(badge).toHaveText(/^\d+ new$/);
+    const before = Number(/\d+/.exec(await badge.innerText())![0]);
 
-  await updates.click();
-  await expect(page.getByText(`${before} unread`, { exact: true })).toBeVisible();
-  const unread = mail.rows.filter({ has: page.locator('.row--unread') }).first();
-  await unread.hover();
-  await unread.getByRole('button', { name: 'Archive' }).first().click();
-  await expect(page.getByText(`${before - 1} unread`, { exact: true })).toBeVisible({ timeout: 1000 });
+    await updates.click();
+    await expect(page.getByText(`${before} unread`, { exact: true })).toBeVisible();
+    // The count is the mail the tab lists, not an estimate.
+    await expect(mail.rows.locator('.row--unread')).toHaveCount(before);
+    const unread = mail.rows.filter({ has: page.locator('.row--unread') }).first();
+    await unread.hover();
+    await unread.getByRole('button', { name: 'Archive' }).first().click();
+    await expect(page.getByText(`${before - 1} unread`, { exact: true })).toBeVisible({ timeout: 1000 });
 
-  await page.goBack();
-  await expect(badge).toHaveText(`${before - 1} new`);
-});
+    await page.goBack();
+    await expect(badge).toHaveText(`${before - 1} new`);
+    // Still right once Gmail's next answer has been counted.
+    await page.waitForTimeout(5000);
+    await expect(badge).toHaveText(`${before - 1} new`);
+  });
+}

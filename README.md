@@ -94,7 +94,7 @@ npm run preview
 
 Serves the UI at http://localhost:5199 against the demo mailbox (set `PREVIEW_PORT` for another port). `npm run dev` runs the real extension in a fresh Chrome with hot reload.
 
-Query flags for the preview: `?latency=0`, `?empty` (new account), `?onboarding`, `?chaos` (30% of calls fail), `?contacts=fail`, `?accounts=1`, `?delegated=0`, `?accountfail=studio`, `?lag=3000` (writes show up late), `?nodelete`, `?gemini=plan|smart-features|fail`, `?geminiDelay=1500`, `?schedule=off`. `/preview/frame.html` takes the same flags and hosts the preview in a frame the way Gmail's page does, which Interface size needs.
+Query flags for the preview: `?latency=0`, `?empty` (new account), `?onboarding`, `?chaos` (30% of calls fail), `?contacts=fail`, `?accounts=1`, `?delegated=0`, `?accountfail=studio`, `?lag=3000` (writes show up late), `?tabcount=missing` (no stored Updates tab count, as on real accounts), `?nodelete`, `?gemini=plan|smart-features|fail`, `?geminiDelay=1500`, `?schedule=off`. `/preview/frame.html` takes the same flags and hosts the preview in a frame the way Gmail's page does, which Interface size needs.
 
 | Script | What it does |
 | --- | --- |

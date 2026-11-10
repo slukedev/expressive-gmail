@@ -8,7 +8,7 @@ import { setVisibleThreadIds } from '../../data/actions';
 import { useAccount, useLabels, useThreadList, useViewQuery } from '../../data/hooks';
 import { useQuery } from '@tanstack/react-query';
 import type { ThreadSummary } from '../../data/types';
-import { CATEGORY_LABEL, stillInView } from '../../data/views';
+import { stillInView } from '../../data/views';
 import type { Label } from '../../data/types';
 import type { View } from '../../router/routes';
 import { useRoute } from '../../router/useRoute';
@@ -185,8 +185,7 @@ export function ListPane({ split }: { split: boolean }) {
 
   const showTabs = (isInbox && inboxType === 'categories') || view.kind === 'category';
   const heroCategory = view.kind === 'category' && view.category !== 'primary' ? view.category : null;
-  const categoryLabel = heroCategory ? labels.find((l) => l.id === CATEGORY_LABEL[heroCategory]) : undefined;
-  const categoryUnread = useCategoryUnread(heroCategory ?? '', categoryLabel, !!heroCategory, { senders: false });
+  const categoryUnread = useCategoryUnread(heroCategory ?? '', labels, !!heroCategory, { senders: false });
   const heroMeta = useHeroMeta(view, labels, list.data?.pages[0]?.resultSizeEstimate, list.data?.pages[0]?.resultSizeAtLeast, categoryUnread);
   const ptrRef = useRef<HTMLDivElement>(null);
   const ptrArrowRef = useRef<HTMLSpanElement>(null);

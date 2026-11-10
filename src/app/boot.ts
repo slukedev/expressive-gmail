@@ -53,6 +53,7 @@ export async function createBackend(choice: BackendChoice, settings: Settings): 
       empty: params.has('empty'),
       failRate: params.has('chaos') ? 0.3 : 0,
       unreadBoost: params.has('unread') ? Number(params.get('unread')) || 1234 : 0,
+      noUpdatesTabUnread: params.get('tabcount') === 'missing',
       contactsFail: params.get('contacts') === 'fail',
       writeLagMs: params.has('lag') ? Number(params.get('lag')) || 3000 : 0,
       noDeleteForever: params.has('nodelete'),

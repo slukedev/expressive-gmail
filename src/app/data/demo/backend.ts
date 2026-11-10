@@ -56,6 +56,8 @@ export interface DemoBackendOptions {
   liveMail?: boolean;
   /** To test big-number layouts. */
   unreadBoost?: number;
+  /** Like real Gmail, which sends the Updates tab's total but not its unread count (`?tabcount=missing`). */
+  noUpdatesTabUnread?: boolean;
   /** Like Google's autocomplete endpoint going away. */
   contactsFail?: boolean;
   /** Label writes are acknowledged at once but show up in reads this much later, the way Gmail's session endpoints lag behind a write. */
@@ -129,6 +131,7 @@ class DemoBackend implements MailBackend {
   private readonly failRate: number;
   private readonly liveMail: boolean;
   private readonly unreadBoost: number;
+  private readonly noUpdatesTabUnread: boolean;
   private readonly contactsFail: boolean;
   private readonly latencyRng: () => number;
   private readonly failRng: () => number;
@@ -165,6 +168,7 @@ class DemoBackend implements MailBackend {
     this.self = this.persona.self;
     this.liveMail = opts.liveMail ?? this.persona.liveMail;
     this.unreadBoost = Math.max(0, opts.unreadBoost ?? 0);
+    this.noUpdatesTabUnread = !!opts.noUpdatesTabUnread;
     this.contactsFail = opts.contactsFail ?? false;
     this.writeLagMs = Math.max(0, opts.writeLagMs ?? 0);
     this.geminiMode = opts.gemini ?? 'ready';
@@ -495,6 +499,7 @@ class DemoBackend implements MailBackend {
       const unread = new Map<string, number>();
       /** Each category's inbox tab, as Gmail counts it beside the label. */
       const tab = new Map<string, number>();
+      const tabTotal = new Map<string, number>();
       for (const t of this.threads.values()) {
         const idx = this.indexed(t);
         const isUnread = idx.labels.has('UNREAD');
@@ -504,7 +509,10 @@ class DemoBackend implements MailBackend {
           if (!counts) continue;
           total.set(l, (total.get(l) ?? 0) + 1);
           if (isUnread) unread.set(l, (unread.get(l) ?? 0) + 1);
-          if (isUnread && l.startsWith('CATEGORY_') && idx.labels.has('INBOX') && !idx.allTrash && !idx.allSpam) tab.set(l, (tab.get(l) ?? 0) + 1);
+          if (l.startsWith('CATEGORY_') && idx.labels.has('INBOX') && !idx.allTrash && !idx.allSpam) {
+            tabTotal.set(l, (tabTotal.get(l) ?? 0) + 1);
+            if (isUnread) tab.set(l, (tab.get(l) ?? 0) + 1);
+          }
         }
       }
       if (this.unreadBoost) {
@@ -519,7 +527,8 @@ class DemoBackend implements MailBackend {
           ...l,
           totalCount: l.id === 'DRAFT' ? this.drafts.size : (total.get(l.id) ?? 0),
           unreadCount: l.id === 'DRAFT' ? 0 : (unread.get(l.id) ?? 0),
-          ...(l.id.startsWith('CATEGORY_') ? { inboxUnreadCount: tab.get(l.id) ?? 0 } : {}),
+          ...(l.id.startsWith('CATEGORY_') ? { inboxTotalCount: tabTotal.get(l.id) ?? 0 } : {}),
+          ...(l.id.startsWith('CATEGORY_') && !(this.noUpdatesTabUnread && l.id === 'CATEGORY_UPDATES') ? { inboxUnreadCount: tab.get(l.id) ?? 0 } : {}),
         });
       }
       const user = [...this.labels.values()].sort((a, b) => a.name.localeCompare(b.name));
