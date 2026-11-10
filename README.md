@@ -5,8 +5,9 @@
 <h1 align="center">Expressive Gmail</h1>
 
 <p align="center">
-  Gmail rebuilt in Material 3 Expressive.<br>
-  A browser extension for Chrome, Firefox and Safari, on desktop and phone.
+  A browser extension that replaces Gmail's interface on mail.google.com<br>
+  with a complete Material 3 Expressive redesign. Just go to Gmail and sign in normally!<br>
+  Chrome, Firefox and Safari, on desktop and phone.
 </p>
 
 <p align="center">
