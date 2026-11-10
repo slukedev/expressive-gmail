@@ -49,14 +49,21 @@ function WarmToasts() {
   ));
 }
 
-/** Off the document, so their code is compiled before the first real one opens. The popups are never connected and never move focus. */
+// Open popups still listen on the document while mounted. Without this, the first Esc or outside click of a busy load
+// would close one of these and stop there, so the app's own shortcuts never saw it.
+const passThrough = (_open: boolean, details: { cancel: () => void; allowPropagation: () => void }) => {
+  details.cancel();
+  details.allowPropagation();
+};
+
+/** Off the document, so their code is compiled before the first real one opens. The popups are never connected, never move focus, and let every key and press through. */
 function warmPopups() {
   const host = document.createElement('div');
   const root = createRoot(host);
   const toasts = Toast.createToastManager();
   root.render(
     <>
-      <Menu.Root open modal={false}>
+      <Menu.Root open modal={false} onOpenChange={passThrough}>
         <Menu.Portal container={host}>
           <Menu.Positioner>
             <Menu.Popup finalFocus={false}>
@@ -65,7 +72,7 @@ function warmPopups() {
           </Menu.Positioner>
         </Menu.Portal>
       </Menu.Root>
-      <Dialog.Root open modal={false}>
+      <Dialog.Root open modal={false} onOpenChange={passThrough}>
         <Dialog.Portal container={host}>
           <Dialog.Backdrop />
           <Dialog.Popup initialFocus={false} finalFocus={false}>
