@@ -189,6 +189,13 @@ test.describe('keyboard and focus', () => {
         await expect(page.getByRole('heading', { name: 'Promotions', exact: true })).toBeVisible();
         await page.keyboard.press('ArrowDown');
         await expect(bodies.nth(0)).toBeFocused();
+        // Esc closes the open conversation first, then leaves the category.
+        await page.keyboard.press('Enter');
+        await expect(mail.threadHeading).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(page).toHaveURL(/#category\/\w+$/);
+        await page.keyboard.press('Escape');
+        await expect(page).toHaveURL(/#inbox$/);
       });
 
       test('Enter opens the conversation full screen and arrows scroll it; Esc comes back to its row', async ({ mail, page }) => {
@@ -212,6 +219,11 @@ test.describe('keyboard and focus', () => {
         await page.keyboard.press('Escape');
         await expect(page).toHaveURL(/#inbox$/);
         await expect(long).toBeFocused();
+        // Enter opens it again, and Enter in the open conversation starts a reply.
+        await page.keyboard.press('Enter');
+        await expect(scroller).toBeFocused();
+        await page.keyboard.press('Enter');
+        await expect(mail.thread.getByRole('textbox', { name: 'Message body' })).toBeFocused();
       });
     });
 

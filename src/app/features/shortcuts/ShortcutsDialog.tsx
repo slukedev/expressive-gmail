@@ -53,6 +53,8 @@ const GROUPS: { title: string; items: Item[] }[] = [
       { keys: '↑ / ↓', label: 'Scroll the open conversation' },
       { keys: '↑ / ↓', label: 'Move through the sidebar' },
       { keys: '→', label: 'From the sidebar to the list' },
+      { keys: 'Enter', label: 'Reply (in a conversation)' },
+      { keys: 'Esc', label: 'Back to the inbox (in a category)' },
     ],
   },
   { title: 'Act on conversations', items: actions('act') },

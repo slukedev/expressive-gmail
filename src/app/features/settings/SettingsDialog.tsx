@@ -471,7 +471,7 @@ function General() {
         />
       </Row>
       <Toggle k="keyboardShortcuts" title="Keyboard shortcuts" keywords="hotkeys keys" description={`Gmail's shortcuts, plus ${keyLabel('Ctrl K')} for the command palette.`} />
-      <Toggle k="arrowKeys" title="Arrow key navigation" keywords="arrows up down keyboard move scroll navigate" description="Up and Down move through mail and scroll an open conversation. Enter opens, Esc goes back." />
+      <Toggle k="arrowKeys" title="Arrow key navigation" keywords="arrows up down keyboard move scroll navigate" description="Up and Down move through mail and scroll an open conversation. Enter opens a conversation or replies to it, Esc goes back." />
       <Row title="Custom keys" keywords="keyboard shortcuts hotkeys remap rebind change keys">
         <Button variant="tonal" icon="keyboard" onClick={() => useUi.getState().set({ shortcutsHelp: true })}>
           Change keys

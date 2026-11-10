@@ -44,6 +44,8 @@ function backToList(threadId: string) {
 type Zone = 'list' | 'tabs' | 'rail' | 'thread';
 
 /** Widgets that already use arrow keys for themselves. */
+/** Enter presses these itself. */
+const CONTROL = 'button, a[href], input, select, textarea, summary, [role="button"], [role="link"], [role="tab"], [role="option"], [role="menuitem"], [role="checkbox"], [role="switch"]';
 const OWN_ARROWS = '[role="radiogroup"], [role="listbox"], [role="slider"], [role="separator"], [role="menu"], [role="combobox"], [role="tree"], [role="grid"], [role="spinbutton"]';
 
 /** Where arrow keys act: the list, the category tabs above it, the sidebar, or the open conversation. */
@@ -238,6 +240,11 @@ export function useShortcuts() {
         case 'Enter': {
           // A focused row opens itself, and Enter on any control presses that control.
           const onPage = e.target === document.body || e.target === document.documentElement;
+          // With arrow keys on, Enter in an open conversation replies, unless it's on a control.
+          if (route.threadId && key === 'Enter' && settings.arrowKeys && !(e.target as Element).closest?.(CONTROL)) {
+            const open = route.threadId;
+            return run(() => void replyToThread(open, 'reply'));
+          }
           if (route.threadId || (key === 'Enter' ? !onPage : (e.target as Element).closest?.('button, a'))) return;
           const id = getVisibleThreadIds()[Math.max(ui.cursor, 0)];
           if (id)
@@ -251,7 +258,10 @@ export function useShortcuts() {
         case 'Escape': {
           if (key === 'Escape' && ui.selected.size) return run(() => ui.clearSelection());
           const open = route.threadId;
-          if (open) run(() => backToList(open));
+          if (open) return run(() => backToList(open));
+          // Arrow keys make Esc "back": out of a category, that's the inbox.
+          if (key === 'Escape' && settings.arrowKeys && route.view.kind === 'category' && route.view.category !== 'primary')
+            run(() => navigate({ view: { kind: 'folder', folder: 'inbox' } }));
           return;
         }
         case 'x':
