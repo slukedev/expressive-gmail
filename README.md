@@ -15,6 +15,14 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-0b57d0" alt="GPL-3.0 license"></a>
 </p>
 
+## Install
+
+| Browser | Get it |
+| --- | --- |
+| Chrome, Dia, Ardia, Edge, Brave, Any Other Chromium Browser | [Chrome Web Store](https://chromewebstore.google.com/search/Expressive%20Gmail) |
+| Firefox, Firefox for Android, Waterfox, Zen, LibreWolf, Any Other Firefox (Gecko) Browser | [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/expressive-gmail/) |
+| Safari on Mac | `brew install --cask slukedev/tap/expressive-gmail`, then turn the extension on in Safari > Settings > Extensions |
+
 ![The inbox in Google's palette](docs/screenshots/inbox.png)
 
 | | |
@@ -28,15 +36,9 @@ Expressive Gmail takes over `mail.google.com` with a complete new interface. It 
 
 It is an independent project, not made by, affiliated with or endorsed by Google. Screenshots show the demo mailbox; every person and company in it is made up.
 
-## Install
+## Install From Source
 
-| Browser | Get it |
-| --- | --- |
-| Chrome, Dia, Arc, Edge, Brave | [Chrome Web Store](https://chromewebstore.google.com/search/Expressive%20Gmail) |
-| Firefox, including Firefox for Android | [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/expressive-gmail/) |
-| Safari on Mac | `brew install --cask slukedev/tap/expressive-gmail`, then turn the extension on in Safari > Settings > Extensions |
-
-**From source.** Build every browser into `.output/`:
+Build every browser into `.output/`:
 
 ```bash
 npm install
