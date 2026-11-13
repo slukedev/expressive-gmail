@@ -264,6 +264,7 @@ const TOGGLES: ToggleDef[] = [
   { key: 'smartFeatures', title: 'Smart chips and cards', icon: 'bolt', keywords: 'codes packages tracking invites bills' },
   { key: 'groupByDate', title: 'Group by date', icon: 'calendar_today', keywords: 'sections today yesterday' },
   { key: 'glance', title: 'At a glance', icon: 'wb_sunny', keywords: 'greeting worth a look reading pane empty' },
+  { key: 'advanceToUnread', title: 'Skip to unread after archiving', icon: 'mark_email_unread', keywords: 'auto-advance next unread classic' },
   { key: 'hoverActions', title: 'Hover actions', icon: 'more_horiz', keywords: 'quick buttons row' },
   { key: 'keyboardShortcuts', title: 'Keyboard shortcuts', icon: 'keyboard', keywords: 'hotkeys keys' },
   { key: 'sendAndArchive', title: 'Send and archive', icon: 'send', keywords: 'reply archive' },

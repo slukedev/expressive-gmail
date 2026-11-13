@@ -419,6 +419,12 @@ function General() {
           ]}
         />
       </Row>
+      <Toggle
+        k="advanceToUnread"
+        title="Skip to unread"
+        keywords="auto-advance next unread conversation classic"
+        description="Opens the next unread conversation instead of the next one in the list."
+      />
       <Toggle k="hoverActions" title="Hover actions" keywords="quick buttons" description="Archive, delete, mark read and snooze from the list." />
       <Row title="Conversations per page" keywords="page size load scroll">
         <Select align="end" label="Page size" value={s.pageSize} onChange={(pageSize) => updateSettings({ pageSize })} options={[[25, '25'], [50, '50'], [100, '100']]} />

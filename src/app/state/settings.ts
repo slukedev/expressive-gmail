@@ -118,6 +118,8 @@ export interface Settings {
   onboarded: boolean;
   /** "auto" advances with a reading pane and returns to the list without one. */
   afterAction: 'auto' | 'older' | 'newer' | 'list';
+  /** Advancing skips read conversations, like classic Gmail. Falls back to the plain neighbour when none are unread. */
+  advanceToUnread: boolean;
   blockTrackers: boolean;
   attachmentReminder: boolean;
   /** Like Gmail on Android. */
@@ -186,6 +188,7 @@ export const DEFAULT_SETTINGS: Settings = {
   groupByDate: true,
   onboarded: false,
   afterAction: 'auto',
+  advanceToUnread: true,
   blockTrackers: true,
   attachmentReminder: true,
   darkEmails: true,

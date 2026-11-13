@@ -7,6 +7,7 @@ import {
   adjustUnread,
   applyLabelChange,
   backend,
+  findThread,
   forgetChange,
   keys,
   patchThreads,
@@ -23,6 +24,7 @@ import { stillInView } from './views';
 import { useSettingsStore } from '../state/settings';
 import { showingCachedMail, untilFreshMail } from './lifecycle';
 import { useUi } from '../state/ui';
+import { nextUnread } from '../features/shortcuts/nextUnread';
 
 /** In list order, so actions can auto-advance. */
 let visibleIds: string[] = [];
@@ -107,6 +109,8 @@ function retryable(err: unknown) {
   return err.code !== 'unauthenticated' && err.code !== 'session-unavailable';
 }
 
+const isUnread = (id: string) => !!findThread(id)?.labelIds.includes('UNREAD');
+
 function advanceFrom(ids: string[]) {
   const route = getRoute();
   if (!route.threadId || !ids.includes(route.threadId)) return;
@@ -115,11 +119,14 @@ function advanceFrom(ids: string[]) {
     navigate({ view: route.view }, { replace: true });
     return;
   }
+  const { advanceToUnread } = useSettingsStore.getState().settings;
   const index = visibleIds.indexOf(route.threadId);
   const remaining = visibleIds.filter((id) => !ids.includes(id));
   // The list is newest first: the older neighbour takes the same index, the newer one sits just above.
-  const older = index >= 0 ? remaining[index] : undefined;
-  const newer = index > 0 ? remaining[index - 1] : undefined;
+  const pick = (at: number | undefined) => (at === undefined ? undefined : remaining[at]);
+  const unread = (dir: 1 | -1) => (index >= 0 ? nextUnread(remaining, index - (dir === 1 ? 1 : 0), dir, isUnread) : undefined);
+  const older = (advanceToUnread ? unread(1) : undefined) ?? pick(index >= 0 ? index : undefined);
+  const newer = (advanceToUnread ? unread(-1) : undefined) ?? pick(index > 0 ? index - 1 : undefined);
   const next = pref === 'newer' ? (newer ?? older) : (older ?? newer);
   navigate({ view: route.view, threadId: next }, { replace: true });
 }
