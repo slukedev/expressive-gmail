@@ -1,6 +1,6 @@
 import type { Message, Thread } from '../../data/types';
 import { fullDate, escapeHtml } from '../../lib/format';
-import { sanitizeEmail } from '../../lib/sanitize';
+import { contentPolicy, sanitizeEmail } from '../../lib/sanitize';
 import { useLocal } from '../../state/local';
 import { useSettingsStore } from '../../state/settings';
 
@@ -13,17 +13,25 @@ export function printThread(thread: Pick<Thread, 'subject' | 'messages'>, me?: s
   const { trustedImageSenders } = useLocal.getState();
   const loads = (m: Message) =>
     !m.labelIds.includes('SPAM') && (externalImages === 'always' || trustedImageSenders.includes(m.from.email.toLowerCase()));
-  const body = thread.messages
-    .filter((m) => !m.isDraft && (!only || m.id === only))
-    .map(
-      (m) => `<hr style="border:none;height:1px;background:#c4c7c5;margin:0 0 16px"><section style="margin:0 0 24px">
+  const printed = thread.messages.filter((m) => !m.isDraft && (!only || m.id === only));
+  // One policy covers the page, so a thread that mixes trusted and blocked senders allows only the trusted ones' pictures, by address.
+  const remote = printed.every(loads);
+  const allowed: string[] = [];
+  const body = printed
+    .map((m) => {
+      const html = m.bodyHtml ? sanitizeEmail(m.bodyHtml, { blockRemoteImages: !loads(m), blockTrackers }) : '';
+      if (html && !remote && loads(m)) {
+        for (const img of new DOMParser().parseFromString(html, 'text/html').images) allowed.push(img.getAttribute('src') ?? '');
+      }
+      return `<hr style="border:none;height:1px;background:#c4c7c5;margin:0 0 16px"><section style="margin:0 0 24px">
       <p style="margin:0 0 4px"><b>${escapeHtml(m.from.name ?? m.from.email)}</b> &lt;${escapeHtml(m.from.email)}&gt;<span style="float:right">${fullDate(m.date)}</span></p>
       <p style="margin:0 0 12px;color:#444746">To: ${escapeHtml(m.to.map((a) => a.email).join(', '))}</p>
-      ${m.bodyHtml ? sanitizeEmail(m.bodyHtml, { blockRemoteImages: !loads(m), blockTrackers }) : `<pre style="white-space:pre-wrap;font:inherit">${escapeHtml(m.bodyText ?? '')}</pre>`}
-    </section>`,
-    )
+      ${html || `<pre style="white-space:pre-wrap;font:inherit">${escapeHtml(m.bodyText ?? '')}</pre>`}
+    </section>`;
+    })
     .join('');
-  w.document.write(`<!doctype html><title>${escapeHtml(thread.subject)}</title><body style="font:14px/1.5 Arial,sans-serif;margin:32px;color:#1f1f1f">
+  const policy = contentPolicy({ remote, images: allowed });
+  w.document.write(`<!doctype html><meta http-equiv="Content-Security-Policy" content="${escapeHtml(policy)}"><title>${escapeHtml(thread.subject)}</title><body style="font:14px/1.5 Arial,sans-serif;margin:32px;color:#1f1f1f">
     <p style="color:#444746">${escapeHtml(me ?? '')}</p><h1 style="font-weight:400;font-size:22px">${escapeHtml(thread.subject || '(no subject)')}</h1>${body}</body>`);
   w.document.close();
   w.focus();

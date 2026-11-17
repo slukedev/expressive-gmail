@@ -16,6 +16,8 @@ const SIGNED_IN = 'https://lh3.google.com/u/0/ogw/AF2bZy=s128-c-mo';
 const OTHER_SIGNED_IN = 'https://lh3.google.com/u/0/ogw/BX7kQ=s128-c-mo';
 const OTHER_PUBLIC = 'https://lh3.googleusercontent.com/ogw/BX7kQ=s128-c-mo';
 const LOOKED_UP = 'https://lh3.googleusercontent.com/a/looked-up=s128';
+// Built once: the first build of a demo mailbox is the slow part, and these tests only read from it.
+const demo = createDemoBackend({ now: () => NOW, liveMail: false });
 
 /** The extension frame in a browser that won't send Google's cookies: every <img> errors, and fetch answers per URL. */
 function setup(photoUrl: string, readable: Record<string, boolean>) {
@@ -26,7 +28,6 @@ function setup(photoUrl: string, readable: Record<string, boolean>) {
       return new Response(new Uint8Array([1]), { headers: { 'content-type': 'image/jpeg' } });
     }),
   );
-  const demo = createDemoBackend({ now: () => NOW, liveMail: false });
   const lookupPhotos = vi.fn(async (emails: string[]) => Object.fromEntries(emails.map((e) => [e, LOOKED_UP])));
   setBackend(Object.assign(Object.create(demo), { lookupPhotos }));
   photos.setScope('session:me@example.com');
@@ -68,7 +69,6 @@ describe('Avatar without a photo yet', () => {
   it('shows the initial, then the photo once a slow lookup answers, without being rendered again', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array([1]), { headers: { 'content-type': 'image/jpeg' } })));
     let answer!: (found: Record<string, string>) => void;
-    const demo = createDemoBackend({ now: () => NOW, liveMail: false });
     setBackend(Object.assign(Object.create(demo), { lookupPhotos: () => new Promise((r) => (answer = r)) }));
     photos.setScope('session:me@example.com');
     const view = render(createElement(Avatar, { name: 'Dee Moss', email: 'dee@example.org', size: 32 }));
@@ -84,7 +84,6 @@ describe('Avatar when reading its photo hangs', () => {
     const HANGING = 'https://lh3.googleusercontent.com/a/hangs=s128';
     // Safari can hold a request to a host it hasn't been allowed on: the read never answers.
     vi.stubGlobal('fetch', vi.fn(() => new Promise(() => undefined)));
-    const demo = createDemoBackend({ now: () => NOW, liveMail: false });
     setBackend(demo);
     photos.setScope('session:me@example.com');
     const view = render(createElement(Avatar, { name: 'Real Person', email: 'real@example.com', photoUrl: HANGING, size: 32 }));
@@ -100,7 +99,7 @@ describe('Avatar while its photo downloads', () => {
     vi.stubGlobal('Image', class extends window.Image {
       override decode = decode;
     });
-    setBackend(createDemoBackend({ now: () => NOW, liveMail: false }));
+    setBackend(demo);
     photos.setScope('session:me@example.com');
     const first = render(createElement(Avatar, { name: 'Sam Slow', email: 'sam@example.com', photoUrl: SLOW, size: 32 }));
     const avatar = first.container.querySelector('.m3-avatar')!;

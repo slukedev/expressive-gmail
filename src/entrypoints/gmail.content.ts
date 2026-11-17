@@ -13,6 +13,7 @@ import { ACCOUNT_PROFILES_KEY, BOOT_CACHE_KEY } from '../app/data/cacheKeys';
 import { FRAME_BG_KEY, pickFrameBg } from '../shared/boot-theme';
 import { switchRequest } from '../shared/switch-link';
 import { mountReturnButton } from '../shared/return-button';
+import { mountSwitchPrompt } from '../shared/switch-prompt';
 import { mergeProbe, PROBE_KEY, probeDom, type ProbeRecord } from '../session/photoProbe';
 import { desktopGmailUrl } from '../shared/mobile';
 import { fitsDelegated, takesOver } from '../shared/takeover';
@@ -41,72 +42,97 @@ export default defineContentScript({
       if (fitsDelegated(here, window.top === window, navigator.userAgent)) fitViewport(ctx.signal);
       return;
     }
-    // Opened by the Mac app's switch: remember the choice, then carry on as a plain inbox.
-    const wanted = switchRequest(location.hash, document.referrer);
+    // Opened by the Mac app's switch (or any page's link to it): once the person agrees, remember the choice, then carry on as a plain inbox.
+    const wanted = switchRequest(location.hash);
     let applied: Promise<unknown> = Promise.resolve();
     if (wanted !== null) {
       history.replaceState(history.state, '', '#inbox');
-      sessionStorage.removeItem(CLASSIC_KEY);
       applied = browser.storage.local
-        .set({ 'bg.enabled': wanted })
-        .then(() => browser.runtime.sendMessage({ type: 'reload-gmail-tabs' }))
+        .get('bg.enabled')
+        .then(({ ['bg.enabled']: enabled }) => {
+          if ((enabled !== false) === wanted) {
+            // Already on, but this tab is in classic Gmail: the link still means this one.
+            if (wanted) sessionStorage.removeItem(CLASSIC_KEY);
+            return;
+          }
+          return new Promise<void>((resolve) => {
+            const stop = mountSwitchPrompt({
+              on: wanted,
+              onCancel: resolve,
+              onConfirm: () => {
+                sessionStorage.removeItem(CLASSIC_KEY);
+                void browser.storage.local
+                  .set({ 'bg.enabled': wanted })
+                  .then(() => browser.runtime.sendMessage({ type: 'reload-gmail-tabs' }))
+                  .catch(() => undefined)
+                  .finally(resolve);
+              },
+            });
+            ctx.onInvalidated(stop);
+          });
+        })
         .catch(() => undefined);
     }
-    const classic = sessionStorage.getItem(CLASSIC_KEY) === '1';
-    // Mobile Gmail has nothing to run on.
-    const desktop = desktopGmailUrl(new URL(location.href));
-    if (desktop) {
-      if (!classic) leaveMobileGmail(desktop, applied);
-      return;
-    }
-    startPhotoProbe(classic, ctx.signal);
-    if (classic) {
-      showReturnButton('tab');
-      return;
-    }
-
-    if (import.meta.env.BROWSER === 'safari') startSafariTokens(diag);
-
-    const hide = document.createElement('style');
-    hide.id = 'better-gmail-hide';
-    const systemDark = matchMedia('(prefers-color-scheme: dark)').matches;
-    const { background: bg, dark } = frameBackground(systemDark);
-    // Gmail's body paints its own (white) background over html's; clear it too.
-    // html doesn't scroll either, or a phone pans Gmail's wide page behind the app.
-    hide.textContent = `html{background:${bg}!important;color-scheme:${dark ? 'dark' : 'light'}!important;overflow:hidden!important;overscroll-behavior:none!important}body{background:none!important}body>*{visibility:hidden!important}body{overflow:hidden!important}`;
-    // Hidden isn't enough: Gmail keeps laying out and animating under the app, and Safari runs
-    // that on the app frame's thread. Skip rendering it; GmailPage wakes it while it steers Gmail.
-    const rest = document.createElement('style');
-    rest.id = 'better-gmail-rest';
-    rest.textContent = 'body>*{content-visibility:hidden!important}';
-    document.documentElement.append(hide, rest);
-    const viewport = fitViewport(ctx.signal);
-    // Safari's web apps run no extensions: one installed from here would open plain Gmail.
-    const app = startAppHost(ctx.signal, { manifest: import.meta.env.BROWSER !== 'safari' });
-    // Updated or removed under an open tab, the app frame goes blank: give the tab back to Gmail.
-    // WXT's interval is what notices the loss and aborts the context.
-    ctx.onInvalidated(() => {
-      hide.remove();
-      rest.remove();
-      document.getElementById('better-gmail-root')?.remove();
-    });
-    ctx.setInterval(() => undefined, 3_000);
-
-    void applied.then(() => browser.storage.local.get('bg.enabled')).then(({ ['bg.enabled']: enabled }) => {
-      if (enabled === false) {
-        hide.remove();
-        rest.remove();
-        viewport.remove();
-        app.release();
-        // Turned off: don't keep a copy of the inbox or any saved session around.
-        void browser.storage.local.remove([BOOT_CACHE_KEY, SESSIONS_KEY]);
-        showReturnButton('off');
+    // Read after any switch question is answered: agreeing to "on" takes a classic tab out of classic.
+    const start = () => {
+      const classic = sessionStorage.getItem(CLASSIC_KEY) === '1';
+      // Mobile Gmail has nothing to run on.
+      const desktop = desktopGmailUrl(new URL(location.href));
+      if (desktop) {
+        if (!classic) leaveMobileGmail(desktop, applied);
         return;
       }
-      // So the way back shows the next time it's turned off.
-      void browser.storage.local.remove(RETURN_HIDDEN_STORE);
-      mount(bg, systemDark, hide, rest, viewport, app, ctx.signal);
-    });
+      startPhotoProbe(classic, ctx.signal);
+      if (classic) {
+        showReturnButton('tab');
+        return;
+      }
+
+      if (import.meta.env.BROWSER === 'safari') startSafariTokens(diag);
+
+      const hide = document.createElement('style');
+      hide.id = 'better-gmail-hide';
+      const systemDark = matchMedia('(prefers-color-scheme: dark)').matches;
+      const { background: bg, dark } = frameBackground(systemDark);
+      // Gmail's body paints its own (white) background over html's; clear it too.
+      // html doesn't scroll either, or a phone pans Gmail's wide page behind the app.
+      hide.textContent = `html{background:${bg}!important;color-scheme:${dark ? 'dark' : 'light'}!important;overflow:hidden!important;overscroll-behavior:none!important}body{background:none!important}body>*{visibility:hidden!important}body{overflow:hidden!important}`;
+      // Hidden isn't enough: Gmail keeps laying out and animating under the app, and Safari runs
+      // that on the app frame's thread. Skip rendering it; GmailPage wakes it while it steers Gmail.
+      const rest = document.createElement('style');
+      rest.id = 'better-gmail-rest';
+      rest.textContent = 'body>*{content-visibility:hidden!important}';
+      document.documentElement.append(hide, rest);
+      const viewport = fitViewport(ctx.signal);
+      // Safari's web apps run no extensions: one installed from here would open plain Gmail.
+      const app = startAppHost(ctx.signal, { manifest: import.meta.env.BROWSER !== 'safari' });
+      // Updated or removed under an open tab, the app frame goes blank: give the tab back to Gmail.
+      // WXT's interval is what notices the loss and aborts the context.
+      ctx.onInvalidated(() => {
+        hide.remove();
+        rest.remove();
+        document.getElementById('better-gmail-root')?.remove();
+      });
+      ctx.setInterval(() => undefined, 3_000);
+
+      void applied.then(() => browser.storage.local.get('bg.enabled')).then(({ ['bg.enabled']: enabled }) => {
+        if (enabled === false) {
+          hide.remove();
+          rest.remove();
+          viewport.remove();
+          app.release();
+          // Turned off: don't keep a copy of the inbox or any saved session around.
+          void browser.storage.local.remove([BOOT_CACHE_KEY, SESSIONS_KEY]);
+          showReturnButton('off');
+          return;
+        }
+        // So the way back shows the next time it's turned off.
+        void browser.storage.local.remove(RETURN_HIDDEN_STORE);
+        mount(bg, systemDark, hide, rest, viewport, app, ctx.signal);
+      });
+    };
+    if (wanted === null) start();
+    else void applied.then(start);
   },
 });
 
@@ -153,6 +179,8 @@ function mount(
   });
   let stopServing: (() => void) | undefined;
   let stopAccounts: (() => void) | undefined;
+  // Compose windows with something in them, so switching modes doesn't reload this tab under them.
+  let unsentDrafts = 0;
   const accounts = accountsService(backend);
   shareSession();
   let wantedTitle = '';
@@ -177,8 +205,9 @@ function mount(
         const accountsChannel = new MessageChannel();
         stopServing?.();
         stopAccounts?.();
-        // The frame that opened other accounts is gone.
+        // The frame that opened other accounts is gone, and so are its compose windows.
         accounts.closeAll();
+        unsentDrafts = 0;
         stopServing = exposeBackend(channel.port1, backend);
         stopAccounts = serveAccounts(accountsChannel.port1, accounts);
         frame.contentWindow!.postMessage({ source: 'better-gmail/content', type: 'port' }, extOrigin, [channel.port2, accountsChannel.port2]);
@@ -187,7 +216,10 @@ function mount(
         break;
       }
       case 'route':
-        if (typeof data.hash === 'string') history.replaceState(history.state, '', data.hash);
+        if (typeof data.hash === 'string' && data.hash.startsWith('#')) history.replaceState(history.state, '', data.hash);
+        break;
+      case 'unsent':
+        unsentDrafts = Number.isInteger(data.count) && (data.count as number) > 0 ? (data.count as number) : 0;
         break;
       case 'diag':
         if (typeof data.line === 'string') diag(`app: ${data.line.slice(0, 300)}`);
@@ -254,10 +286,13 @@ function mount(
     schemeQuery.removeEventListener('change', postScheme);
   });
 
-  const onRuntimeMessage = (message: { type?: string; threadId?: string }) => {
+  const onRuntimeMessage = (message: { type?: string; threadId?: string }, _sender: unknown, sendResponse: (r: unknown) => void) => {
     if (message?.type === 'open-thread' && message.threadId) {
       frame.contentWindow?.postMessage({ source: 'better-gmail/content', type: 'open-thread', threadId: message.threadId }, extOrigin);
+    } else if (message?.type === 'unsent-drafts') {
+      sendResponse({ unsent: unsentDrafts });
     }
+    return false;
   };
   browser.runtime.onMessage.addListener(onRuntimeMessage);
   signal.addEventListener('abort', () => {

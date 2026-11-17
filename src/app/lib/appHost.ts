@@ -8,7 +8,7 @@ import { NO_APP_HOST, type AppHostState, type BadgeValue, type Launch } from '..
 
 const GMAIL = 'https://mail.google.com';
 // The preview's stand-in host (preview/frame.html) frames the app from its own origin.
-const HOST = import.meta.env.DEV && typeof location !== 'undefined' && location.protocol.startsWith('http') ? location.origin : GMAIL;
+export const HOST = import.meta.env.DEV && typeof location !== 'undefined' && location.protocol.startsWith('http') ? location.origin : GMAIL;
 
 export type AppLaunch = Launch & { files?: File[] };
 
@@ -50,7 +50,7 @@ function isLaunch(v: unknown): v is AppLaunch {
 if (typeof window !== 'undefined' && window.parent !== window) {
   window.addEventListener('message', (e) => {
     const d = e.data as { source?: string; type?: string; [k: string]: unknown };
-    if (e.source !== window.parent || d?.source !== 'better-gmail/content' || typeof d.type !== 'string') return;
+    if (e.source !== window.parent || e.origin !== HOST || d?.source !== 'better-gmail/content' || typeof d.type !== 'string') return;
     if (d.type === 'app-state' && isState(d.state)) {
       state = d.state;
       listeners.forEach((fn) => fn());
@@ -126,6 +126,14 @@ export function setAppBadge(value: BadgeValue) {
   if (value === lastBadge) return;
   lastBadge = value;
   post('app-badge', { value });
+}
+
+let lastUnsent = 0;
+/** So turning the app off or on elsewhere doesn't reload this tab under a message being written. */
+export function reportUnsentDrafts(count: number) {
+  if (count === lastUnsent) return;
+  lastUnsent = count;
+  post('unsent', { count });
 }
 
 /** One handler at a time; launches that came before it are handed over in order. */

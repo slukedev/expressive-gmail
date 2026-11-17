@@ -5,6 +5,7 @@ import { photoData } from '../session/account';
 import { isThumbnailUrl } from '../session/thumbnails';
 import { notificationId, notificationThread } from '../shared/notify';
 import { runsApp } from '../shared/takeover';
+import { switchableTabs } from '../shared/gmail-tabs';
 import { DESKTOP_RULE_ID, desktopRule, isPhone } from '../shared/mobile';
 export default defineBackground(() => {
   // Nothing here opens a tab, window or page: Gmail opens only when someone clicks to open it.
@@ -48,23 +49,6 @@ export default defineBackground(() => {
         .catch((err: unknown) => sendResponse({ ok: false, error: String((err as Error)?.message ?? err) }));
       return true;
     }
-    if (m?.type === 'bimi' && typeof (m as { domain?: unknown }).domain === 'string') {
-      const domain = (m as { domain: string }).domain;
-      const selector = (m as { selector?: unknown }).selector;
-      const name = typeof selector === 'string' && /^[a-z0-9_-]{1,63}$/i.test(selector) ? selector : 'default';
-      if (!/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(domain)) {
-        sendResponse({ ok: false });
-        return false;
-      }
-      void fetch(`https://dns.google/resolve?name=${name}._bimi.${domain}&type=TXT`, { credentials: 'omit' })
-        .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
-        .then((json: { Answer?: { data?: string }[] }) => {
-          const records = (json.Answer ?? []).map((a) => String(a.data ?? '').replace(/^"|"$/g, '').replace(/"\s*"/g, ''));
-          sendResponse({ ok: true, records });
-        })
-        .catch((err: unknown) => sendResponse({ ok: false, error: String((err as Error)?.message ?? err) }));
-      return true;
-    }
     if (m?.type === 'list-accounts') {
       // Needs accounts.google.com's cookies, so it runs here.
       void listAccountsWithSlots(fetch.bind(globalThis))
@@ -73,9 +57,9 @@ export default defineBackground(() => {
       return true;
     }
     if (m?.type === 'reload-gmail-tabs') {
-      void browser.tabs
-        .query({ url: 'https://mail.google.com/*' })
-        .then((tabs) => Promise.all(tabs.map((t) => t.id !== undefined && t.id !== _sender.tab?.id && runsApp(t.url) && browser.tabs.reload(t.id))))
+      // Tabs with a message being written keep it; they switch when next loaded.
+      void switchableTabs(_sender.tab?.id)
+        .then((tabs) => Promise.allSettled(tabs.filter((t) => !t.unsent).map((t) => browser.tabs.reload(t.id))))
         .then(() => sendResponse({ ok: true }), () => sendResponse({ ok: false }));
       return true;
     }

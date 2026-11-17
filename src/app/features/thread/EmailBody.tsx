@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { backend } from '../../data/client';
 import type { Message } from '../../data/types';
-import { sanitizeEmail, splitQuoted, textToHtml } from '../../lib/sanitize';
+import { contentPolicy, sanitizeEmail, splitQuoted, textToHtml } from '../../lib/sanitize';
 import { useResolvedDark } from '../../theme/ThemeProvider';
 import { Tooltip } from '../../ui/Tooltip';
 import { composeFromMailto } from '../compose/open';
@@ -14,8 +14,14 @@ import { useShowsOriginal } from '../darkmail/original';
 import { useBodySizing } from './sizing';
 import '../darkmail/darkmail.css';
 
-let frameSeq = 0;
 const FRAME_CSS_ID = 'bg-frame-css';
+
+/** FNV-1a, enough to tell one srcdoc from the next. */
+function hash(text: string) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
+  return (h >>> 0).toString(36);
+}
 
 /** In dark mode they're darkened, or keep a light "paper". */
 export function isDesigned(html: string) {
@@ -38,17 +44,21 @@ function useCidMap(message: Message) {
     if (!inline.length || !bodyHtml?.includes('cid:')) return;
     let cancelled = false;
     const urls: string[] = [];
-    void Promise.all(
+    // One image that fails to load leaves the others showing.
+    void Promise.allSettled(
       inline.map(async (a) => {
         const { data, mimeType } = await backend().getAttachment(id, a.id);
+        if (cancelled) return undefined;
         const bytes = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
         const url = URL.createObjectURL(new Blob([bytes], { type: mimeType || a.mimeType }));
         urls.push(url);
-        return [a.contentId!, url] as const;
+        return [cid(a.contentId!), url] as const;
       }),
     )
-      .then((pairs) => !cancelled && setFetched(new Map(pairs.map(([k, v]) => [cid(k), v]))))
-      .catch(() => undefined);
+      .then((results) => {
+        if (cancelled) return;
+        setFetched(new Map(results.flatMap((r) => (r.status === 'fulfilled' && r.value ? [r.value] : []))));
+      });
     return () => {
       cancelled = true;
       urls.forEach((u) => URL.revokeObjectURL(u));
@@ -163,15 +173,17 @@ export function EmailBody({ message, loadImages, linksOff }: { message: Message;
   // A theme flip restyles the open frame in place instead of reloading it, unless the email's own colors need rewriting.
   const darkNow = useRef(dark);
   darkNow.current = dark;
+  const frameId = useId();
   const [html, frameKey] = useMemo(() => {
     const doc = new DOMParser().parseFromString(main, 'text/html');
-    // So the effect can tell when the frame already holds this document.
-    const key = String(++frameSeq);
+    const withQuote = showQuoted && quoted ? quoted : '';
+    // So the effects can tell when the frame already holds this document. Undoing fixText's rewrite takes a fresh document, so it's part of the key.
+    const key = [frameId, hash(main), hash(withQuote), designed, adapt, fixText].join(':');
     doc.documentElement.setAttribute('data-bg-frame', key);
-    if (showQuoted && quoted) {
+    if (withQuote) {
       const q = doc.createElement('div');
       q.className = 'bg-quoted';
-      q.innerHTML = quoted;
+      q.innerHTML = withQuote;
       doc.body.appendChild(q);
     }
     for (const img of doc.images) {
@@ -184,9 +196,13 @@ export function EmailBody({ message, loadImages, linksOff }: { message: Message;
     const style = doc.createElement('style');
     style.id = FRAME_CSS_ID;
     style.textContent = frameCss(designed, darkNow.current, adapt);
-    doc.head.prepend(style);
+    const policy = doc.createElement('meta');
+    policy.httpEquiv = 'Content-Security-Policy';
+    policy.content = contentPolicy({ remote: loadImages, images: [...cidMap.values()] });
+    // First in the document, so it governs everything after it.
+    doc.head.prepend(policy, style);
     return [`<!doctype html>${doc.documentElement.outerHTML}`, key] as const;
-  }, [main, quoted, showQuoted, designed, adapt, fixText]);
+  }, [frameId, main, quoted, showQuoted, designed, adapt, fixText, loadImages, cidMap]);
 
   useEffect(() => {
     const doc = frameRef.current?.contentDocument;
@@ -244,7 +260,7 @@ export function EmailBody({ message, loadImages, linksOff }: { message: Message;
       });
     };
     const onClick = (e: MouseEvent) => {
-      const a = (e.target as Element).closest?.('a');
+      const a = (e.target as Element).closest?.('a, area');
       if (!a) return;
       const href = a.getAttribute('href') ?? '';
       if (href.startsWith('#')) return;

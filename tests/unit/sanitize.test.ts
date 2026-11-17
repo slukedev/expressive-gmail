@@ -1,4 +1,4 @@
-import { sanitizeEmail, splitQuoted, textToHtml } from '../../src/app/lib/sanitize';
+import { contentPolicy, sanitizeEmail, splitQuoted, textToHtml } from '../../src/app/lib/sanitize';
 
 const parse = (html: string) => new DOMParser().parseFromString(html, 'text/html');
 const clean = (html: string, opts: Parameters<typeof sanitizeEmail>[1] = { blockRemoteImages: false }) => parse(sanitizeEmail(html, opts));
@@ -43,6 +43,14 @@ describe('sanitizeEmail', () => {
     expect(doc.querySelector('td')?.getAttribute('valign')).toBe('top');
   });
 
+  it('treats image-map areas like links, in Spam too', () => {
+    const map = `<map name="m"><area id="area" shape="rect" coords="0,0,10,10" href="https://example.com/x"></map>`;
+    expect(clean(map).getElementById('area')?.getAttribute('target')).toBe('_blank');
+    const off = clean(map, { blockRemoteImages: true, disableLinks: true }).getElementById('area')!;
+    expect(off.hasAttribute('href')).toBe(false);
+    expect(off.getAttribute('data-href')).toBe('https://example.com/x');
+  });
+
   it('opens external links in a new tab and leaves in-page anchors alone', () => {
     const doc = clean(`<a id="ext" href="https://example.com/x" target="_self">x</a><a id="mail" href="mailto:a@b.c">m</a><a id="toc" href="#section-2">jump</a>`);
     for (const id of ['ext', 'mail']) {
@@ -85,6 +93,37 @@ describe('sanitizeEmail', () => {
     expect(doc.getElementById('video')?.hasAttribute('poster')).toBe(false);
   });
 
+  it.each([
+    ['an escaped url() in a style sheet', String.raw`<style>.a{background:\75 rl(https://t.example.com/a.gif)}</style>`],
+    ['image-set() with a bare string', `<style>.a{background-image:image-set("https://t.example.com/b.gif" 1x)}</style>`],
+    ['list-style-image', `<ul><li style="list-style-image:url(https://t.example.com/c.gif)">x</li></ul>`],
+    ['border-image', `<div style="border-image:url(https://t.example.com/d.gif) 30">x</div>`],
+    ['mask, cursor and content', `<div style="mask-image:url(//t.example.com/e.gif);cursor:url('https://t.example.com/f.cur'),auto">x</div><style>p::after{content:url(https://t.example.com/g.gif)}</style>`],
+    ['an escaped url() inline', String.raw`<div style="background:\75 rl(https://t.example.com/h.gif)">x</div>`],
+    ['an escaped @import', String.raw`<style>@\69mport "https://t.example.com/i.css";</style>`],
+    ['an escaped src in @font-face', String.raw`<style>@font-face{font-family:x;src:\75 rl(https://t.example.com/j.woff)}</style>`],
+    ['a URL split by a line continuation', `<style>.a{background-image:image-set("ht\\\ntps://t.example.com/k.gif" 1x)}</style>`],
+    ['a scheme without slashes', `<style>.a{background:url(https:t.example.com/l.gif)}</style>`],
+    ['an escaped scheme', String.raw`<style>.a{background:url(\68 ttps\3a //t.example.com/m.gif)}</style>`],
+    ['a track element', `<video><track src="https://t.example.com/n.vtt"></video>`],
+  ])('blocks %s', (_, html) => {
+    const out = sanitizeEmail(html, { blockRemoteImages: true, blockTrackers: true });
+    expect(out).not.toContain('t.example.com');
+  });
+
+  it('keeps escaped selectors, so responsive layouts survive blocked images', () => {
+    const sheet = String.raw`@media (min-width:600px){.sm\:w-full{width:100%!important}.md\:px-0{padding:0}}.hero{background:url(https://t.example.com/bg.png)}`;
+    const css = parse(sanitizeEmail(`<style>${sheet}</style><div class="sm:w-full">x</div>`, { blockRemoteImages: true })).querySelector('style')!.textContent!;
+    expect(css).toContain(String.raw`.sm\:w-full{width:100%!important}`);
+    expect(css).toContain(String.raw`.md\:px-0{padding:0}`);
+    expect(css).not.toContain('t.example.com');
+  });
+
+  it('leaves the same CSS alone when images are allowed', () => {
+    const out = sanitizeEmail(`<li style="list-style-image:url(https://cdn.example/c.png)">x</li>`, { blockRemoteImages: false });
+    expect(out).toContain('https://cdn.example/c.png');
+  });
+
   it('strips background images when blocking, and keeps them otherwise', () => {
     const html = `<td id="cell" background="https://track.example/bg.png" style="color: red; background-image: url('https://track.example/bg2.png')">x</td>`;
     const wrap = (h: string) => `<table><tr>${h}</tr></table>`;
@@ -117,6 +156,25 @@ describe('sanitizeEmail', () => {
     expect(doc.getElementById('b')?.getAttribute('src')).toBe('blob:https://mail.google.com/2');
     expect(doc.getElementById('c')?.hasAttribute('src')).toBe(false);
     expect(doc.getElementById('c')?.hasAttribute('data-blocked-src')).toBe(false);
+  });
+});
+
+describe('contentPolicy', () => {
+  const directive = (policy: string, name: string) => policy.split('; ').find((d) => d.startsWith(`${name} `)) ?? '';
+
+  it('lets nothing load from the network while images are blocked', () => {
+    const policy = contentPolicy({ remote: false });
+    expect(policy).toContain("default-src 'none'");
+    for (const name of ['img-src', 'media-src', 'font-src', 'style-src']) expect(directive(policy, name)).not.toMatch(/https?:/);
+  });
+
+  it('allows remote pictures once the reader does', () => {
+    expect(directive(contentPolicy({ remote: true }), 'img-src')).toContain('https:');
+  });
+
+  it('allows exact addresses, without their query, and skips any that would break the policy', () => {
+    const policy = contentPolicy({ remote: false, images: ['https://cdn.example/a.png?u=1', "https://cdn.example/b;c.png", 'javascript:alert(1)', 'not a url'] });
+    expect(directive(policy, 'img-src')).toBe('img-src data: blob: https://cdn.example/a.png');
   });
 });
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { photos, usePersonPhoto, useVerifiedLogo } from '../data/photos';
+import { photos, usePersonPhoto } from '../data/photos';
 import { publicPhoto } from '../../session/account';
 import { localCopy, reportUnreadable, useAvatarFit } from './avatarFit';
 import { useImageReady } from './imageReady';
@@ -30,8 +30,6 @@ reportUnreadable((url) => {
   photoLog.add({ who: tag(url), kind: 'person', steps: ["pixels couldn't be read, so a placeholder can't be told from a photo"], result: 'error' });
 });
 
-const COVER = { kind: 'cover', scale: 1, x: 0, y: 0 } as const;
-
 function initial(name: string | undefined, email: string) {
   const source = (name || email).trim();
   const match = source.match(/\p{L}|\p{N}/u);
@@ -52,31 +50,18 @@ export function Avatar({ name, email, photoUrl, photoKind = 'person', size = 40,
   const { bg, fg } = avatarColor(email.toLowerCase(), dark);
   const given = photoUrl && !failed.includes(photoUrl) ? photoUrl : undefined;
   // Without a working photo from the caller: a profile photo, or the sender's brand logo.
-  const lookedUp = usePersonPhoto(given ? undefined : email, name);
-  // A verified logo beats even a photo that came with the mail (a brand's blank Google profile).
-  const verifiedLogo = useVerifiedLogo(given && !own ? email : undefined);
-  const looked = verifiedLogo && !failed.includes(verifiedLogo.url) ? verifiedLogo : lookedUp;
+  const looked = usePersonPhoto(given ? undefined : email, name);
   // In order: the caller's photo, its public twin (a signed-in-only address won't load in this frame), the looked-up one.
   const twin = photoUrl ? publicPhoto(photoUrl) : undefined;
   const lookedUrl = looked && !failed.includes(looked.url) ? looked.url : undefined;
-  const url = (looked?.verified ? lookedUrl : undefined) ?? given ?? (twin && !failed.includes(twin) ? twin : undefined) ?? lookedUrl;
+  const url = given ?? (twin && !failed.includes(twin) ? twin : undefined) ?? lookedUrl;
   const kind = url && url === lookedUrl ? looked!.kind : photoKind;
   const src = url ? (copies[url] ?? url) : undefined;
-  const measured = useAvatarFit(src, kind === 'brand');
-  // A verified logo is drawn to fill a circle; it isn't measured.
-  const verified = !!url && url === lookedUrl && !!looked?.verified;
-  // A readable verified logo gets the same fit as any brand mark; unreadable, it fills the circle on white, as Gmail draws it. It never waits on the read.
-  const fit = verified ? (measured && measured.kind === 'unknown' ? COVER : measured) : measured;
+  const fit = useAvatarFit(src, kind === 'brand');
   // Until the fit is known (and for Google's placeholders) the initial shows. Google's letter avatars are flat by design and show as Gmail shows them.
   const monogram = !!url?.endsWith(MONOGRAM_MARK);
   const showPhoto = !!src && !!fit && (own || monogram || fit.kind !== 'placeholder');
-  // Verified logos are drawn for a white ground (many leave it transparent), as Gmail shows them, in dark mode too.
-  const fill =
-    showPhoto && (fit.kind === 'tile' || fit.kind === 'mark')
-      ? whiteish(fit.bg)
-      : (showPhoto && verified) || fit?.kind === 'unknown'
-        ? '#ffffff'
-        : bg;
+  const fill = showPhoto && (fit.kind === 'tile' || fit.kind === 'mark') ? whiteish(fit.bg) : fit?.kind === 'unknown' ? '#ffffff' : bg;
   const placed = showPhoto && fit && 'scale' in fit ? { transform: `translate(${fit.x}%, ${fit.y}%) scale(${fit.scale})` } : undefined;
 
   // A caller's photo that is Google's generic placeholder (a contact without a picture) says nothing; the person's own photo may still exist.

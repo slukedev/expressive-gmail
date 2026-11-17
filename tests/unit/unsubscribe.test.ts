@@ -65,6 +65,23 @@ it('without one-click it sends the mailto request, with the subject the sender a
   expect(b.send).toHaveBeenCalledWith(expect.objectContaining({ to: [expect.objectContaining({ email: 'u@stride.example' })], subject: 'Remove me' }));
 });
 
+it('in a merged inbox, the mailto request goes out from the account the mail reached', async () => {
+  const { useAccounts } = await import('../../src/app/data/accounts/store');
+  const { accountKey, qualify } = await import('../../src/app/data/accounts/ids');
+  const studio = 'alex@riverastudio.example.net';
+  useAccounts.setState({
+    accounts: [
+      { key: accountKey('alex@example.com'), email: 'alex@example.com', index: 0 },
+      { key: accountKey(studio), email: studio, index: 1 },
+    ] as never,
+    scope: 'all',
+  });
+  const b = sessionLike({ listUnsubscribe: '<mailto:u@stride.example>' });
+  expect(await unsubscribe({ ...msg, id: qualify(accountKey(studio), 'msg-f:1') })).toBe(true);
+  expect(b.send).toHaveBeenCalledWith(expect.objectContaining({ from: { email: studio } }));
+  useAccounts.setState({ accounts: [], scope: null });
+});
+
 it('a page-only sender opens the page; no header at all says so and reports failure', async () => {
   sessionLike({ listUnsubscribe: '<https://stride.example/page>' });
   expect(await unsubscribe(msg)).toBe(true);

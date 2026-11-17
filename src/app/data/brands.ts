@@ -70,27 +70,6 @@ export function brandDomain(
   return undefined;
 }
 
-/** Worth asking about a verified (BIMI) logo whoever the sender looks like: a domain that publishes one is a brand ("The New York Times" <nytdirect@nytimes.com>). */
-export function orgDomain(email: string, ownEmail: string | undefined): string | undefined {
-  const domain = registrableDomain(email.slice(email.lastIndexOf('@') + 1));
-  if (!domain || RESERVED.test(domain) || CONSUMER_NAMES.has(domain.split('.')[0]!)) return undefined;
-  const own = ownEmail ? registrableDomain(ownEmail.slice(ownEmail.lastIndexOf('@') + 1)) : undefined;
-  return own === domain ? undefined : domain;
-}
-
-/** "v=BIMI1; s=nyt" -> "nyt", unless it's the default. */
-export function bimiSelectorOf(header: string | undefined): string | undefined {
-  const s = header && /(?:^|;)\s*s=([a-z0-9_-]{1,63})\s*(?:;|$)/i.exec(header)?.[1]?.toLowerCase();
-  return s && s !== 'default' ? s : undefined;
-}
-
-/** Only an https SVG. */
-export function bimiLogo(record: string): string | undefined {
-  if (!/^\s*v=BIMI1\s*;/i.test(record)) return undefined;
-  const l = /(?:^|;)\s*l=([^;\s]+)/i.exec(record)?.[1];
-  return l && /^https:\/\/[^\s]+\.svg(\?[^\s]*)?$/i.test(l) ? l : undefined;
-}
-
 /** Best first: the sender's own host when it's a subdomain with its own site (pharmacy.cvs.com), then the registrable domain, where mail subdomains (e.cvs.com) lead. */
 export function logoHosts(email: string): string[] {
   const host = email.slice(email.lastIndexOf('@') + 1).trim().toLowerCase().replace(/\.$/, '').replace(/^www\./, '');

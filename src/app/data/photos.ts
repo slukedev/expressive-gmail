@@ -1,6 +1,6 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { readKey, writeKey } from '../state/storage';
-import { MIN_LOGO_PX, bimiLogo, bimiSelectorOf, brandDomain, faviconUrl, imageWidth, logoHosts, orgDomain } from './brands';
+import { MIN_LOGO_PX, brandDomain, faviconUrl, imageWidth, logoHosts } from './brands';
 import { personLabel, photoLog } from './photoLog';
 import { tag } from '../../session/shape';
 import { PHOTOS_KEY } from './cacheKeys';
@@ -15,8 +15,6 @@ import { isGooglePlaceholder } from '../ui/avatarFit';
 export interface Photo {
   url: string;
   kind: 'person' | 'brand';
-  /** A brand's verified (BIMI) logo: a square mark made to fill the circle, as Gmail shows it. */
-  verified?: true;
 }
 
 const HOUR = 60 * 60_000;
@@ -61,8 +59,6 @@ export interface PhotoCacheDeps {
   imageWidth?: (url: string) => Promise<number>;
   /** The demo's invented brands, used instead of Google's favicon service. */
   logo?: (domain: string) => string | undefined;
-  /** Undefined when DNS can't be asked from here. */
-  bimi?: (host: string, selector?: string) => Promise<string[] | undefined>;
   now?: () => number;
   batchDelayMs?: number;
   saveDelayMs?: number;
@@ -121,12 +117,6 @@ export class PhotoCache {
   private inflight = new Set<string>();
   private brandQueue = new Set<string>();
   private brandInflight = new Set<string>();
-  /** Saved under "bimi:<domain>" in `brands`. */
-  private orgOf = new Map<string, string>();
-  private bimiQueue = new Set<string>();
-  private bimiInflight = new Set<string>();
-  /** From a sender's BIMI-Selector header ("nytimes.com" -> "nyt"). */
-  private selectorOf = new Map<string, string>();
   private listeners = new Map<string, Set<() => void>>();
   /** Never offered again this session. */
   private readonly brokenUrls = new Set<string>();
@@ -137,7 +127,7 @@ export class PhotoCache {
   /** A tab open for weeks sees thousands of senders; memory keeps the most recent. Anyone dropped is looked up again when shown. */
   private trim() {
     const max = PHOTO_LIMITS.inMemory;
-    for (const m of [this.people, this.brands, this.brandOf, this.orgOf, this.hostsOf, this.names, this.snapshots, this.logged, this.selectorOf]) cap(m, max);
+    for (const m of [this.people, this.brands, this.brandOf, this.hostsOf, this.names, this.snapshots, this.logged]) cap(m, max);
   }
   private flushTimer: ReturnType<typeof setTimeout> | undefined;
   private saveTimer: ReturnType<typeof setTimeout> | undefined;
@@ -192,7 +182,8 @@ export class PhotoCache {
       if (Array.isArray(value) && !this.people.has(email)) this.people.set(email, value);
     }
     for (const [domain, value] of Object.entries(current ? (saved?.brands ?? {}) : {})) {
-      if (!Array.isArray(value) || this.brands.has(domain)) continue;
+      // Verified logos older builds fetched from addresses senders chose.
+      if (!Array.isArray(value) || this.brands.has(domain) || domain.startsWith('bimi:')) continue;
       this.brands.set(domain, value);
     }
     this.notifyAll();
@@ -207,51 +198,6 @@ export class PhotoCache {
         this.preloaded = { raw };
       });
     return this.preloading;
-  }
-
-  /** For an avatar that already has a photo from the mail itself. */
-  requestVerified(email: string) {
-    const key = norm(email);
-    if (key.includes('@')) this.askVerified(key);
-  }
-
-  /** Never starts a lookup. */
-  peekVerified(email: string): Photo | undefined {
-    const photo = this.peek(email);
-    return photo?.verified ? photo : undefined;
-  }
-
-  private askVerified(key: string) {
-    if (this.deps.bimi && !this.orgOf.has(key)) {
-      const org = orgDomain(key, this.ownEmail);
-      if (org) {
-        this.orgOf.set(key, org);
-        this.snapshots.delete(key);
-        if (!this.hostsOf.has(`bimi:${org}`)) this.hostsOf.set(`bimi:${org}`, logoHosts(key));
-      }
-    }
-    const org = this.orgOf.get(key);
-    if (org && !this.bimiQueue.has(org) && !this.bimiInflight.has(org) && !this.isFresh(this.brands.get(`bimi:${org}`), 'brand')) {
-      this.bimiQueue.add(org);
-      this.scheduleFlush();
-    }
-  }
-
-  /** Some senders publish their verified logo under a selector of their own (The New York Times under "nyt"), which only their mail names. */
-  bimiSelector(email: string, header: string | undefined) {
-    const selector = bimiSelectorOf(header);
-    const key = norm(email);
-    const org = this.orgOf.get(key) ?? (this.deps.bimi ? orgDomain(key, this.ownEmail) : undefined);
-    if (!selector || !org || this.selectorOf.get(org) === selector) return;
-    this.selectorOf.set(org, selector);
-    this.orgOf.set(key, org);
-    if (!this.hostsOf.has(`bimi:${org}`)) this.hostsOf.set(`bimi:${org}`, logoHosts(key));
-    if (this.brands.get(`bimi:${org}`)?.[0]) return;
-    this.brands.delete(`bimi:${org}`);
-    if (!this.bimiInflight.has(org)) {
-      this.bimiQueue.add(org);
-      this.scheduleFlush();
-    }
   }
 
   /** Forgets every saved answer for this account and looks up everyone on screen again. */
@@ -274,10 +220,6 @@ export class PhotoCache {
   }
 
   private resolve(key: string): Photo | undefined {
-    // A verified logo first, as Gmail shows it ahead of a profile photo.
-    const org = this.orgOf.get(key);
-    const verified = org ? this.brands.get(`bimi:${org}`)?.[0] : undefined;
-    if (verified && !this.brokenUrls.has(verified)) return { url: verified, kind: 'brand', verified: true };
     const person = this.people.get(key)?.[0];
     // An organisation's own picture, and any inline image (a verified sender's logo), sit like logos.
     if (person && !this.brokenUrls.has(person)) return { url: person, kind: this.brandOf.has(key) || person.startsWith('data:') ? 'brand' : 'person' };
@@ -300,7 +242,6 @@ export class PhotoCache {
         this.snapshots.delete(key);
       }
     }
-    this.askVerified(key);
     const domain = this.brandOf.get(key);
     const saved = this.people.get(key);
     if (saved && this.isFresh(saved, 'person') && !this.logged.has(key)) {
@@ -380,7 +321,7 @@ export class PhotoCache {
     if (!scope) return;
     await this.loaded;
     if (this.scope !== scope) return;
-    await Promise.all([this.flushPeople(scope), this.flushBrands(scope), this.flushBimi(scope)]);
+    await Promise.all([this.flushPeople(scope), this.flushBrands(scope)]);
   }
 
   /** Whatever queues meanwhile goes in the next batch. */
@@ -498,45 +439,6 @@ export class PhotoCache {
     this.scheduleSave();
   }
 
-  /** The sender's own host first (email.newyorktimes.com), then its organisation domain. */
-  private async flushBimi(scope: string) {
-    const ask = this.deps.bimi;
-    const orgs = [...this.bimiQueue].filter((d) => !this.isFresh(this.brands.get(`bimi:${d}`), 'brand'));
-    this.bimiQueue.clear();
-    if (!ask || !orgs.length) return;
-    orgs.forEach((d) => this.bimiInflight.add(d));
-    for (const org of orgs) {
-      const hosts = this.hostsOf.get(`bimi:${org}`) ?? [org];
-      if (!hosts.includes(org)) hosts.push(org);
-      const steps: string[] = [];
-      let url: string | undefined;
-      let unavailable = false;
-      const selectors = [this.selectorOf.get(org), undefined];
-      ask: for (const selector of selectors.filter((s, i) => i === selectors.length - 1 || s)) {
-        for (const host of hosts) {
-          const records = await ask(host, selector).catch(() => undefined);
-          const where = `${selector ?? 'default'}._bimi.${host}`;
-          if (!records) {
-            unavailable = true;
-            steps.push(`verified logo ${where}: DNS not reachable`);
-            break ask;
-          }
-          url = records.map(bimiLogo).find(Boolean);
-          steps.push(`verified logo ${where}: ${url ? tag(url) : 'none'}`);
-          if (url) break ask;
-        }
-      }
-      this.bimiInflight.delete(org);
-      if (this.scope !== scope) return;
-      const now = this.now();
-      photoLog.add({ who: org, kind: 'brand', steps, result: url ? 'hit' : unavailable ? 'error' : 'miss' });
-      // Not reachable: ask again sooner than after a genuine "none".
-      this.brands.set(`bimi:${org}`, [url ?? null, unavailable ? now - PHOTO_LIMITS.brandMissTtlMs + PHOTO_LIMITS.brandErrorTtlMs : now]);
-      for (const [key, d] of this.orgOf) if (d === org) this.notify(key);
-    }
-    this.scheduleSave();
-  }
-
   private notify(key: string) {
     this.snapshots.delete(key);
     this.listeners.get(key)?.forEach((fn) => fn());
@@ -589,26 +491,7 @@ export const photos = new PhotoCache({
   placeholder: isGooglePlaceholder,
   read: () => readKey(PHOTOS_KEY),
   write: (store) => writeKey(PHOTOS_KEY, store),
-  bimi: async (host, selector) => {
-    const runtime = (globalThis as { browser?: { runtime?: { id?: string; sendMessage?: (m: unknown) => Promise<unknown> } } }).browser?.runtime;
-    if (!runtime?.id || !runtime.sendMessage) return undefined;
-    const res = (await runtime.sendMessage({ type: 'bimi', domain: host, ...(selector ? { selector } : {}) }).catch(() => undefined)) as { ok?: boolean; records?: string[] } | undefined;
-    return res?.ok ? (res.records ?? []) : undefined;
-  },
 });
-
-/** For an avatar that has a photo already: Gmail puts the verified logo first. */
-export function useVerifiedLogo(email: string | undefined): Photo | undefined {
-  const key = email ? norm(email) : '';
-  const photo = useSyncExternalStore(
-    (fn) => (key ? photos.subscribe(key, fn) : () => undefined),
-    () => (key ? photos.peekVerified(key) : undefined),
-  );
-  useEffect(() => {
-    if (key) photos.requestVerified(key);
-  }, [key]);
-  return photo;
-}
 
 /** A person's profile photo or an organisation's brand logo. `name` helps tell a brand ("Stripe") from a person. Each address is looked up at most once per TTL; avatars rendered together share one request. */
 export function usePersonPhoto(email: string | undefined, name?: string): Photo | undefined {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { backend } from '../../data/client';
 import type { Attachment, Message } from '../../data/types';
 import { fileSize } from '../../lib/format';
@@ -31,11 +31,11 @@ export async function downloadAttachment(messageId: string, a: Attachment) {
 }
 
 export function Attachments({ message }: { message: Message }) {
-  const files = message.attachments.filter((a) => !a.inline);
+  const files = useMemo(() => message.attachments.filter((a) => !a.inline).map((f) => ({ ...f, messageId: message.id })), [message.attachments, message.id]);
   const [viewing, setViewing] = useState<number | null>(null);
   const total = files.reduce((n, a) => n + a.size, 0);
   return (
-    <section className="attachments" aria-label={`${files.length} attachments`}>
+    <section className="attachments" aria-label={files.length === 1 ? 'One attachment' : `${files.length} attachments`}>
       <p className="attachments__head md-label-large">
         {files.length === 1 ? 'One attachment' : `${files.length} attachments`}
         <span className="attachments__size"> · {fileSize(total)}</span>
@@ -56,7 +56,7 @@ export function Attachments({ message }: { message: Message }) {
         ))}
       </ul>
       {viewing !== null && (
-        <AttachmentViewer files={files.map((f) => ({ ...f, messageId: message.id }))} index={viewing} onIndex={setViewing} onClose={() => setViewing(null)} />
+        <AttachmentViewer files={files} index={viewing} onIndex={setViewing} onClose={() => setViewing(null)} />
       )}
     </section>
   );

@@ -38,7 +38,7 @@ export default defineConfig({
 		],
 	},
 	modules: ["@wxt-dev/module-react"],
-	manifest: ({ browser }) => ({
+	manifest: ({ browser, mode }) => ({
 		name: "Expressive Gmail",
 		short_name: "Expressive Gmail",
 		description:
@@ -64,8 +64,6 @@ export default defineConfig({
 			"https://gmail.googleapis.com/*",
 			"https://people.googleapis.com/*",
 			"https://*.googleusercontent.com/*",
-			// Brands' verified logo records (BIMI), from Google's DNS resolver.
-			"https://dns.google/*",
 			// Google's favicon service, for brand logos in avatars.
 			"https://*.gstatic.com/*",
 		],
@@ -88,6 +86,16 @@ export default defineConfig({
 			},
 		],
 		action: { default_title: "Expressive Gmail" },
+		// The browsers' defaults, pinned, plus no <base> or form targets: the backstop behind every
+		// place mail HTML becomes DOM. WXT's dev server needs its own.
+		...(mode === "production"
+			? {
+					content_security_policy: {
+						extension_pages:
+							"script-src 'self' 'wasm-unsafe-eval'; object-src 'none'; base-uri 'none'; form-action 'none'",
+					},
+				}
+			: {}),
 		...(browser === "chrome" ? { minimum_chrome_version: "120" } : {}),
 		...(browser === "firefox"
 			? {

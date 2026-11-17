@@ -2,6 +2,15 @@ import { flushSync } from 'react-dom';
 
 let running = false;
 
+/** Chrome 159 crashes the tab when a view transition runs alongside another compositor animation, and CSS can't pause script-driven ones (Spark, Morph), so they wait out the transition. */
+export function startQuietTransition(update: () => void) {
+  const paused = document.getAnimations().filter((a) => a.playState === 'running');
+  paused.forEach((a) => a.pause());
+  const t = document.startViewTransition(update);
+  void t.finished.finally(() => paused.forEach((a) => a.playState === 'paused' && a.play()));
+  return t;
+}
+
 /** Changes during a fade apply straight away and retarget it. */
 export const themeFading = () => running;
 
@@ -21,7 +30,7 @@ export function crossfadeTheme(change: () => void) {
     if (typeof requestIdleCallback === 'function') requestIdleCallback(() => still.remove(), { timeout: 1_000 });
     else setTimeout(() => still.remove(), 300);
   };
-  const t = document.startViewTransition(() => {
+  const t = startQuietTransition(() => {
     document.head.append(still);
     flushSync(change);
   });

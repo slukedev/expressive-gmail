@@ -3,7 +3,7 @@ import DOMPurify from 'dompurify';
 const purify = DOMPurify(window);
 
 purify.addHook('afterSanitizeAttributes', (node) => {
-  if (node.tagName === 'A') {
+  if (node.tagName === 'A' || node.tagName === 'AREA') {
     const href = node.getAttribute('href') ?? '';
     if (!href.startsWith('#')) {
       node.setAttribute('target', '_blank');
@@ -52,8 +52,57 @@ export function isTrackingPixel(img: HTMLImageElement): boolean {
   return w !== null && h !== null && w <= 2 && h <= 2;
 }
 
-const REMOTE_IMPORT = /@import\s+(?:url\()?\s*['"]?\s*(?:https?:)?\/\/[^;]*;?/gi;
-const REMOTE_URL = /url\(\s*['"]?\s*(?:https?:)?\/\/[^)]*\)/gi;
+// "https:host/x" counts too: against a base with another scheme, the URL parser reads it as https://host/x.
+const REMOTE = String.raw`\s*['"]?\s*(?:https?:|\/\/)`;
+const REMOTE_IMPORT = new RegExp(String.raw`^@import\s+(?:url\()?${REMOTE}`, 'i');
+// url(), and image-set() or src() with a bare string.
+const REMOTE_FUNCTION = new RegExp(String.raw`^[\w-]+\((?:[^)]*[(,\s])?${REMOTE}`, 'i');
+const REMOTE_STRING = new RegExp(String.raw`^${REMOTE}`, 'i');
+const ESCAPED = String.raw`\\(?:[0-9a-f]{1,6}[ \t\n\r\f]?|[^0-9a-f\n\r\f])`;
+const STRING = String.raw`"(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'`;
+// The pieces of a sheet that can fetch: a string, a function call, an at-rule's prelude. Selectors and other text are never touched.
+const FETCHING = new RegExp(String.raw`${STRING}|(?:[\w-]|${ESCAPED})+\((?:${STRING}|[^)"'])*\)?|@(?:[\w-]|${ESCAPED})+[^;{}]*;?`, 'gi');
+const CSS_ESCAPE = /\\(?:([0-9a-f]{1,6})[ \t\n\r\f]?|([^0-9a-f\n\r\f]))/gi;
+const CSS_CONTINUATION = /\\(?:\r\n|[\n\r\f])/g;
+
+/** Decodes escapes of the characters a URL or at-rule is spelled with, so `\75 rl(` reads as `url(`; any other escape stays as written. Only for looking: decoded selectors like `.sm\:w-full` would stop matching. */
+function plainCss(css: string) {
+  return css.replace(CSS_CONTINUATION, '').replace(CSS_ESCAPE, (all, hex: string | undefined, ch: string | undefined) => {
+    const code = hex ? parseInt(hex, 16) : ch!.codePointAt(0)!;
+    const c = code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : '';
+    return /^[a-z0-9@:/.-]$/i.test(c) ? c : all;
+  });
+}
+
+/** Remote url(), image-set() and src() strings and @import, the ways CSS fetches from the sender; everything else stays exactly as written. */
+export function withoutRemoteUrls(css: string) {
+  return css.replace(FETCHING, (piece) => {
+    const plain = plainCss(piece);
+    if (plain.startsWith('@')) return REMOTE_IMPORT.test(plain) ? '' : piece;
+    if (/^["']/.test(plain)) return REMOTE_STRING.test(plain) ? '""' : piece;
+    return REMOTE_FUNCTION.test(plain) ? 'none' : piece;
+  });
+}
+
+/** A CSP for a document that shows sanitized mail: the regexes in sanitizeEmail are a first pass, this is what the browser enforces. With `remote` off, only `images` (exact addresses) load from the network. */
+export function contentPolicy({ remote, images = [] }: { remote: boolean; images?: readonly string[] }): string {
+  const exact = images.flatMap((src) => {
+    if (!URL.canParse(src)) return [];
+    const url = new URL(src);
+    const at = /^https?:$/.test(url.protocol) ? `${url.origin}${url.pathname}` : '';
+    return at && !/[\s;,']/.test(at) ? [at] : [];
+  });
+  const media = ['data:', 'blob:', ...(remote ? ['https:', 'http:'] : exact)].join(' ');
+  return [
+    "default-src 'none'",
+    `img-src ${media}`,
+    `media-src ${media}`,
+    `font-src 'self' data:${remote ? ' https:' : ''}`,
+    `style-src 'unsafe-inline'${remote ? ' https:' : ''}`,
+    "base-uri 'none'",
+    "form-action 'none'",
+  ].join('; ');
+}
 
 export function sanitizeEmail(html: string, opts: SanitizeOptions): string {
   const clean = purify.sanitize(html, {
@@ -93,7 +142,7 @@ export function sanitizeEmail(html: string, opts: SanitizeOptions): string {
     }
   });
   if (opts.disableLinks) {
-    doc.querySelectorAll('a[href]').forEach((a) => {
+    doc.querySelectorAll('a[href], area[href]').forEach((a) => {
       a.setAttribute('data-href', a.getAttribute('href') ?? '');
       a.removeAttribute('href');
       a.setAttribute('role', 'link');
@@ -102,19 +151,16 @@ export function sanitizeEmail(html: string, opts: SanitizeOptions): string {
     });
   }
   if (opts.blockRemoteImages) {
-    // Background images in inline styles are the other tracking vector.
-    doc.querySelectorAll<HTMLElement>('[style*="url("], [background]').forEach((el) => {
-      el.style.backgroundImage = '';
-      el.removeAttribute('background');
-    });
-    // So are srcset, video posters and media, and remote urls in style sheets.
+    // Any CSS image (background, list-style-image, border-image, mask, cursor, content) is the other tracking vector.
+    doc.querySelectorAll('[style]').forEach((el) => el.setAttribute('style', withoutRemoteUrls(el.getAttribute('style') ?? '')));
+    doc.querySelectorAll('[background]').forEach((el) => el.removeAttribute('background'));
     doc.querySelectorAll('img[srcset], picture source[srcset]').forEach((el) => el.removeAttribute('srcset'));
-    doc.querySelectorAll('video, audio, source').forEach((el) => {
+    doc.querySelectorAll('video, audio, source, track').forEach((el) => {
       if (/^https?:|^\/\//i.test(el.getAttribute('src') ?? '')) el.removeAttribute('src');
       el.removeAttribute('poster');
     });
     doc.querySelectorAll('style').forEach((el) => {
-      el.textContent = (el.textContent ?? '').replace(REMOTE_IMPORT, '').replace(REMOTE_URL, 'none');
+      el.textContent = withoutRemoteUrls(el.textContent ?? '');
     });
   }
   return doc.documentElement.outerHTML;

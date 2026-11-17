@@ -24,6 +24,38 @@ body {
   margin: 2px 0 0;
   color: var(--md-sys-color-on-surface-variant);
 }
+.popup__sub[data-loading] {
+  visibility: hidden;
+}
+/* Holds the switch's place until the saved choice is read. */
+.popup__switch-slot {
+  width: 52px;
+  height: 32px;
+}
+.popup__confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 16px 8px;
+  border-radius: 16px;
+  background: var(--md-sys-color-surface-container-lowest);
+  transition:
+    opacity var(--md-sys-motion-effects-default),
+    transform var(--md-sys-motion-spatial-fast);
+  @starting-style {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+.popup__confirm p {
+  margin: 0;
+}
+.popup__confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .popup__row {
   display: flex;
   align-items: center;

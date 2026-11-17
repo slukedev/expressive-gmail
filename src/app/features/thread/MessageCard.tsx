@@ -1,5 +1,4 @@
-import { memo, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { photos } from '../../data/photos';
+import { memo, useState, type CSSProperties, type ReactNode } from 'react';
 import { useAccount, useMe } from '../../data/hooks';
 import type { Address, Message } from '../../data/types';
 import { addressList, displayName, fullDate, isMe, messageDate, relative } from '../../lib/format';
@@ -56,8 +55,6 @@ export const MessageCard = memo(function MessageCard({ message, threadId, expand
   const spam = message.labelIds.includes('SPAM');
   const loadImages = !spam && (externalImages === 'always' || trusted || showImages);
   const listHeaders = useListHeaders(message);
-  // A sender whose verified logo lives under its own selector names it here.
-  useEffect(() => photos.bimiSelector(message.from.email, listHeaders.bimiSelector), [message.from.email, listHeaders.bimiSelector]);
   const dark = useResolvedDark();
   const darkEmails = useSettings((s) => s.darkEmails);
   const original = useShowsOriginal(message.id);

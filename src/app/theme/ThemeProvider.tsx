@@ -2,8 +2,9 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useSyncExternalStore, type
 import { isRandomTheme, useSettings, useSettingsStore } from '../state/settings';
 import { BOOT_THEME_KEY, systemDarkFromSearch, type SavedBootTheme } from '../../shared/boot-theme';
 import { themeToCssVars } from './color';
-import { themeFading } from './crossfade';
+import { startQuietTransition, themeFading } from './crossfade';
 import { GOOGLE_DARK, GOOGLE_LIGHT } from './google-palette';
+import { HOST } from '../lib/appHost';
 
 const darkQuery = typeof window !== 'undefined' ? window.matchMedia('(prefers-color-scheme: dark)') : null;
 
@@ -16,7 +17,7 @@ if (typeof window !== 'undefined' && window.parent !== window) {
   window.addEventListener('message', (e) => {
     const d = e.data as { source?: string; type?: string; dark?: unknown };
     // Only the embedding page can send this, and it carries nothing but a light/dark flag.
-    if (e.source !== window.parent || d?.source !== 'better-gmail/content' || d.type !== 'scheme' || typeof d.dark !== 'boolean') return;
+    if (e.source !== window.parent || e.origin !== HOST || d?.source !== 'better-gmail/content' || d.type !== 'scheme' || typeof d.dark !== 'boolean') return;
     hostDark = d.dark;
     darkListeners.forEach((fn) => fn());
   });
@@ -96,7 +97,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       return;
     }
     fading.current = true;
-    const t = document.startViewTransition(apply);
+    const t = startQuietTransition(apply);
     t.ready.catch(() => {});
     void t.finished.finally(() => {
       fading.current = false;

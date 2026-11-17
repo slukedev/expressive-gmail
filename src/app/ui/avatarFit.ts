@@ -113,7 +113,6 @@ function flatRing(points: RGBA[]): RGBA | null {
 
 const css = (p: RGBA) => `rgb(${Math.round(p[0])} ${Math.round(p[1])} ${Math.round(p[2])})`;
 
-/** Exported for tests. */
 export function fitFromPixels(px: Pixels, brand: boolean): AvatarFit {
   const corners = [at(px, 0, 0), at(px, SIZE - 1, 0), at(px, 0, SIZE - 1), at(px, SIZE - 1, SIZE - 1)];
   const transparentCorners = corners.filter((p) => p[3] < 64).length >= 3;

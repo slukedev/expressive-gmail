@@ -1,7 +1,5 @@
 /** Talks to the content script hosting this frame on mail.google.com. */
-const GMAIL = 'https://mail.google.com';
-// The preview's stand-in host (preview/frame.html) frames the app from its own origin.
-const HOST = import.meta.env.DEV && typeof location !== 'undefined' && location.protocol.startsWith('http') ? location.origin : GMAIL;
+import { HOST } from './appHost';
 
 function post(type: string, payload: Record<string, unknown> = {}) {
   if (window.parent === window) return false;
@@ -42,7 +40,11 @@ export function setHostScale(scale: number) {
   post('scale', { scale });
 }
 
+const OPENABLE = new Set(['http:', 'https:', 'mailto:']);
+
+/** Many links come from mail, so only web and mail addresses open. */
 export function openUrl(url: string) {
+  if (!URL.canParse(url) || !OPENABLE.has(new URL(url).protocol)) return;
   window.open(url, '_blank', 'noopener,noreferrer');
 }
 
@@ -52,7 +54,7 @@ const diagListeners = new Set<() => void>();
 if (typeof window !== 'undefined') {
   window.addEventListener('message', (e) => {
     const d = e.data as { source?: string; type?: string; lines?: string[] };
-    if (e.source !== window.parent || d?.source !== 'better-gmail/content' || d.type !== 'diag' || !Array.isArray(d.lines)) return;
+    if (e.source !== window.parent || e.origin !== HOST || d?.source !== 'better-gmail/content' || d.type !== 'diag' || !Array.isArray(d.lines)) return;
     diagLines = d.lines.map(String);
     diagListeners.forEach((fn) => fn());
   });

@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { backend, queryClient } from '../../data/client';
+import { threadAccount } from '../../data/accounts/threads';
+import { splitId } from '../../data/accounts/ids';
 import { escapeHtml, parseAddresses } from '../../lib/format';
 import { findUnsubscribeLink, parseListUnsubscribe, parseMailto } from '../../lib/unsubscribe';
 import type { Message } from '../../data/types';
@@ -90,8 +92,11 @@ export async function unsubscribe(message: Message): Promise<boolean> {
       }
       if (targets.mailto && b.capabilities.send) {
         const mail = parseMailto(targets.mailto);
+        // In a merged inbox, from the account the list mails, or the list keeps mailing it.
+        const owner = splitId(message.id).key ? threadAccount(message.id) : undefined;
         if (mail.to.length) {
           await b.send({
+            ...(owner ? { from: { email: owner } } : {}),
             to: mail.to.flatMap((t) => parseAddresses(t)),
             cc: [],
             bcc: [],
