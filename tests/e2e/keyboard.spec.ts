@@ -82,6 +82,83 @@ test.describe('keyboard and focus', () => {
     await expect(page.getByRole('toolbar', { name: '4 selected' })).toBeVisible();
   });
 
+  test('b, l and v act on the cursor row when nothing is checked, like Gmail', async ({ mail, page }) => {
+    await mail.open('inbox', 'latency=0');
+    const bodies = mail.list.locator('[data-row-index]');
+    await expect(bodies.nth(1)).toBeVisible();
+    // No cursor row yet: nothing to act on.
+    await page.keyboard.press('b');
+    await page.keyboard.press('l');
+    await expect(page.getByRole('menu')).toHaveCount(0);
+    await expect(page.getByRole('toolbar', { name: /selected/ })).toHaveCount(0);
+
+    await page.keyboard.press('j');
+    await page.keyboard.press('j');
+    await page.keyboard.press('b');
+    const menu = page.getByRole('menu');
+    await expect(menu).toBeVisible();
+    await expect(menu.getByRole('menuitem').first()).toBeVisible();
+    await expect(page.getByRole('toolbar', { name: '1 selected' })).toBeVisible();
+    await expect(mail.rows.nth(1).getByRole('button', { name: 'Deselect conversation' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(menu).toBeHidden();
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('toolbar', { name: /selected/ })).toBeHidden();
+    await bodies.nth(1).focus();
+    await page.keyboard.press('v');
+    await expect(page.getByRole('menu')).toBeVisible();
+  });
+
+  test('l, a new name, then Create opens the label dialog with that name filled in', async ({ mail, page }) => {
+    await mail.open('inbox', 'latency=0');
+    await expect(mail.list.locator('[data-row-index]').nth(1)).toBeVisible();
+    await page.keyboard.press('j');
+    await page.keyboard.press('l');
+    const menu = page.getByRole('menu');
+    await menu.getByRole('textbox').fill('Conference 2027');
+    await menu.getByRole('menuitem', { name: 'Create “Conference 2027”' }).click();
+    const dialog = page.getByRole('dialog', { name: 'New label' });
+    await expect(dialog.getByRole('textbox', { name: 'Label name' })).toHaveValue('Conference 2027');
+  });
+
+  test('Esc from the command palette puts focus back on the row it was opened from', async ({ mail, page }) => {
+    await mail.open('inbox', 'latency=0');
+    const bodies = mail.list.locator('[data-row-index]');
+    await expect(bodies.nth(2)).toBeVisible();
+    await page.keyboard.press('j');
+    await page.keyboard.press('j');
+    await expect(bodies.nth(1)).toBeFocused();
+    await page.keyboard.press('ControlOrMeta+k');
+    const palette = page.getByRole('dialog', { name: 'Command palette' });
+    await expect(palette).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(palette).toBeHidden();
+    await expect(bodies.nth(1)).toBeFocused();
+    await page.keyboard.press('j');
+    await expect(bodies.nth(2)).toBeFocused();
+  });
+
+  test('the menu opened over the list keeps focus inside it and gives it back on Esc', async ({ mail, page, browserName }) => {
+    const tab = tabKey(browserName);
+    await page.setViewportSize({ width: 900, height: 800 });
+    await mail.open('inbox', 'latency=0');
+    await expect(mail.rows.first()).toBeVisible();
+    const open = page.getByRole('button', { name: 'Expand menu' });
+    await open.focus();
+    await page.keyboard.press('Enter');
+    const menu = page.getByRole('dialog', { name: 'Menu' });
+    await expect(menu).toBeVisible();
+    await expect(menu.getByRole('button', { name: 'Close menu' })).toBeFocused();
+    for (let i = 0; i < 30; i++) {
+      await page.keyboard.press(tab);
+      expect(await menu.evaluate((el) => el.contains(document.activeElement))).toBe(true);
+    }
+    await page.keyboard.press('Escape');
+    await expect(menu).toBeHidden();
+    await expect(open).toBeFocused();
+  });
+
   test('Enter on a button inside a row presses it and leaves the conversation closed', async ({ mail, page }) => {
     await mail.open('inbox', 'latency=0');
     await expect(mail.rows.nth(1)).toBeVisible();
@@ -96,7 +173,7 @@ test.describe('keyboard and focus', () => {
     await mail.open('inbox', 'latency=0');
     const bodies = mail.list.locator('[data-row-index]');
     await expect(bodies.nth(2)).toBeVisible();
-    const next = await mail.rows.nth(1).locator('.row__subject-text').innerText();
+    const next = (await mail.rows.nth(1).locator('.row__subject-text').textContent())!;
     await page.keyboard.press('j');
     // A focused row builds its hover actions.
     const archive = mail.rows.nth(0).getByRole('button', { name: 'Archive', exact: true });

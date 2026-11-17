@@ -51,7 +51,10 @@ test.describe('accessibility smoke', () => {
     for (const role of ['textbox', 'combobox', 'switch', 'radio', 'checkbox']) await expectNamed(all, role, 0);
 
     const nav = all.getByRole('navigation', { name: 'Settings sections' });
-    const names = (await nav.locator('.settings-nav-item__label').allInnerTexts()).filter((t) => t !== 'Switch to classic Gmail');
+    // One evaluate on the nav: Playwright's Firefox crashes on allInnerTexts after repeated aria snapshots.
+    const names = (await nav.evaluate((el) => [...el.querySelectorAll<HTMLElement>('.settings-nav-item__label')].map((l) => l.innerText))).filter(
+      (t) => t !== 'Switch to classic Gmail',
+    );
     expect(names.length).toBeGreaterThan(5);
     for (const name of names) {
       const item = nav.getByRole('button', { name, exact: true });
@@ -90,5 +93,27 @@ test.describe('accessibility smoke', () => {
     await expect(gemini).toBeVisible();
     await expectNamedButtons(gemini, 2);
     await expectNamed(gemini, 'textbox', 1);
+  });
+
+  test('list sections are lists of conversations only, and the resize handle reports the width', async ({ mail, page }) => {
+    await mail.open('inbox', 'latency=0');
+    await expect(mail.rows.first()).toBeVisible();
+    const sections = mail.list.getByRole('list');
+    expect(await sections.count()).toBeGreaterThan(0);
+    // Headings, banners and follow-ups sit between the lists, never inside one.
+    const strays = await mail.list.evaluate((el) =>
+      [...el.querySelectorAll('[role="list"]')].flatMap((list) =>
+        [...list.querySelectorAll('*')].filter((c) => c.closest('[role="listitem"]') === null && c.matches('h1, h2, h3, [role="status"], [role="button"], button')).map((c) => c.outerHTML.slice(0, 80)),
+      ),
+    );
+    expect(strays).toEqual([]);
+    await expect(sections.first()).toHaveAccessibleName(/\S/);
+
+    const handle = page.getByRole('separator', { name: 'Resize list' });
+    const width = Math.round((await page.locator('.list-pane').boundingBox())!.width);
+    await expect(handle).toHaveAttribute('aria-valuenow', String(width));
+    await handle.focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(handle).toHaveAttribute('aria-valuenow', String(width + 24));
   });
 });

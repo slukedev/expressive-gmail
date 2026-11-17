@@ -4,7 +4,9 @@ import { useAccountViews, useIsMerged } from '../accounts/AccountBits';
 import { accountScope, useAccounts } from '../../data/accounts/store';
 import { switchScope } from '../accounts/switch';
 import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { setVisibleThreadIds } from '../../data/actions';
+import { publishListOrder } from './listOrder';
+import { BackendError } from '../../data/backend';
+import { ErrorBoundary, ItemFailed } from '../../ui/ErrorBoundary';
 import { useAccount, useLabels, useThreadList, useViewQuery } from '../../data/hooks';
 import { useQuery } from '@tanstack/react-query';
 import type { ThreadSummary } from '../../data/types';
@@ -124,7 +126,7 @@ export function ListPane({ split }: { split: boolean }) {
   // What the reader can see; Select all never reaches held mail.
   const visibleThreads = useMemo(() => [...pinnedRows, ...rows], [pinnedRows, rows]);
   const orderedIds = useMemo(() => visibleThreads.map((t) => t.id), [visibleThreads]);
-  useEffect(() => setVisibleThreadIds(orderedIds), [orderedIds]);
+  useEffect(() => publishListOrder(orderedIds), [orderedIds]);
   // Rows that leave leave the selection too, or the bar counts mail you can't see.
   useEffect(() => {
     const ui = useUi.getState();
@@ -157,11 +159,14 @@ export function ListPane({ split }: { split: boolean }) {
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (shownView.current === viewKey) {
+      // Shown again, rows would replay their entrance, and the scroller would follow them a few pixels off.
+      el?.setAttribute('data-returned', '');
       // Hidden lists lose their scroll offset.
       if (el && el.scrollTop !== scrollPos.current) el.scrollTop = scrollPos.current;
       return;
     }
     shownView.current = viewKey;
+    el?.removeAttribute('data-returned');
     scrollPos.current = 0;
     el?.scrollTo({ top: 0 });
     setScrolled(false);
@@ -232,8 +237,12 @@ export function ListPane({ split }: { split: boolean }) {
     return () => window.clearTimeout(t);
   }, [asidesPending, list.isPending]);
 
+  // A connection that never came up says so after the first try, instead of holding placeholder rows through the retries.
+  const sessionDown =
+    list.isPending && list.failureReason instanceof BackendError && (list.failureReason.code === 'session-unavailable' || list.failureReason.code === 'unauthenticated');
   let body;
-  if (list.isPending || asidesPending) body = <ListSkeleton />;
+  if (sessionDown) body = <ListError error={list.failureReason} onRetry={() => void list.refetch()} />;
+  else if (list.isPending || asidesPending) body = <ListSkeleton />;
   else if (list.isError) body = <ListError error={list.error} onRetry={() => void list.refetch()} />;
   else if (!pinnedRows.length && !rows.length && !held.length)
     body = (
@@ -256,22 +265,23 @@ export function ListPane({ split }: { split: boolean }) {
     );
   else {
     let index = 0;
-    const renderGroup = (group: ThreadSummary[]) => (
-      <div className="seg-list" role="presentation">
+    const renderGroup = (group: ThreadSummary[], name: string) => (
+      <div className="seg-list" role="list" aria-label={name}>
         {group.map((t) => {
           const i = index++;
           return (
-            <ThreadRow
-              key={t.id}
-              thread={t}
-              index={i}
-              view={view}
-              active={route.threadId === t.id}
-              selected={selected.has(t.id)}
-              leaving={stillInView(view, t, labels) === false}
-              pinned={pinned.includes(rawId(t.id))}
-              labels={rowLabels}
-            />
+            <ErrorBoundary key={t.id} fallback={(retry) => <ItemFailed role="listitem" text={`“${t.subject || '(no subject)'}” couldn't be shown.`} onRetry={retry} />}>
+              <ThreadRow
+                thread={t}
+                index={i}
+                view={view}
+                active={route.threadId === t.id}
+                selected={selected.has(t.id)}
+                leaving={stillInView(view, t, labels) === false}
+                pinned={pinned.includes(rawId(t.id))}
+                labels={rowLabels}
+              />
+            </ErrorBoundary>
           );
         })}
       </div>
@@ -292,7 +302,7 @@ export function ListPane({ split }: { split: boolean }) {
       }
     }
     body = (
-      <div role="list" aria-label="Conversations" className="thread-list" data-grouped={sections.length > 0 || undefined}>
+      <div className="thread-list" data-grouped={sections.length > 0 || undefined}>
         {pauseBanner}
         {isInbox && !filters.length && <ReplyLaterStack threads={threads} />}
         {isInbox && !filters.length && <ScheduledSoon />}
@@ -300,7 +310,7 @@ export function ListPane({ split }: { split: boolean }) {
         {pinnedRows.length > 0 && (
           <>
             <SectionHeader title="Pinned" leaving={allLeaving(pinnedRows)} />
-            {renderGroup(pinnedRows)}
+            {renderGroup(pinnedRows, 'Pinned')}
             {!sections.length && <SectionHeader title="Everything else" leaving={allLeaving(rows) || allLeaving(pinnedRows)} />}
           </>
         )}
@@ -308,10 +318,10 @@ export function ListPane({ split }: { split: boolean }) {
           ? sections.map((s) => (
               <div key={s.title} className="list-group" role="presentation">
                 <SectionHeader title={s.title} leaving={allLeaving(s.rows)} />
-                {renderGroup(s.rows)}
+                {renderGroup(s.rows, s.title)}
               </div>
             ))
-          : rows.length > 0 && renderGroup(rows)}
+          : rows.length > 0 && renderGroup(rows, pinnedRows.length ? 'Everything else' : 'Conversations')}
         <div ref={setSentinel} className="list-sentinel" />
         {list.isFetchingNextPage && (
           <div className="list-more">

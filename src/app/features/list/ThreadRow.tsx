@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
 import { isArriving } from '../../data/client';
 import { useMoved } from '../../data/moved';
 import { motionToken } from '../../ui/motion';
@@ -170,7 +170,9 @@ export const ThreadRow = memo(function ThreadRow({ thread, index, view, active, 
 
   const smart = useRowSmart(thread, me, smartFeatures);
   // An invite's .ics shows as the RSVP chips instead.
-  const chipFiles = thread.attachments.filter((a) => smart?.kind !== 'invite' || !/\.ics$|calendar/i.test(a.filename + a.mimeType));
+  const invite = smart?.kind === 'invite';
+  const chipFiles = useMemo(() => thread.attachments.filter((a) => !invite || !/\.ics$|calendar/i.test(a.filename + a.mimeType)), [thread.attachments, invite]);
+  const viewerFiles = useMemo(() => chipFiles.map((a) => ({ ...a, size: a.size ?? 0 })), [chipFiles]);
   const [viewing, setViewing] = useState<number | null>(null);
   const smartLine = smart && (smart.kind === 'package' || smart.kind === 'bill');
   const nudge = smart?.kind === 'nudge' ? smart : null;
@@ -410,7 +412,7 @@ export const ThreadRow = memo(function ThreadRow({ thread, index, view, active, 
       </div>
       {viewing !== null && (
         <AttachmentViewer
-          files={chipFiles.map((a) => ({ ...a, size: a.size ?? 0 }))}
+          files={viewerFiles}
           index={viewing}
           onIndex={setViewing}
           onClose={() => setViewing(null)}

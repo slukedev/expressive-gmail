@@ -1,7 +1,7 @@
 import type { ThreadPage, ThreadQuery, ThreadSummary } from '../../data/types';
 
 /** Past this the badge reads "99+", so counting further buys nothing. */
-export const TAB_COUNT_LIMIT = 100;
+const TAB_COUNT_LIMIT = 100;
 
 /**
  * Lists a tab's unread threads up to the limit and counts them. Gmail's own total for an unread search is a guess

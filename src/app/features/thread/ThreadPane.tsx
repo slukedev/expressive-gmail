@@ -1,6 +1,6 @@
 import { rawId } from '../../data/accounts/ids';
 import { memo, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { getVisibleThreadIds, mail } from '../../data/actions';
+import { mail } from '../../data/actions';
 import { prefetchThread, useAccount, useLabels, useMe, useThread } from '../../data/hooks';
 import { isMe } from '../../lib/format';
 import type { Message, Thread } from '../../data/types';
@@ -17,6 +17,7 @@ import { LabelChip } from '../labels/LabelChip';
 import { AccountChip, useThreadAccount } from '../accounts/AccountBits';
 import { LabelMenu } from '../labels/LabelMenu';
 import { SnoozeDialog, SnoozeMenu, SnoozeSubmenu } from '../snooze/SnoozeMenu';
+import { foldedMessages } from './fold';
 import { MessageCard } from './MessageCard';
 import { ReplyBar } from './ReplyBar';
 import { SummaryCard } from '../gemini/SummaryCard';
@@ -39,6 +40,8 @@ import { forwardAll } from '../compose/open';
 import { filterLikeThese } from './filterLike';
 import { findThread } from '../../data/client';
 import { BodySizingContext, useBodySizing, type BodySizing } from './sizing';
+import { useNeighbours } from '../list/listOrder';
+import { ErrorBoundary, ItemFailed } from '../../ui/ErrorBoundary';
 
 const HIDDEN = new Set(['UNREAD', 'STARRED', 'IMPORTANT', 'SENT', 'DRAFT', 'SNOOZED', 'SCHEDULED', 'CHAT', 'MUTED']);
 
@@ -61,7 +64,16 @@ export function ThreadPane({ threadId, single }: { threadId: string; single?: bo
   const owner = useThreadAccount(threadId);
   const pinned = useLocal((s) => s.pinned.includes(rawId(threadId)));
   const hasNote = useLocal((s) => !!s.notes[rawId(threadId)]);
-  const [noteOpen, setNoteOpen] = useState(false);
+  const [noteOpen, setNoteOpen] = useState(hasNote);
+  // M3 top app bars take a container color once content scrolls under them.
+  const [scrolled, setScrolled] = useState(false);
+  // Reset while rendering, so no frame shows the last thread's note or bar.
+  const [noteFor, setNoteFor] = useState({ threadId, hasNote });
+  if (noteFor.threadId !== threadId || noteFor.hasNote !== hasNote) {
+    if (noteFor.threadId !== threadId) setScrolled(false);
+    setNoteFor({ threadId, hasNote });
+    setNoteOpen(hasNote);
+  }
   const smartFeatures = useSettings((s) => s.smartFeatures);
   // Only which compose: its text changes on every keystroke.
   const inlineKey = useUi((s) => s.composes.find((c) => c.inline && c.threadId === threadId)?.key);
@@ -85,15 +97,12 @@ export function ThreadPane({ threadId, single }: { threadId: string; single?: bo
   useEffect(() => {
     if (scrollTop.current) scrollRef.current?.scrollTo({ top: 0 });
     scrollTop.current = 0;
-    setNoteOpen(false);
+    // Short windows scroll the whole pane, toolbar included (app.css).
+    const pane = scrollRef.current?.closest<HTMLElement>('.detail-pane');
+    if (pane?.scrollTop) pane.scrollTo({ top: 0 });
   }, [threadId]);
 
-  useEffect(() => setNoteOpen(hasNote), [hasNote, threadId]);
-
-  const ids = getVisibleThreadIds();
-  const position = ids.indexOf(threadId);
-  const newer = position > 0 ? ids[position - 1] : undefined;
-  const older = position >= 0 && position < ids.length - 1 ? ids[position + 1] : undefined;
+  const { position, count, newer, older } = useNeighbours(threadId);
   useEffect(() => {
     if (older) void prefetchThread(older);
   }, [older]);
@@ -130,21 +139,21 @@ export function ThreadPane({ threadId, single }: { threadId: string; single?: bo
     () =>
       thread && (
         <>
-          <ReplyLaterSession threadId={thread.id} />
-          <SpamBanner thread={thread} />
-          <ScheduledBanner thread={thread} />
-          <SummaryCard thread={thread} />
-          {smartFeatures && <SmartCards thread={thread} />}
+          {/* Extras around the mail: one failing leaves itself out, never the messages. */}
+          <ErrorBoundary fallback={() => null}>
+            <ReplyLaterSession threadId={thread.id} />
+            <SpamBanner thread={thread} />
+            <ScheduledBanner thread={thread} />
+            <SummaryCard thread={thread} />
+            {smartFeatures && <SmartCards thread={thread} />}
+          </ErrorBoundary>
           <MessageList messages={thread.messages} initiallyExpanded={initiallyExpanded} threadId={thread.id} />
-          {inlineKey ? <InlineReply composeKey={inlineKey} /> : <ReplyBar thread={thread} />}
+          <ErrorBoundary fallback={() => null}>{inlineKey ? <InlineReply composeKey={inlineKey} /> : <ReplyBar thread={thread} />}</ErrorBoundary>
         </>
       ),
     [thread, smartFeatures, initiallyExpanded, inlineKey],
   );
 
-  // M3 top app bars take a container color once content scrolls under them.
-  const [scrolled, setScrolled] = useState(false);
-  useEffect(() => setScrolled(false), [threadId]);
   // Watched, not computed per scroll event.
   const [pastSubject, setPastSubject] = useState(false);
   const subjectRef = useRef<HTMLHeadingElement>(null);
@@ -274,7 +283,7 @@ export function ThreadPane({ threadId, single }: { threadId: string; single?: bo
         {position >= 0 && !compact && (
           <>
             <span className="thread-toolbar__pos md-body-small">
-              {(position + 1).toLocaleString()} of {ids.length.toLocaleString()}
+              {(position + 1).toLocaleString()} of {count.toLocaleString()}
             </span>
             <IconButton icon="chevron_left" label="Newer" shortcut="k" disabled={!newer} onClick={() => newer && openThread(newer, route.view)} />
             <IconButton icon="chevron_right" label="Older" shortcut="j" disabled={!older} onClick={() => older && openThread(older, route.view)} />
@@ -422,7 +431,11 @@ const MessageList = memo(function MessageList({ messages, initiallyExpanded, thr
   };
   // The photo and name move from where they were; everything else fades in where it lands, so it reads as one card opening.
   const morph = (el: HTMLElement, was: Map<string, DOMRect> | undefined, opening: boolean) => {
-    if (reduced()) return;
+    // Reduced motion keeps a short cross-fade instead of the movement.
+    if (reduced()) {
+      el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 150, easing: 'linear' });
+      return;
+    }
     const { spatial, effects } = easings();
     const fade = (node: Element) =>
       node.animate([{ opacity: 0 }, { opacity: 1 }], { duration: opening ? 230 : 150, delay: opening ? 60 : 0, easing: effects, fill: 'backwards' });
@@ -504,11 +517,7 @@ const MessageList = memo(function MessageList({ messages, initiallyExpanded, thr
 
   // A draft open in a composer shows there, not as a row too.
   const visible = useMemo(() => messages.filter((m) => !m.isDraft || !editing.includes(m.id)), [messages, editing]);
-  // Long threads fold their middle, like Gmail's "N older messages".
-  const fold = !showAll && visible.length > 4;
-  const firstExpanded = visible.findIndex((m) => expanded.has(m.id));
-  const keepTail = Math.max(2, visible.length - Math.max(firstExpanded, 1));
-  const hidden = fold ? visible.slice(1, Math.max(1, visible.length - keepTail)) : [];
+  const hidden = showAll ? [] : foldedMessages(visible, (m) => expanded.has(m.id));
   const hiddenSet = new Set(hidden.map((m) => m.id));
 
   return (
@@ -536,15 +545,16 @@ const MessageList = memo(function MessageList({ messages, initiallyExpanded, thr
             );
           }
           return (
-            <MessageCard
-              key={m.id}
-              message={m}
-              threadId={threadId}
-              expanded={expanded.has(m.id)}
-              last={i === visible.length - 1}
-              revealIndex={revealed.has(m.id) ? [...revealed].indexOf(m.id) : undefined}
-              onToggle={onToggle}
-            />
+            <ErrorBoundary key={m.id} fallback={(retry) => <ItemFailed text="This message couldn't be shown." onRetry={retry} />}>
+              <MessageCard
+                message={m}
+                threadId={threadId}
+                expanded={expanded.has(m.id)}
+                last={i === visible.length - 1}
+                revealIndex={revealed.has(m.id) ? [...revealed].indexOf(m.id) : undefined}
+                onToggle={onToggle}
+              />
+            </ErrorBoundary>
           );
         })}
       </div>

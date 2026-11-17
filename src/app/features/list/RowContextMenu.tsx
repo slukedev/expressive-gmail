@@ -2,7 +2,9 @@ import { rawId } from '../../data/accounts/ids';
 import { ContextMenu } from '@base-ui/react/context-menu';
 import type { ReactNode } from 'react';
 import { mail } from '../../data/actions';
+import { useMe } from '../../data/hooks';
 import type { ThreadSummary } from '../../data/types';
+import { isMe } from '../../lib/format';
 import { describeTime, presetTime, snoozePresets } from '../../lib/presets';
 import { navigate } from '../../router/useRoute';
 import { local, useLocal } from '../../state/local';
@@ -32,7 +34,8 @@ function RowMenuItems({ thread }: { thread: ThreadSummary }) {
   const setAside = useAside((s) => isAside(s.items, thread.id));
   const ids = [thread.id];
   const unread = thread.labelIds.includes('UNREAD');
-  const sender = thread.participants[thread.participants.length - 1];
+  const me = useMe();
+  const sender = [...thread.participants].reverse().find((p) => !isMe(p.email, me));
   return (
     <MenuSections>
       <MenuItem icon="reply" onClick={() => void replyToThread(thread.id, 'reply')}>Reply</MenuItem>

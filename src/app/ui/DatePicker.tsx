@@ -93,6 +93,7 @@ function Picker({
   const grid = useRef<HTMLDivElement>(null);
   const moved = useRef(false);
   const yearList = useRef<HTMLDivElement>(null);
+  const min = minDate ? startOfDay(minDate) : undefined;
 
   const month = new Date(focus.getFullYear(), focus.getMonth(), 1);
   const start = weekStartDay();
@@ -132,10 +133,10 @@ function Picker({
     if (!next) return;
     e.preventDefault();
     moved.current = true;
-    setFocus(next());
+    // Disabled days can't take focus, so the keys stop at the first day that can be picked.
+    const to = next();
+    setFocus(min && to < min ? min : to);
   };
-
-  const min = minDate ? startOfDay(minDate) : undefined;
   const headline = headlineFor
     ? headlineFor(selected)
     : selected
@@ -164,7 +165,15 @@ function Picker({
         </button>
         {!years && (
           <span className="m3-datepicker__arrows">
-            <IconButton icon="chevron_left" label="Previous month" onClick={() => setFocus(addMonths(focus, -1))} />
+            <IconButton
+              icon="chevron_left"
+              label="Previous month"
+              disabled={!!min && month <= min}
+              onClick={() => {
+                const to = addMonths(focus, -1);
+                setFocus(min && to < min ? min : to);
+              }}
+            />
             <IconButton icon="chevron_right" label="Next month" onClick={() => setFocus(addMonths(focus, 1))} />
           </span>
         )}

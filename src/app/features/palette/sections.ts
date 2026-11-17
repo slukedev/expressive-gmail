@@ -146,6 +146,7 @@ function help(src: Sources, q: string): RankedSection[] {
 
 export function buildSections(src: Sources): RankedSection[] {
   const q = src.query.trim();
+  if (src.page?.id === 'help') return help(src, q);
   if (src.page) return pageSection(src, src.page, src.query);
   if (!q) return emptyRoot(src);
   if (q.startsWith('?')) return help(src, q.slice(1).trim());

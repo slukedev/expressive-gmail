@@ -1,7 +1,7 @@
 import { rawId } from '../../data/accounts/ids';
 import { accountLabel, accountScope, useAccounts } from '../../data/accounts/store';
 import { mail, undoableAction, undoLast } from '../../data/actions';
-import { backend, findThread, keys, queryClient } from '../../data/client';
+import { backend, canDeleteForever, findThread, keys, queryClient } from '../../data/client';
 import type { Address, Contact, Label, Thread } from '../../data/types';
 import { isMe } from '../../lib/format';
 import { classicGmail, openUrl } from '../../lib/host';
@@ -75,7 +75,7 @@ const BULK = ['CATEGORY_PROMOTIONS', 'CATEGORY_UPDATES', 'CATEGORY_SOCIAL', 'CAT
 
 // Actions on the target
 
-export function contextItems(ctx: Context, env: Env): Item[] {
+export function contextItems(ctx: Context): Item[] {
   const target = ctx.target;
   if (!target) return [];
   const { ids, threads, name } = target;
@@ -95,7 +95,7 @@ export function contextItems(ctx: Context, env: Env): Item[] {
   else add({ id: 'to-inbox', title: `Move ${name} to Inbox`, icon: 'move_to_inbox', keywords: 'unarchive', run: () => void mail.moveToInbox(ids) });
 
   if (every('TRASH')) {
-    if (ctx.caps.deleteForever) add({ id: 'delete-forever', title: `Delete ${name} forever`, icon: 'delete_forever', keywords: 'permanently remove', run: () => void mail.deleteForever(ids) });
+    if (canDeleteForever(ids)) add({ id: 'delete-forever', title: `Delete ${name} forever`, icon: 'delete_forever', keywords: 'permanently remove', run: () => void mail.deleteForever(ids) });
   } else add({ id: 'delete', title: `Delete ${name}`, icon: 'delete', shortcut: '#', keywords: 'trash bin remove', run: () => void mail.trash(ids) });
 
   if (every('SNOOZED')) add({ id: 'unsnooze', title: `Unsnooze ${name}`, icon: 'alarm_on', keywords: 'wake back to inbox', run: () => void mail.unsnooze(ids) });
@@ -244,7 +244,6 @@ export function contextItems(ctx: Context, env: Env): Item[] {
     if (older) add({ id: 'older', title: 'Older conversation', icon: 'chevron_right', shortcut: 'j', keywords: 'next', run: () => openThread(older, ctx.route.view) });
     if (newer) add({ id: 'newer', title: 'Newer conversation', icon: 'chevron_left', shortcut: 'k', keywords: 'previous', run: () => openThread(newer, ctx.route.view) });
   }
-  void env;
   return out;
 }
 
@@ -502,7 +501,7 @@ export function labelGoItems(ctx: Context, env: Env): Item[] {
   }));
 }
 
-export function actionItems(ctx: Context, env: Env, s: Settings): Item[] {
+export function actionItems(ctx: Context, s: Settings): Item[] {
   const ui = useUi.getState();
   const out: Item[] = [];
   const add = (item: Omit<Item, 'group'> & { group?: string }) => out.push({ group: 'Actions', ...item });
@@ -512,7 +511,11 @@ export function actionItems(ctx: Context, env: Env, s: Settings): Item[] {
   add({ id: 'search-options', title: 'Search options', icon: 'manage_search', keywords: 'advanced search from to subject date size', run: () => void window.dispatchEvent(new CustomEvent('bg:advanced-search', { detail: '' })) });
   const undo = undoableAction();
   add({ id: 'undo', title: undo ? `Undo: ${undo}` : 'Undo last action', icon: 'undo', shortcut: 'z', keywords: 'revert take back undo', run: undoLast });
-  add({ id: 'refresh', title: 'Refresh', icon: 'refresh', shortcut: 'Shift N', keywords: 'reload sync check new mail', run: () => void queryClient.invalidateQueries({ queryKey: keys.allThreads }) });
+  const refresh = () => {
+    void queryClient.invalidateQueries({ queryKey: keys.allThreads });
+    void queryClient.invalidateQueries({ queryKey: keys.labels });
+  };
+  add({ id: 'refresh', title: 'Refresh', icon: 'refresh', shortcut: 'Shift N', keywords: 'reload sync check new mail', run: refresh });
   if (ctx.listIds.length) {
     add({ id: 'select-all', title: 'Select all conversations', icon: 'select_all', shortcut: '* a', keywords: 'select every', run: () => ui.setSelected(new Set(ctx.listIds)) });
     add({ id: 'select-unread', title: 'Select unread conversations', icon: 'mark_email_unread', shortcut: '* u', keywords: 'select', run: () => ui.setSelected(new Set(ctx.listIds.filter((id) => !!findThread(id)?.labelIds.includes('UNREAD')))) });
@@ -607,30 +610,57 @@ export function actionItems(ctx: Context, env: Env, s: Settings): Item[] {
     { id: 'classic', title: 'Switch to classic Gmail', icon: 'swap_horiz', keywords: 'old original', run: classicGmail },
   ];
   for (const m of more) out.push({ group: 'Settings', ...m });
-  void env;
   return out;
 }
 
-/** Where the caret was in the compose window, as the Templates menu does. */
-let lastEditor: { el: HTMLElement; range: Range | null } | null = null;
+/** A point in an editor as child indexes from its root, so nothing here holds the editor's nodes. */
+type Point = { path: number[]; offset: number };
+const pointOf = (root: Node, node: Node, offset: number): Point => {
+  const path: number[] = [];
+  for (let n: Node = node; n !== root && n.parentNode; n = n.parentNode) path.unshift(Array.prototype.indexOf.call(n.parentNode.childNodes, n));
+  return { path, offset };
+};
+const nodeAt = (root: Node, path: number[]) => path.reduce<Node | undefined>((n, i) => n?.childNodes[i], root);
+
+/** Where the caret was in the compose window, as the Templates menu does. Held weakly, so a closed window's editor and the thread quoted in it can go. */
+let lastEditor: { el: WeakRef<HTMLElement>; caret: { start: Point; end: Point } | null } | null = null;
 if (typeof document !== 'undefined') {
   document.addEventListener('focusout', (e) => {
     const el = e.target as HTMLElement | null;
     if (!el?.classList?.contains('editor__content')) return;
     const sel = window.getSelection();
-    lastEditor = { el, range: sel && sel.rangeCount && el.contains(sel.anchorNode) ? sel.getRangeAt(0).cloneRange() : null };
+    const r = sel && sel.rangeCount && el.contains(sel.anchorNode) ? sel.getRangeAt(0) : null;
+    lastEditor = { el: new WeakRef(el), caret: r && { start: pointOf(el, r.startContainer, r.startOffset), end: pointOf(el, r.endContainer, r.endOffset) } };
   });
 }
 
+function caretIn(el: HTMLElement): Range | null {
+  const caret = lastEditor?.el.deref() === el ? lastEditor.caret : null;
+  if (!caret) return null;
+  const start = nodeAt(el, caret.start.path);
+  const end = nodeAt(el, caret.end.path);
+  if (!start || !end) return null;
+  try {
+    const range = document.createRange();
+    range.setStart(start, caret.start.offset);
+    range.setEnd(end, caret.end.offset);
+    return range;
+  } catch {
+    return null;
+  }
+}
+
 function insertTemplate(html: string, subject?: string) {
-  const el = lastEditor?.el.isConnected ? lastEditor.el : document.querySelector<HTMLElement>('.compose .editor__content, .editor__content');
+  const last = lastEditor?.el.deref();
+  const el = last?.isConnected ? last : document.querySelector<HTMLElement>('.compose .editor__content, .editor__content');
   if (!el) return snack('Open a message to insert a template into');
+  const range = caretIn(el);
   window.setTimeout(() => {
     el.focus();
     const sel = window.getSelection();
-    if (sel && lastEditor?.el === el && lastEditor.range) {
+    if (sel && range) {
       sel.removeAllRanges();
-      sel.addRange(lastEditor.range);
+      sel.addRange(range);
     }
     document.execCommand('insertHTML', false, html);
     if (subject) {
@@ -687,13 +717,14 @@ function whenRow(kind: 'snooze' | 'remind' | 'pause', query: string, ctx: Contex
 /** So a misread is obvious. */
 function relative(at: number, now: Date): string {
   const mins = Math.round((at - now.getTime()) / 60_000);
+  if (mins < 1) return 'In under a minute';
   if (mins < 60) return `In ${mins} minute${mins === 1 ? '' : 's'}`;
   const hours = Math.round(mins / 60);
   if (hours < 36) return `In ${hours} hour${hours === 1 ? '' : 's'}`;
   // Days count by the calendar: Saturday afternoon is 3 days from Wednesday, however late it is.
   const midnight = (t: number) => new Date(t).setHours(0, 0, 0, 0);
   const days = Math.round((midnight(at) - midnight(now.getTime())) / 86_400_000);
-  if (days < 14) return `In ${days} days`;
+  if (days < 14) return days === 1 ? 'Tomorrow' : `In ${days} days`;
   const weeks = Math.round(days / 7);
   if (days < 60) return `In ${weeks} weeks`;
   return `In ${Math.round(days / 30)} months`;
@@ -804,8 +835,8 @@ export function pageItems(page: PageRef, ctx: Context, env: Env, s: Settings): I
   if (id.startsWith('choice:')) return choiceItems(id.slice('choice:'.length), s);
   if (id === 'setting') return settingItems(s).map((i) => ({ ...i, group: i.toggle === undefined ? 'Options' : 'Switches' }));
   if (id === 'go') return goItems(ctx).concat(labelGoItems(ctx, env));
-  if (id === 'switch') return actionItems(ctx, env, s).filter((i) => i.group === 'Accounts');
-  if (id === 'template') return actionItems(ctx, env, s).filter((i) => i.group === 'Templates');
+  if (id === 'switch') return actionItems(ctx, s).filter((i) => i.group === 'Accounts');
+  if (id === 'template') return actionItems(ctx, s).filter((i) => i.group === 'Templates');
   if (id === 'person' && page.person) return personItems(page.person, ctx);
   return [];
 }

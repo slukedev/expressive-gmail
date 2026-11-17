@@ -100,3 +100,49 @@ test.describe('reading a conversation', () => {
     await expect(page).toHaveURL(/#inbox$/);
   });
 });
+
+test('a message that fails to render is replaced by a notice, and the rest of the conversation stays', async ({ mail, page }) => {
+  const logged: string[] = [];
+  page.on('console', (m) => m.type() === 'error' && logged.push(m.text()));
+  await mail.open('inbox/t-onboarding-v4');
+  const messages = mail.thread.locator('[data-mid]');
+  await expect(messages.first()).toBeVisible();
+  const before = await messages.count();
+
+  // Mail as a broken response might deliver it: the oldest message has no sender.
+  await page.evaluate(async () => {
+    // The exact module the app loaded (a dev server may version it), so this is the cache it reads.
+    const url = performance.getEntriesByType('resource').find((e) => /\/src\/app\/data\/client\.ts(\?|$)/.test(e.name))!.name;
+    const { queryClient }: typeof import('../../src/app/data/client') = await import(url);
+    queryClient.setQueriesData<{ messages: { from: unknown }[] }>(
+      { predicate: (q) => q.queryKey[0] === 'thread' && String(q.queryKey[1]).endsWith('t-onboarding-v4') },
+      (t) => t && { ...t, messages: t.messages.map((m, i) => (i === 0 ? { ...m, from: null } : m)) },
+    );
+  });
+
+  await expect(mail.thread.getByText("This message couldn't be shown.")).toBeVisible();
+  await expect(messages).toHaveCount(before - 1);
+  await expect(mail.threadHeading).toBeVisible();
+  await expect(mail.thread.getByRole('button', { name: 'Reply', exact: true }).last()).toBeVisible();
+  await expect(mail.rows.first()).toBeVisible();
+  expect(logged.some((l) => l.includes('Caught render error'))).toBe(true);
+});
+
+test('the open conversation keeps its place in the list as rows around it change', async ({ mail, page }) => {
+  await mail.open('inbox', 'latency=0');
+  const bodies = mail.list.locator('[data-row-index]');
+  await expect(bodies.nth(3)).toBeVisible();
+  await bodies.nth(1).click({ position: { x: 200, y: 16 } });
+  const position = mail.thread.locator('.thread-toolbar__pos');
+  await expect(position).toHaveText(/^2 of \d+$/);
+  const total = Number((await position.innerText()).split(' of ')[1]);
+
+  // Archive the row above from the list: the open one moves up.
+  // A focused row builds its hover actions.
+  await bodies.nth(0).focus();
+  const archive = mail.rows.nth(0).getByRole('button', { name: 'Archive', exact: true });
+  await archive.focus();
+  await page.keyboard.press('Enter');
+  await expect(position).toHaveText(`1 of ${total - 1}`);
+  await expect(mail.thread.getByRole('button', { name: 'Newer', exact: true })).toBeDisabled();
+});

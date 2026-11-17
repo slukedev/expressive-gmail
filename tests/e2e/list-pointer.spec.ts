@@ -147,3 +147,12 @@ test.describe('an empty inbox with replies set aside', () => {
     await expect(page.getByRole('heading', { name: /to write$/ })).toHaveCount(0);
   });
 });
+
+test('the row menu finds mail from the other person, not from you, when you wrote last', async ({ mail, page }) => {
+  await mail.open('inbox');
+  const row = mail.row('climbing saturday?');
+  await expect(row).toBeVisible();
+  await row.click({ button: 'right' });
+  const menu = page.getByRole('menu');
+  await expect(menu.getByRole('menuitem', { name: /^Find emails from/ })).toHaveText(/Find emails from Theo/);
+});

@@ -42,6 +42,9 @@ const GROUPS: { title: string; items: Item[] }[] = [
       { keys: '* then a', label: 'Select all' },
       { keys: '* then n', label: 'Select none' },
       { keys: '* then u', label: 'Select unread' },
+      { keys: '* then r', label: 'Select read' },
+      { keys: '* then s', label: 'Select starred' },
+      { keys: '* then t', label: 'Select unstarred' },
     ],
   },
   {
@@ -184,9 +187,12 @@ export function ShortcutsDialog() {
                         data-editing={isEditing || undefined}
                         disabled={!enabled}
                         aria-label={isEditing ? `Press a key for ${a.label}` : `Change the key for ${a.label}, now ${now.join(' or ') || 'none'}`}
-                        onClick={() => {
+                        onClick={(e) => {
                           stopEditing();
-                          if (!isEditing) setEditing(a.id);
+                          if (isEditing) return;
+                          setEditing(a.id);
+                          // Safari doesn't focus a button on click, and the key is read from this button.
+                          e.currentTarget.focus();
                         }}
                         onKeyDown={(e) => onCapture(a.id, e)}
                         onBlur={() => isEditing && stopEditing()}

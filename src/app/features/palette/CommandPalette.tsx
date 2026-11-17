@@ -44,6 +44,21 @@ export function CommandPalette() {
   // Escape steps out of a page before it closes the palette.
   const back = useRef<(() => boolean) | null>(null);
   const pick = useCallback((kind: 'snooze' | 'remind', ids: string[]) => setPicker({ kind, ids }), []);
+  // Read as the store flips, before the palette takes focus. Opened from a shortcut there is no trigger to go back to.
+  const returnTo = useRef<Element | null>(null);
+  useEffect(
+    () =>
+      useUi.subscribe((s, prev) => {
+        if (s.palette && !prev.palette) returnTo.current = document.activeElement;
+      }),
+    [],
+  );
+  const finalFocus = useCallback(() => {
+    const el = returnTo.current;
+    returnTo.current = null;
+    if (el instanceof HTMLElement && el !== document.body && el.isConnected && el.getClientRects().length) return el;
+    return document.querySelector<HTMLElement>('.list-scroll .row[data-cursor]') ?? true;
+  }, []);
 
   return (
     <>
@@ -59,7 +74,7 @@ export function CommandPalette() {
       >
         <BaseDialog.Portal>
           <BaseDialog.Backdrop className="m3-scrim m3-scrim--light" />
-          <BaseDialog.Popup className="palette" aria-label="Command palette">
+          <BaseDialog.Popup className="palette" aria-label="Command palette" finalFocus={finalFocus}>
             <Palette onPick={pick} back={back} />
           </BaseDialog.Popup>
         </BaseDialog.Portal>
@@ -131,9 +146,9 @@ function Palette({ onPick, back }: { onPick: Env['pick']; back: React.RefObject<
   const env = useMemo<Env>(() => ({ dark, pick: onPick, whenOptions: { dayFirst: DAY_FIRST } }), [dark, onPick]);
 
   // Prepared once per open; settings rows again when a switch flips.
-  const contextEntries = useMemo(() => prepareAll(contextItems(ctx, env)), [ctx, env]);
+  const contextEntries = useMemo(() => prepareAll(contextItems(ctx)), [ctx]);
   const placeEntries = useMemo(() => prepareAll([...goItems(ctx), ...labelGoItems(ctx, env)]), [ctx, env]);
-  const actionEntries = useMemo(() => prepareAll(actionItems(ctx, env, settings)), [ctx, env, settings]);
+  const actionEntries = useMemo(() => prepareAll(actionItems(ctx, settings)), [ctx, settings]);
   // Picture rows depend on whether At a glance shows one.
   const picture = useHasPicture();
   const settingEntries = useMemo(() => prepareAll(settingItems(settings)), [settings, picture]); // eslint-disable-line react-hooks/exhaustive-deps

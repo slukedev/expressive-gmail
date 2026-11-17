@@ -97,7 +97,7 @@ export function SubscriptionsView() {
           {q.isPending
             ? 'Finding the newsletters and mailing lists you get.'
             : senders.length
-              ? `${senders.length} senders sent you ${total.toLocaleString()} emails in the last six months${neverRead ? `. You haven't opened anything from ${neverRead} of them.` : '.'}`
+              ? `${senders.length === 1 ? 'One sender' : `${senders.length} senders`} sent you ${total === 1 ? 'one email' : `${total.toLocaleString()} emails`} in the last six months${neverRead ? `. You haven't opened anything from ${neverRead} of them.` : '.'}`
               : ''}
         </p>
         {senders.length > 0 && (
@@ -164,7 +164,7 @@ export function SubscriptionsView() {
       <Dialog
         open={!!confirm}
         onOpenChange={(o) => !o && setConfirm(null)}
-        title={confirm ? `${confirm.action === 'archive' ? 'Archive' : 'Delete'} ${confirm.sender.threads.length} emails?` : ''}
+        title={confirm ? `${confirm.action === 'archive' ? 'Archive' : 'Delete'} ${confirm.sender.threads.length === 1 ? 'one email' : `${confirm.sender.threads.length} emails`}?` : ''}
         description={confirm ? `Everything from ${confirm.sender.name ?? confirm.sender.email} in the last six months. You can undo right after.` : ''}
         actions={
           <>

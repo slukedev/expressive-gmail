@@ -3,7 +3,7 @@ import { useAccount, useLabels, useMailSync } from '../../data/hooks';
 import { useBackendKind } from '../../data/useBackendKind';
 import { setHostFavicon, setHostTitle } from '../../lib/host';
 import { useAppLaunches } from './useAppLaunches';
-import { useRoute } from '../../router/useRoute';
+import { getRoute, navigate, useRoute } from '../../router/useRoute';
 import { useSettings, updateSettings } from '../../state/settings';
 import { useUi } from '../../state/ui';
 import { ComposeDock } from '../compose/ComposeDock';
@@ -26,10 +26,20 @@ import { Morph } from './Morph';
 import { useGeminiPanel } from '../gemini/panel';
 import { useGeminiFeature } from '../gemini/useGemini';
 import { useAccounts } from '../../data/accounts/store';
-import { useNewCircle } from '../accounts/newCircle';
+import { closeNewCircle, useNewCircle } from '../accounts/newCircle';
 import { useScopeTitle } from '../accounts/AccountBits';
 import { OnFirstOpen, preloadable } from '../../warmup';
 import { SettingsDialog } from '../settings/lazy';
+import { OverlayBoundary } from '../../ui/ErrorBoundary';
+
+const closeSettings = () => {
+  useUi.getState().set({ settingsSection: null });
+  closeNewCircle();
+};
+const closeQuickSettings = () => useUi.getState().set({ quickSettings: false });
+const closePalette = () => useUi.getState().set({ palette: false });
+const closeShortcuts = () => useUi.getState().set({ shortcutsHelp: false });
+const closeGemini = () => useGeminiPanel.getState().close();
 
 // Opened now and then: their code loads in the warm-up. The command palette stays in: keys pressed before its code arrived would be lost, or run as list shortcuts.
 const Onboarding = preloadable(() => import('../onboarding/Onboarding').then((m) => m.Onboarding));
@@ -41,18 +51,60 @@ function SettingsHost() {
   const circle = useNewCircle((s) => s.open);
   const open = settings || circle;
   return (
-    <OnFirstOpen open={open}>
-      <SettingsDialog />
-    </OnFirstOpen>
+    <OverlayBoundary name="Settings" openKey={open} onFail={closeSettings}>
+      <OnFirstOpen open={open}>
+        <SettingsDialog />
+      </OnFirstOpen>
+    </OverlayBoundary>
+  );
+}
+
+function ComposeHost({ compact }: { compact: boolean }) {
+  const windows = useUi((s) => s.composes.length);
+  return (
+    <OverlayBoundary name="Compose" openKey={windows}>
+      <ComposeDock compact={compact} />
+    </OverlayBoundary>
+  );
+}
+
+function QuickSettingsHost() {
+  const open = useUi((s) => s.quickSettings);
+  return (
+    <OverlayBoundary name="Quick settings" openKey={open} onFail={closeQuickSettings}>
+      <QuickSettings />
+    </OverlayBoundary>
+  );
+}
+
+function PaletteHost() {
+  const open = useUi((s) => s.palette);
+  return (
+    <OverlayBoundary name="Search and commands" openKey={open} onFail={closePalette}>
+      <CommandPalette />
+    </OverlayBoundary>
+  );
+}
+
+function ShortcutsHost() {
+  const open = useUi((s) => s.shortcutsHelp);
+  return (
+    <OverlayBoundary name="Keyboard shortcuts" openKey={open} onFail={closeShortcuts}>
+      <ShortcutsDialog />
+    </OverlayBoundary>
   );
 }
 
 function OnboardingHost() {
   const onboarded = useSettings((s) => s.onboarded);
+  // Not over a connection that never came up: it says you're still signed in.
+  const mailIn = useLabels().isSuccess;
   return (
-    <OnFirstOpen open={!onboarded}>
-      <Onboarding />
-    </OnFirstOpen>
+    <OverlayBoundary name="Welcome" openKey={onboarded}>
+      <OnFirstOpen open={!onboarded && mailIn}>
+        <Onboarding />
+      </OnFirstOpen>
+    </OverlayBoundary>
   );
 }
 
@@ -87,6 +139,14 @@ export function Shell() {
   const { data: account } = useAccount();
   const { data: labels } = useLabels();
   const scopeTitle = useScopeTitle();
+
+  // Gmail's own settings links (#settings/general) open Settings over the inbox.
+  const askedSettings = route.settings;
+  useEffect(() => {
+    if (!askedSettings) return;
+    useUi.getState().set({ settingsSection: askedSettings });
+    navigate({ view: getRoute().view }, { replace: true });
+  }, [askedSettings]);
 
   useMailSync(kind === 'demo' ? 20_000 : 30_000);
   useShortcuts();
@@ -127,11 +187,11 @@ export function Shell() {
   const overlays = useMemo(
     () => (
       <>
-        <ComposeDock compact={compact} />
-        <QuickSettings />
+        <ComposeHost compact={compact} />
+        <QuickSettingsHost />
         <SettingsHost />
-        <CommandPalette />
-        <ShortcutsDialog />
+        <PaletteHost />
+        <ShortcutsHost />
         <OnboardingHost />
       </>
     ),
@@ -185,7 +245,7 @@ export function Shell() {
         }}
       />
       {modalShown && (
-        <NavRail mode="modal" openMore={modalMore} closing={!modalWanted} onClose={closeModal} />
+        <NavRail mode="modal" openMore={modalMore} closing={!modalWanted} onClose={closeModal} container={appRef} />
       )}
       <OfflineBanner />
       {/* Morph.tsx shows these around the main area while it moves with the rail. */}
@@ -193,9 +253,11 @@ export function Shell() {
       {main}
       <div className="main-move" data-side="over" aria-hidden="true" />
       {geminiShown && (
-        <Suspense fallback={null}>
-          <GeminiPanel mode={geminiMode} />
-        </Suspense>
+        <OverlayBoundary name="Gemini" openKey={geminiShown} onFail={closeGemini}>
+          <Suspense fallback={null}>
+            <GeminiPanel mode={geminiMode} />
+          </Suspense>
+        </OverlayBoundary>
       )}
       {compact && !route.threadId && <CompactFab />}
       {overlays}

@@ -9,12 +9,12 @@ import { useUi } from '../../state/ui';
 import { newCompose, replyToThread } from '../compose/open';
 import { accountScope, useAccounts } from '../../data/accounts/store';
 import { switchScope } from '../accounts/switch';
-import { aside, isAside, useAside } from '../replylater/store';
+import { aside, isAside, useAside, visibleItems } from '../replylater/store';
 import { nextUnread } from './nextUnread';
 import { canonicalKey } from './bindings';
 import { selectRangeTo, toggleOne } from '../list/select';
 import { snack } from '../../ui/Snackbar';
-import { focusRow, focusThread, isThreadScroller, pendingRow, scrollThread, supersedeFocus } from './focus';
+import { focusRow, focusThread, isThreadScroller, pendingRow, scrollThread, supersedeFocus, whenShown } from './focus';
 
 const GO: Record<string, Folder> = { i: 'inbox', s: 'starred', b: 'snoozed', t: 'sent', d: 'drafts', a: 'all' };
 
@@ -177,7 +177,7 @@ export function useShortcuts() {
           navigate({ view: { kind: 'folder', folder: GO[key] } });
         } else if (p === 'g' && key === 'r') {
           e.preventDefault();
-          if (useAside.getState().items.length) aside.start();
+          if (visibleItems(useAside.getState().items).length) aside.start();
           else snack('Nothing is set aside. Press Shift L on a conversation to reply to it later.');
         } else if (p === 'g' && key === 'k') {
           navigate({ view: { kind: 'reminders' } });
@@ -351,9 +351,17 @@ export function useShortcuts() {
         case 'l':
         case 'v': {
           const label = key === 'b' ? 'Snooze' : key === 'l' ? 'Labels' : 'Move to';
-          const btn = document.querySelector<HTMLButtonElement>(
-            route.threadId ? `.thread-toolbar [aria-label="${label}"]` : `.selection-bar [aria-label="${label}"]`,
-          );
+          const selector = route.threadId ? `.thread-toolbar [aria-label="${label}"]` : `.selection-bar [aria-label="${label}"]`;
+          // Like Gmail, the cursor row stands in for a selection: check it, then open the menu once the selection bar is up.
+          if (!route.threadId && !ui.selected.size) {
+            const id = t[0];
+            if (!id) return;
+            return run(() => {
+              toggleOne(id);
+              whenShown(selector, (btn) => btn.click());
+            });
+          }
+          const btn = document.querySelector<HTMLButtonElement>(selector);
           if (btn) run(() => btn.click());
           return;
         }

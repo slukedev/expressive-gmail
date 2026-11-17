@@ -310,13 +310,23 @@ test.describe('smart features', () => {
     const target = nudges.filter({ hasText: 'Weekly design update' });
     await expect(target).toContainText(/Sent \d+ days ago\. Follow up\?/);
 
-    await target.getByRole('button', { name: 'Dismiss this nudge' }).click();
+    // Dismiss sits beside the row's button, not inside it.
+    await expect(target.getByRole('button', { name: 'Dismiss this nudge' })).toHaveCount(0);
+    await page.locator('.nudge-row', { has: target }).getByRole('button', { name: 'Dismiss this nudge' }).click();
 
     await expect(target).toHaveCount(0);
     await page.reload();
     await expect(page.getByRole('heading', { level: 2, name: 'Follow-ups' })).toBeVisible();
     await expect(nudges.first()).toBeVisible();
     await expect(target).toHaveCount(0);
+  });
+
+  test('a sent nudge opens its conversation with Space, like any button', async ({ mail, page }) => {
+    await mail.open('inbox');
+    const nudge = page.getByRole('button', { name: /Car insurance quotes.*Follow up\?/ });
+    await nudge.focus();
+    await page.keyboard.press('Space');
+    await expect(page).not.toHaveURL(/#inbox$/);
   });
 
   test('hovering a sender shows a card with their address and actions', async ({ mail, page }) => {

@@ -195,3 +195,20 @@ test.describe('a saved circle', () => {
     await expect(mail.row(STUDIO_THREAD)).toHaveCount(0);
   });
 });
+
+test('narrowed to one account, Reply later leaves out the others, and g then r says nothing is set aside', async ({ mail, page }) => {
+  await mail.open('inbox');
+  await pick(page, /^All inboxes/);
+  await expect(mail.row(MAIN_THREAD)).toBeVisible();
+  await mail.row(MAIN_THREAD).getByRole('button', { name: 'Select conversation' }).click();
+  await page.keyboard.press('Shift+L');
+  await expect(mail.snackbar).toContainText('Moved to Reply later');
+
+  await page.getByRole('group', { name: 'Show mail from' }).getByRole('button', { name: /^Only riverastudio/ }).click();
+  await expect(mail.row(STUDIO_THREAD)).toBeVisible();
+  // Narrowed to the studio account, the main account's conversation can't open here.
+  await expect(page.getByRole('region', { name: 'Reply later' })).toHaveCount(0);
+  await page.keyboard.press('g');
+  await page.keyboard.press('r');
+  await expect(mail.snackbar).toContainText('Nothing is set aside');
+});

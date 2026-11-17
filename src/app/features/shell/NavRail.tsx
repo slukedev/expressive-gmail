@@ -1,5 +1,6 @@
 import { ContextMenu } from '@base-ui/react/context-menu';
-import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { Dialog } from '@base-ui/react/dialog';
+import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import { useLabels } from '../../data/hooks';
 import type { Label } from '../../data/types';
 import { sameView, type View } from '../../router/routes';
@@ -15,6 +16,7 @@ import { useResolvedDark } from '../../theme/ThemeProvider';
 import { LabelEditor } from '../labels/LabelEditor';
 import { LabelOptions } from '../labels/LabelOptions';
 import { backend } from '../../data/client';
+import { inCurrentScope } from '../../data/accounts/threads';
 import { SplitEditor } from '../splits/SplitEditor';
 import { useLocal } from '../../state/local';
 import { newCompose } from '../compose/open';
@@ -50,6 +52,7 @@ export function NavRail({
   closing,
   onMenu,
   onClose,
+  container,
 }: {
   mode: 'expanded' | 'collapsed' | 'modal';
   /** Opened from the collapsed rail's More. */
@@ -59,6 +62,8 @@ export function NavRail({
   /** The only thing that expands or collapses it (WideNavigationRail header). */
   onMenu?: () => void;
   onClose?: () => void;
+  /** Where the modal rail mounts, so it sits inside the app it belongs to. */
+  container?: RefObject<HTMLElement | null>;
 }) {
   const route = useRoute();
   const { data: labels = [], isFetched: labelsIn } = useLabels();
@@ -88,7 +93,7 @@ export function NavRail({
     scheduled: { count: total('SCHEDULED'), muted: true },
     drafts: { count: total('DRAFT'), muted: true, emphasize: true },
     spam: { count: unread('SPAM'), emphasize: true },
-    reminders: { count: reminders.filter((r) => r.due <= Date.now()).length, emphasize: true },
+    reminders: { count: reminders.filter((r) => r.due <= Date.now() && inCurrentScope(r.account)).length, emphasize: true },
   };
   const itemFor = (id: NavId): NavItem => ({ id, view: navView(id), ...NAV_META[id], ...extra[id] });
   const primary = layout.main.map(itemFor);
@@ -177,20 +182,6 @@ export function NavRail({
     else waited.current = false;
   }, [expanded, mode, labels, labelsIn, splits, reminders, shape]);
 
-  // The modal rail takes focus: the first More destination when opened from More, else the close button. Focus goes back when it closes.
-  useEffect(() => {
-    if (mode !== 'modal') return;
-    const back = document.activeElement as HTMLElement | null;
-    const nav = navRef.current;
-    const first = openMore ? nav?.querySelector<HTMLElement>('.rail__more .rail-item') : nav?.querySelector<HTMLElement>('.rail__header button');
-    // A pointer-opened rail shouldn't land with a focus ring (WebKit shows one for script focus).
-    const keyboard = back?.matches(':focus-visible') ?? false;
-    first?.focus({ preventScroll: true, focusVisible: keyboard } as FocusOptions);
-    return () => {
-      if (back?.isConnected) back.focus({ preventScroll: true });
-    };
-  }, [mode, openMore]);
-
   // The editors' dialogs sit out the expand and collapse commits.
   const editors = useMemo(
     () => (
@@ -202,14 +193,8 @@ export function NavRail({
     [labelEditor, splitEditor],
   );
 
-  const content = (
-    <nav
-      ref={navRef}
-      className={cx('rail', mode === 'modal' ? 'rail--modal' : expanded ? 'rail--expanded' : 'rail--collapsed')}
-      data-pending={!settled || undefined}
-      aria-label="Mailboxes"
-      onKeyDown={(e) => e.key === 'Escape' && onClose?.()}
-    >
+  const body = (
+    <>
       <div className="rail__header">
         {mode === 'modal' ? (
           <IconButton icon="menu_open" label="Close menu" onClick={onClose} />
@@ -305,9 +290,6 @@ export function NavRail({
                 <Fragment key="splits">
                   <SectionHeader title="Splits" actionLabel="Create split" onAction={() => setSplitEditor(true)} />
                   <ul className="rail__list" role="list">
-                    {splits.length === 0 && (
-                      <li className="rail__hint md-body-small">Turn any search into its own inbox tab.</li>
-                    )}
                     {splits.map((s) => (
                       <RailItem
                         key={s.id}
@@ -320,7 +302,7 @@ export function NavRail({
                 </Fragment>
               ) : (
                 <Fragment key="labels">
-                  <SectionHeader title="Labels" actionLabel="Create new label" onAction={() => setLabelEditor({ open: true })} />
+                  <SectionHeader title="Labels" actionLabel="Create new label" onAction={labelsEditable ? () => setLabelEditor({ open: true }) : undefined} />
                   <ul className="rail__list" role="list">
                     {userLabels.map((l) => (
                       <LabelItem
@@ -343,15 +325,66 @@ export function NavRail({
       {editors}
       {/* Morph.tsx fades labels out from here when they change layout. */}
       <div className="rail__ghosts" aria-hidden="true" />
-    </nav>
+    </>
   );
 
-  if (mode !== 'modal') return content;
+  if (mode !== 'modal') {
+    return (
+      <nav ref={navRef} className={cx('rail', expanded ? 'rail--expanded' : 'rail--collapsed')} data-pending={!settled || undefined} aria-label="Mailboxes">
+        {body}
+      </nav>
+    );
+  }
   return (
-    <div className="rail-modal" role="dialog" aria-modal="true" aria-label="Menu" data-closing={closing || undefined} data-morph-off={closing || undefined}>
-      <div className="rail-modal__scrim" onClick={onClose} />
-      {content}
-    </div>
+    <ModalRail navRef={navRef} openMore={openMore} closing={closing} onClose={onClose} container={container} pending={!settled}>
+      {body}
+    </ModalRail>
+  );
+}
+
+/** Base UI's dialog traps focus, makes the rest of the app inert, closes on Esc and the scrim, and hands focus back. The rail stays mounted for its closing motion (Shell.tsx). */
+function ModalRail({
+  navRef,
+  openMore,
+  closing,
+  onClose,
+  container,
+  pending,
+  children,
+}: {
+  navRef: RefObject<HTMLElement | null>;
+  openMore?: boolean;
+  closing?: boolean;
+  onClose?: () => void;
+  container?: RefObject<HTMLElement | null>;
+  pending: boolean;
+  children: ReactNode;
+}) {
+  // The first More destination when opened from More, else the close button. A pointer-opened rail lands without a focus ring.
+  const initialFocus = (openType: string) => {
+    const nav = navRef.current;
+    const first = openMore ? nav?.querySelector<HTMLElement>('.rail__more .rail-item') : nav?.querySelector<HTMLElement>('.rail__header button');
+    if (!first) return true;
+    const keyboard = openType === 'keyboard' || (document.activeElement?.matches(':focus-visible') ?? false);
+    first.focus({ preventScroll: true, focusVisible: keyboard } as FocusOptions);
+    return false;
+  };
+  return (
+    <Dialog.Root open={!closing} onOpenChange={(open) => !open && onClose?.()}>
+      <Dialog.Portal container={container} className="rail-modal" data-closing={closing || undefined} data-morph-off={closing || undefined}>
+        <Dialog.Backdrop className="rail-modal__scrim" />
+        <Dialog.Popup
+          ref={navRef as RefObject<HTMLDivElement | null>}
+          render={<nav />}
+          className="rail rail--modal"
+          data-pending={pending || undefined}
+          aria-label="Menu"
+          initialFocus={initialFocus}
+        >
+          {children}
+        </Dialog.Popup>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 
@@ -378,11 +411,11 @@ function MenuButton({ open, onClick }: { open: boolean; onClick: () => void }) {
   );
 }
 
-function SectionHeader({ title, actionLabel, onAction }: { title: string; actionLabel: string; onAction: () => void }) {
+function SectionHeader({ title, actionLabel, onAction }: { title: string; actionLabel: string; onAction?: () => void }) {
   return (
     <div className="rail__section">
       <h2 className="md-title-small rail__section-title">{title}</h2>
-      <IconButton icon="add" label={actionLabel} size="xs" onClick={onAction} />
+      {onAction && <IconButton icon="add" label={actionLabel} size="xs" onClick={onAction} />}
     </div>
   );
 }

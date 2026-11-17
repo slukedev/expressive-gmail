@@ -12,7 +12,8 @@ import type { IconName } from '../../ui/Icon';
 import { readsAsQuestion } from '../../data/gemini';
 import { useGeminiFeature } from '../gemini/useGemini';
 
-const EMPTY: Record<string, { icon: IconName; title: string; text: string }> = {
+// Spam and Trash say how long mail stays in their header already.
+const EMPTY: Record<string, { icon: IconName; title: string; text?: string }> = {
   inbox: { icon: 'done_all', title: "You're all caught up", text: 'New mail will show up here.' },
   primary: { icon: 'done_all', title: "You're all caught up", text: 'New mail will show up here.' },
   social: { icon: 'group', title: 'Nothing in Social', text: 'Messages from social networks and media sites show up here.' },
@@ -26,8 +27,8 @@ const EMPTY: Record<string, { icon: IconName; title: string; text: string }> = {
   scheduled: { icon: 'schedule_send', title: 'Nothing scheduled', text: 'Use the arrow next to Send to send a message later.' },
   drafts: { icon: 'draft', title: 'No drafts', text: 'Messages you start but don’t send are saved here.' },
   all: { icon: 'stacks', title: 'No conversations', text: 'Everything you receive, send and archive shows up here.' },
-  spam: { icon: 'report', title: 'Hooray, no spam here', text: 'Messages in Spam are deleted after 30 days.' },
-  trash: { icon: 'delete', title: 'Trash is empty', text: 'Messages in Trash are deleted after 30 days.' },
+  spam: { icon: 'report', title: 'Hooray, no spam here' },
+  trash: { icon: 'delete', title: 'Trash is empty' },
 };
 
 const SEARCH_EMPTY = { icon: 'search_off' as IconName, title: 'No messages matched your search', text: 'Try different words, or check the filters above.' };
@@ -66,7 +67,7 @@ export function ListEmpty({ view, filtered, onClearFilters }: { view: View; filt
     <div className="empty" role="status">
       <EmptyArt icon={content.icon} />
       <h2 className="md-title-large empty__title">{content.title}</h2>
-      <p className="md-body-medium empty__text">{content.text}</p>
+      {content.text && <p className="md-body-medium empty__text">{content.text}</p>}
     </div>
   );
 }

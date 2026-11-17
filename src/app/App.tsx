@@ -15,6 +15,7 @@ import { useHostUiScale } from './theme/uiScale';
 import { useEditor } from './features/wallpaper/editor';
 import { TooltipProvider } from './ui/Tooltip';
 import { SnackbarHost, snack } from './ui/Snackbar';
+import { AppFailed, ErrorBoundary } from './ui/ErrorBoundary';
 import { fontsReady } from './theme/fonts';
 import { OnFirstOpen, preloadable, warmUp } from './warmup';
 
@@ -78,12 +79,15 @@ export function App() {
     if (boot.status === 'ready') warmUp();
   }, [boot.status]);
 
+  const shellKey = boot.status === 'ready' ? `${boot.backend.kind}|${scope}|${focus ?? ''}` : '';
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <TooltipProvider>
           {boot.status === 'ready' ? (
-            <Shell key={`${boot.backend.kind}|${scope}|${focus ?? ''}`} />
+            <ErrorBoundary resetKey={shellKey} fallback={() => <AppFailed />}>
+              <Shell key={shellKey} />
+            </ErrorBoundary>
           ) : (
             <BootScreen error={boot.status === 'error' ? boot.error : undefined} onRetry={() => setAttempt((n) => n + 1)} />
           )}

@@ -11,7 +11,7 @@ export function supersedeFocus() {
 }
 
 /** Runs `fn` with the first match once it's laid out; a pane that just mounted, or a list coming back from a full-screen thread, takes a few frames. */
-function whenShown(selector: string, fn: (el: HTMLElement) => void) {
+export function whenShown(selector: string, fn: (el: HTMLElement) => void) {
   const mine = ++generation;
   // By time, not frames: a busy machine draws far fewer of them.
   const until = performance.now() + 1000;
@@ -62,10 +62,12 @@ export function scrollThread(key: 'ArrowUp' | 'ArrowDown' | 'Home' | 'End'): boo
   if (!el) return false;
   supersedeFocus();
   el.focus({ preventScroll: true });
+  // On short windows the whole pane scrolls instead, so its toolbar can move out of the way.
+  const scroller = el.scrollHeight > el.clientHeight ? el : (el.closest<HTMLElement>('.detail-pane') ?? el);
   const behavior = reducedMotion() ? 'auto' : 'smooth';
-  if (key === 'Home') el.scrollTo({ top: 0, behavior });
-  else if (key === 'End') el.scrollTo({ top: el.scrollHeight, behavior });
-  else el.scrollBy({ top: key === 'ArrowDown' ? LINE : -LINE, behavior });
+  if (key === 'Home') scroller.scrollTo({ top: 0, behavior });
+  else if (key === 'End') scroller.scrollTo({ top: scroller.scrollHeight, behavior });
+  else scroller.scrollBy({ top: key === 'ArrowDown' ? LINE : -LINE, behavior });
   return true;
 }
 

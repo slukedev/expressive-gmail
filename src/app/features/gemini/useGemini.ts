@@ -40,7 +40,7 @@ export function useGeminiStatusSettled(): boolean {
 }
 
 /** Gemini shows: Gmail offers it for this account, and the person hasn't turned it off. */
-export function useGeminiOn(): boolean {
+function useGeminiOn(): boolean {
   const choice = useSettings((s) => s.geminiChoice);
   return geminiOn(choice, useGeminiStatus());
 }

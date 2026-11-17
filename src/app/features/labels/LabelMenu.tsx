@@ -1,7 +1,7 @@
 import { Menu as BaseMenu } from '@base-ui/react/menu';
 import { useMemo, useState, type ReactElement } from 'react';
 import { mail } from '../../data/actions';
-import { snapshotThreads } from '../../data/client';
+import { backend, snapshotThreads } from '../../data/client';
 import { useLabels } from '../../data/hooks';
 import type { LabelId } from '../../data/types';
 import { labelDotColor } from '../../theme/color';
@@ -24,7 +24,9 @@ export function LabelMenu({
   const dark = useResolvedDark();
   const [filter, setFilter] = useState('');
   const [pending, setPending] = useState<Map<LabelId, boolean>>(new Map());
-  const [creating, setCreating] = useState(false);
+  // The name typed when Create was picked; closing the menu clears the filter in the same click.
+  const [creating, setCreating] = useState<string | null>(null);
+  const canCreate = backend().capabilities.labelsEdit;
 
   const userLabels = useMemo(
     () =>
@@ -128,15 +130,19 @@ export function LabelMenu({
             })}
             {shown.length === 0 && filter && <p className="label-menu__empty md-body-medium">No labels match “{filter}”</p>}
           </div>
-          <MenuSeparator />
-          <MenuItem icon="new_label" onClick={() => setCreating(true)}>
-            {filter ? `Create “${filter}”` : 'Create new label'}
-          </MenuItem>
+          {canCreate && (
+            <>
+              <MenuSeparator />
+              <MenuItem icon="new_label" onClick={() => setCreating(filter.trim())}>
+                {filter ? `Create “${filter}”` : 'Create new label'}
+              </MenuItem>
+            </>
+          )}
         </MenuPopup>
       </BaseMenu.Root>
       <LabelEditor
-        state={{ open: creating, initialName: filter }}
-        onClose={() => setCreating(false)}
+        state={{ open: creating !== null, initialName: creating ?? '' }}
+        onClose={() => setCreating(null)}
         onCreated={(label) => (mode === 'move' ? void mail.moveTo(ids, label.id, label.name) : void mail.addLabels(ids, [label.id], [], `Label "${label.name}" added`))}
       />
     </>

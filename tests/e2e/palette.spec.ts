@@ -25,6 +25,17 @@ async function openThread(mail: Mail) {
 }
 
 test.describe('command palette', () => {
+  test('Keyboard shortcuts opens a page listing the shortcuts, and typing filters it', async ({ mail, page }) => {
+    await mail.open('inbox');
+    await expect(mail.rows.first()).toBeVisible();
+    const p = await openPalette(page);
+    await page.keyboard.type('keyboard shortcuts');
+    await p.dialog.getByRole('option', { name: 'Keyboard shortcuts', exact: true }).click();
+    await expect(p.option(/^Compose/).first()).toBeVisible();
+    await page.keyboard.type('archive');
+    await expect(p.option(/^Archive/).first()).toBeVisible();
+  });
+
   test('leads with actions on the open conversation, named in each row', async ({ mail, page }) => {
     await openThread(mail);
     const p = await openPalette(page);

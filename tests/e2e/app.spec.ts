@@ -8,7 +8,7 @@ test.use({ viewport: { width: 1366, height: 768 } });
 async function openApp(page: Page, mode: 'install' | 'standalone', hash = 'inbox') {
   await page.goto(`/preview/frame.html?latency=0&app=${mode}#${hash}`);
   const app = page.frameLocator('iframe');
-  await expect(app.getByRole('list', { name: 'Conversations' }).getByRole('listitem').first()).toBeVisible();
+  await expect(app.locator('.thread-list').getByRole('listitem').first()).toBeVisible();
   return app;
 }
 
