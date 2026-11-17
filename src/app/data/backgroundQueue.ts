@@ -19,6 +19,8 @@ const CACHE_LIMIT = 200;
 
 interface Job {
   key: string;
+  /** The account it was asked of, even if the view switches accounts before it runs. */
+  backend: MailBackend;
   query: string;
   pageSize: number;
   promise: Promise<ThreadSummary[]>;
@@ -53,7 +55,12 @@ const browserEnv: QueueEnv = {
 export function createBackgroundQueue(env: QueueEnv = browserEnv) {
   const caches = new WeakMap<MailBackend, Cache>();
   const queue: Job[] = [];
-  const inflight = new Map<string, Job>();
+  const inflight = new WeakMap<MailBackend, Map<string, Job>>();
+  const inflightFor = (b: MailBackend) => {
+    let m = inflight.get(b);
+    if (!m) inflight.set(b, (m = new Map()));
+    return m;
+  };
   let tokens = BUCKET_SIZE;
   let refilledAt = env.now();
   let running = false;
@@ -103,7 +110,7 @@ export function createBackgroundQueue(env: QueueEnv = browserEnv) {
     if (!job) return;
     tokens--;
     running = true;
-    const b = env.backend();
+    const b = job.backend;
     try {
       const page = await b.listThreads({ q: job.query, pageSize: job.pageSize });
       const cache = cacheFor(b);
@@ -113,7 +120,7 @@ export function createBackgroundQueue(env: QueueEnv = browserEnv) {
     } catch (e) {
       job.reject(e);
     } finally {
-      inflight.delete(job.key);
+      inflightFor(b).delete(job.key);
       running = false;
       schedule(0);
     }
@@ -133,13 +140,13 @@ export function createBackgroundQueue(env: QueueEnv = browserEnv) {
     if (hit && env.now() - hit.at < maxAge) return Promise.resolve(hit.threads);
     if (opts.signal?.aborted) return Promise.reject(abortError());
 
-    let job = inflight.get(key);
+    let job = inflightFor(b).get(key);
     if (!job) {
       let resolve!: Job['resolve'];
       let reject!: Job['reject'];
       const promise = new Promise<ThreadSummary[]>((res, rej) => ((resolve = res), (reject = rej)));
-      job = { key, query: query.trim(), pageSize, promise, resolve, reject, waiters: 0 };
-      inflight.set(key, job);
+      job = { key, backend: b, query: query.trim(), pageSize, promise, resolve, reject, waiters: 0 };
+      inflightFor(b).set(key, job);
       queue.push(job);
       schedule(0);
     }
@@ -153,7 +160,7 @@ export function createBackgroundQueue(env: QueueEnv = browserEnv) {
         // Nobody else wants it and it hasn't started.
         if (--j.waiters === 0 && queue.includes(j)) {
           queue.splice(queue.indexOf(j), 1);
-          inflight.delete(j.key);
+          inflightFor(j.backend).delete(j.key);
         }
       };
       signal.addEventListener('abort', abort, { once: true });

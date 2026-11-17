@@ -1,9 +1,24 @@
 import { BackendError, type MailBackend } from './backend';
-import { readKey, watchKey, writeKey } from '../state/storage';
+import { readKey, watchKey, withLock, writeKey } from '../state/storage';
 import type { LabelChange, ThreadPage, ThreadQuery, ThreadSummary } from './types';
 
 const STORE_KEY = 'bg.localSnooze.v1';
 type Store = Record<string, number>;
+
+const storeKeyFor = (email: string) => `${STORE_KEY}:${email.trim().toLowerCase()}`;
+/** Each wrapped account's wake-up in this tab, by store key. */
+const wakers = new Map<string, () => Promise<string[]>>();
+
+/** Wakes due snoozes of accounts this tab isn't showing: an account's snoozes otherwise wake only while a scope with it is open. `open` builds an account's backend, which wakes it. */
+export async function wakeSnoozesElsewhere(emails: string[], open: (email: string) => Promise<unknown>, now = Date.now()): Promise<void> {
+  for (const email of emails) {
+    const key = storeKeyFor(email);
+    const store = await readKey<Store>(key);
+    if (!store || typeof store !== 'object' || !Object.values(store).some((t) => typeof t === 'number' && t <= now)) continue;
+    const wake = wakers.get(key);
+    await (wake ? wake() : open(email)).catch(() => undefined);
+  }
+}
 
 /** For backends without Gmail's snooze: archive now, keep the wake time in this browser, and put the thread back in the inbox (unread) the next time Gmail is open after it. */
 export function withLocalSnooze(inner: MailBackend, account?: string): MailBackend {
@@ -12,7 +27,11 @@ export function withLocalSnooze(inner: MailBackend, account?: string): MailBacke
   let key: Promise<string> | undefined;
   const storeKey = () => {
     if (!key) {
-      key = (account ? Promise.resolve(account) : signedInAs(inner)).then((email) => `${STORE_KEY}:${email.trim().toLowerCase()}`);
+      key = (account ? Promise.resolve(account) : signedInAs(inner)).then((email) => {
+        const k = storeKeyFor(email);
+        wakers.set(k, wake);
+        return k;
+      });
       key.catch(() => (key = undefined));
     }
     return key;
@@ -34,10 +53,13 @@ export function withLocalSnooze(inner: MailBackend, account?: string): MailBacke
   let writes: Promise<unknown> = Promise.resolve();
   const update = (change: (store: Store) => Store | undefined): Promise<void> => {
     const run = writes.then(async () => {
-      const next = change({ ...(await read()) });
-      if (!next) return;
-      cache = next;
-      await writeKey(await storeKey(), next);
+      // Another tab on this account writes the same key.
+      await withLock(await storeKey(), async () => {
+        const next = change({ ...(await read()) });
+        if (!next) return;
+        cache = next;
+        await writeKey(await storeKey(), next);
+      });
     });
     writes = run.catch(() => undefined);
     return run;

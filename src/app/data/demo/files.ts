@@ -17,12 +17,18 @@ function crc32(bytes: Uint8Array, start = 0, end = bytes.length, seed = 0): numb
   return (c ^ 0xffffffff) >>> 0;
 }
 
+/** The modulo once per 5552 bytes, the most that can't overflow (zlib's NMAX). */
 function adler32(bytes: Uint8Array): number {
   let a = 1;
   let b = 0;
-  for (let i = 0; i < bytes.length; i++) {
-    a = (a + bytes[i]!) % 65521;
-    b = (b + a) % 65521;
+  for (let start = 0; start < bytes.length; start += 5552) {
+    const end = Math.min(start + 5552, bytes.length);
+    for (let i = start; i < end; i++) {
+      a += bytes[i]!;
+      b += a;
+    }
+    a %= 65521;
+    b %= 65521;
   }
   return ((b << 16) | a) >>> 0;
 }
@@ -42,8 +48,8 @@ class BitWriter {
   bits(value: number, count: number) {
     this.acc |= value << this.n;
     this.n += count;
+    this.ensure(4);
     while (this.n >= 8) {
-      this.ensure(1);
       this.buf[this.len++] = this.acc & 0xff;
       this.acc >>>= 8;
       this.n -= 8;
@@ -93,7 +99,7 @@ function deflateRaw(data: Uint8Array): Uint8Array {
   const HBITS = 15;
   const head = new Int32Array(1 << HBITS).fill(-1);
   const prev = new Int32Array(n);
-  const hash = (i: number) => (((data[i]! << 10) ^ (data[i + 1]! << 5) ^ data[i + 2]!) * 2654435761) >>> (32 - HBITS);
+  const hash = (i: number) => Math.imul((data[i]! << 10) ^ (data[i + 1]! << 5) ^ data[i + 2]!, 2654435761 | 0) >>> (32 - HBITS);
   const insert = (i: number) => {
     if (i + 2 >= n) return;
     const h = hash(i);
@@ -109,6 +115,11 @@ function deflateRaw(data: Uint8Array): Uint8Array {
       let chain = 24;
       const maxLen = Math.min(258, n - i);
       while (cand >= 0 && chain-- > 0 && i - cand <= 32768) {
+        // A candidate that differs at the best length so far can't beat it (zlib's own shortcut).
+        if (bestLen && data[cand + bestLen] !== data[i + bestLen]) {
+          cand = prev[cand]!;
+          continue;
+        }
         let l = 0;
         while (l < maxLen && data[cand + l] === data[i + l]) l++;
         if (l > bestLen) {

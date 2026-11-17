@@ -4,6 +4,7 @@ import {
   createTokenProvider,
   parseAuthResponse,
   redirectUriFor,
+  signIn,
   type OAuthMessage,
 } from '../../src/app/data/api/auth';
 import { createOAuthHandler, type OAuthDeps } from '../../src/background/oauth';
@@ -196,5 +197,18 @@ describe('UI token provider', () => {
   it('throws an unauthenticated BackendError when silent renewal fails', async () => {
     const provider = createTokenProvider(async () => ({ error: 'interaction-required', message: 'Sign in again' }));
     await expect(provider()).rejects.toMatchObject({ name: 'BackendError', code: 'unauthenticated' });
+  });
+});
+
+describe('signing in from Settings', () => {
+  it.each([
+    ['access-denied', 'Google sign-in was declined.', 'Sign-in was cancelled. Sign in again to use the Gmail API.'],
+    ['cancelled', 'Google sign-in was closed.', 'Sign-in was cancelled. Sign in again to use the Gmail API.'],
+    ['state-mismatch', 'The sign-in response did not match this request.', "Couldn't sign in with Google. Try again."],
+    ['invalid-response', 'Google did not return an access token.', "Couldn't sign in with Google. Try again."],
+    ['no-client-id', 'Add your Google OAuth client ID in Settings to use the Gmail API backend.', 'Add your Google OAuth client ID in Settings to use the Gmail API backend.'],
+  ] as const)('says what to do after %s, keeping Google\'s wording as the cause', async (error, message, shown) => {
+    const err = await signIn(undefined, async () => ({ error, message })).catch((e: Error) => e);
+    expect(err).toMatchObject({ message: shown, cause: message });
   });
 });

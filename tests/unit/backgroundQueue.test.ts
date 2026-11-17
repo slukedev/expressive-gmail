@@ -75,4 +75,25 @@ describe('backgroundSearch', () => {
     await vi.advanceTimersByTimeAsync(60_000);
     expect(asked).toEqual(['a', 'b', 'c']);
   });
+
+  it('keeps each account to its own results when the view switches accounts mid-search', async () => {
+    const backendFor = (name: string) =>
+      ({ listThreads: vi.fn(async () => ({ threads: [{ id: `${name}-thread` }] })) }) as unknown as MailBackend;
+    const a = backendFor('a');
+    const b = backendFor('b');
+    let current = a;
+    const queue = createBackgroundQueue({
+      now: () => Date.now(),
+      visible: () => true,
+      idle: (fn) => setTimeout(fn, 0),
+      setTimer: (fn, ms) => setTimeout(fn, ms),
+      backend: () => current,
+    });
+    const fromA = queue.search('1Z999');
+    current = b;
+    const fromB = queue.search('1Z999');
+    await vi.advanceTimersByTimeAsync(100);
+    expect((await fromA)[0]!.id).toBe('a-thread');
+    expect((await fromB)[0]!.id).toBe('b-thread');
+  });
 });

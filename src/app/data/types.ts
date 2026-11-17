@@ -87,8 +87,6 @@ export interface Message {
     listUnsubscribe?: string;
     listUnsubscribePost?: string;
     listId?: string;
-    /** Which of the sender's verified-logo records to read. */
-    bimiSelector?: string;
   };
   isDraft?: boolean;
 }
@@ -173,6 +171,8 @@ export interface OutgoingMessage {
   attachments: OutgoingAttachment[];
   /** Epoch ms. Only honored when the backend can schedule. */
   sendAt?: number;
+  /** The same on every try at sending one message, so a retry after Gmail went quiet finds the first try instead of sending twice. */
+  sendKey?: string;
 }
 
 export interface OutgoingAttachment {
@@ -182,6 +182,8 @@ export interface OutgoingAttachment {
   size: number;
   /** Base64 (not url-safe). */
   data: string;
+  /** A picture the body shows by `cid:`, sent as an inline part rather than a file. */
+  contentId?: string;
 }
 
 export interface Draft {

@@ -1,5 +1,9 @@
 import { backend, keys, queryClient } from '../data/client';
-import type { Account } from '../data/types';
+import { splitId } from '../data/accounts/ids';
+import { bytesToBase64, utf8Encode } from '../data/api/base64';
+import { myAddresses } from '../data/hooks';
+import type { Account, Address } from '../data/types';
+import { isMe } from '../lib/format';
 import { local } from '../state/local';
 import { snack } from '../ui/Snackbar';
 import { buildIcsReply, parseIcs, type CalendarEvent, type Rsvp } from './extract';
@@ -20,23 +24,33 @@ export async function loadThreadEvent(threadId: string): Promise<{ event: Calend
   return null;
 }
 
+/** The invited address that's mine, preferring the account that owns the conversation, since that account sends the reply. */
+export function attendeeFor(event: CalendarEvent, account: Account, threadId: string): Address {
+  const owner = account.members?.find((m) => m.key === splitId(threadId).key) ?? account;
+  const ownAddresses = [owner.email, ...(owner.sendAs ?? []).map((a) => a.email)];
+  const mine = event.attendees.find((a) => isMe(a.email, ownAddresses)) ?? event.attendees.find((a) => isMe(a.email, myAddresses(account)));
+  return { email: mine?.email ?? owner.email, name: mine?.name ?? owner.name };
+}
+
 /** An iMIP reply to the organizer, like Gmail's Yes / Maybe / No. */
 export async function rsvp(threadId: string, answer: Rsvp, preloaded?: CalendarEvent): Promise<boolean> {
-  const me = queryClient.getQueryData<Account>(keys.account);
+  const account = queryClient.getQueryData<Account>(keys.account);
   try {
     const event = preloaded ?? (await loadThreadEvent(threadId))?.event;
-    if (!event || !me) throw new Error('No invitation found in this conversation.');
+    if (!event || !account) throw new Error('No invitation found in this conversation.');
     if (!event.organizer) throw new Error('This invitation has no organizer to reply to.');
-    const ics = buildIcsReply(event, { name: me.name, email: me.email }, answer);
+    const me = attendeeFor(event, account, threadId);
+    const ics = utf8Encode(buildIcsReply(event, me, answer));
     const when = new Date(event.start).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     await backend().send({
       threadId,
+      from: { email: me.email },
       to: [event.organizer],
       cc: [],
       bcc: [],
       subject: `${VERB[answer]}: ${event.title} @ ${when}`,
-      html: `<p>${me.name} has ${VERB[answer].toLowerCase()} this invitation.</p>`,
-      attachments: [{ id: 'rsvp', filename: 'invite.ics', mimeType: 'text/calendar; method=REPLY', size: ics.length, data: btoa(unescape(encodeURIComponent(ics))) }],
+      html: `<p>${me.name ?? me.email} has ${VERB[answer].toLowerCase()} this invitation.</p>`,
+      attachments: [{ id: 'rsvp', filename: 'invite.ics', mimeType: 'text/calendar; method=REPLY', size: ics.length, data: bytesToBase64(ics) }],
     });
     local.setRsvp(event.uid, answer);
     // Even when the thread isn't on screen: a hover prefetch may hold it without the reply.

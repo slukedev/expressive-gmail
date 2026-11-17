@@ -10,10 +10,12 @@ import {
   findCode,
   findDeal,
   googleCalendarUrl,
+  messageLanguage,
   messageText,
   packageStatus,
   parseIcs,
   phishingSignals,
+  zonedToUtc,
   type SmartInfo,
 } from '../../src/app/smart/extract';
 import { collectPackages } from '../../src/app/smart/packages';
@@ -318,6 +320,15 @@ describe('analyzeMessage', () => {
     const personal = msg({ labelIds: ['INBOX', 'CATEGORY_PERSONAL'], subject: 'saw this', bodyText: text });
     expect(kind(analyzeMessage(personal), 'deal')).toBeUndefined();
   });
+
+  it.each(['javascript:alert(1)', 'data:text/html,<b>hi</b>', 'file:///etc/hosts'])('never offers %s as the deal link', (href) => {
+    const promo = msg({
+      labelIds: ['INBOX', 'CATEGORY_PROMOTIONS'],
+      subject: 'Members only: 20% off',
+      bodyHtml: `<p>Take 20% off everything this weekend. Use code FALL20.</p><p><a href="${href}">Shop now</a></p>`,
+    });
+    expect(kind(analyzeMessage(promo), 'deal')).toMatchObject({ code: 'FALL20', url: undefined });
+  });
 });
 
 describe('analyzeRow', () => {
@@ -438,8 +449,6 @@ describe('parseIcs', () => {
   // Outlook and Apple Calendar send TZID-qualified local times. Lisbon is UTC+1 on Oct 9.
   it('honours TZID on DTSTART', () => {
     const ev = parseIcs(CRLF(['BEGIN:VCALENDAR', 'BEGIN:VEVENT', 'UID:tz', 'SUMMARY:Check-in', 'DTSTART;TZID=Europe/Lisbon:20261009T150000', 'END:VEVENT', 'END:VCALENDAR']))!;
-    // Only meaningful when the test machine is not on Lisbon time.
-    expect(new Date(2026, 9, 9, 15).getTime()).not.toBe(Date.UTC(2026, 9, 9, 14));
     expect(ev.start).toBe(Date.UTC(2026, 9, 9, 14, 0));
   });
 
@@ -448,6 +457,47 @@ describe('parseIcs', () => {
       CRLF(['BEGIN:VCALENDAR', 'BEGIN:VEVENT', 'UID:b', 'SUMMARY:Lisbon offsite', 'DTSTART;VALUE=DATE:20261012', 'DTEND;VALUE=DATE:20261015', 'END:VEVENT', 'END:VCALENDAR']),
     )!;
     expect(ev).toMatchObject({ allDay: true, start: new Date(2026, 9, 12).getTime(), end: new Date(2026, 9, 15).getTime(), title: 'Lisbon offsite' });
+  });
+
+  it.each([
+    ['Pacific Standard Time', Date.UTC(2026, 9, 9, 16)],
+    ['W. Europe Standard Time', Date.UTC(2026, 9, 9, 7)],
+    ['India Standard Time', Date.UTC(2026, 9, 9, 3, 30)],
+    ['Europe/Lisbon', Date.UTC(2026, 9, 9, 8)],
+  ])('reads Outlook\'s %s as that zone\'s time', (tzid, utc) => {
+    const ev = parseIcs(CRLF(['BEGIN:VCALENDAR', 'BEGIN:VEVENT', 'UID:w', `DTSTART;TZID="${tzid}":20261009T090000`, 'END:VEVENT', 'END:VCALENDAR']))!;
+    expect(ev.start).toBe(utc);
+  });
+
+  it('follows the invite\'s own VTIMEZONE rules for a zone name it doesn\'t know, across daylight saving', () => {
+    const zone = [
+      'BEGIN:VTIMEZONE',
+      'TZID:Head Office Time',
+      'BEGIN:STANDARD',
+      'DTSTART:16010101T020000',
+      'TZOFFSETFROM:-0700',
+      'TZOFFSETTO:-0800',
+      'RRULE:FREQ=YEARLY;BYDAY=1SU;BYMONTH=11',
+      'END:STANDARD',
+      'BEGIN:DAYLIGHT',
+      'DTSTART:16010101T020000',
+      'TZOFFSETFROM:-0800',
+      'TZOFFSETTO:-0700',
+      'RRULE:FREQ=YEARLY;BYDAY=2SU;BYMONTH=3',
+      'END:DAYLIGHT',
+      'END:VTIMEZONE',
+    ];
+    const at = (when: string) => parseIcs(CRLF(['BEGIN:VCALENDAR', ...zone, 'BEGIN:VEVENT', 'UID:h', `DTSTART;TZID=Head Office Time:${when}`, 'END:VEVENT', 'END:VCALENDAR']))!.start;
+    expect(at('20261009T090000')).toBe(Date.UTC(2026, 9, 9, 16));
+    expect(at('20261209T090000')).toBe(Date.UTC(2026, 11, 9, 17));
+    expect(at('20260308T030000')).toBe(Date.UTC(2026, 2, 8, 10));
+    expect(at('20261101T013000')).toBe(Date.UTC(2026, 10, 1, 8, 30));
+  });
+
+  it('reads a quoted name with a colon in it as the name', () => {
+    const ev = parseIcs(CRLF(['BEGIN:VCALENDAR', 'BEGIN:VEVENT', 'UID:q', 'DTSTART:20261009T180000Z', 'ORGANIZER;CN="Doe: PM; Ops":mailto:doe@example.com', 'ATTENDEE;CN="Rivera: Alex";PARTSTAT=ACCEPTED:mailto:alex.rivera@example.com', 'END:VEVENT', 'END:VCALENDAR']))!;
+    expect(ev.organizer).toEqual({ name: 'Doe: PM; Ops', email: 'doe@example.com' });
+    expect(ev.attendees).toEqual([{ name: 'Rivera: Alex', email: 'alex.rivera@example.com', status: 'ACCEPTED' }]);
   });
 
   it('accepts LF-only files', () => {
@@ -477,6 +527,13 @@ describe('buildIcsReply', () => {
     expect(back.attendees).toEqual([{ email: me.email, name: me.name, status: answer }]);
   });
 
+  it('answers an all-day event with its calendar dates, not times', () => {
+    const ev = parseIcs(CRLF(['BEGIN:VCALENDAR', 'BEGIN:VEVENT', 'UID:b', 'SUMMARY:Offsite', 'DTSTART;VALUE=DATE:20261012', 'DTEND;VALUE=DATE:20261015', 'END:VEVENT', 'END:VCALENDAR']))!;
+    const lines = buildIcsReply(ev, me, 'ACCEPTED', NOW).split('\r\n');
+    expect(lines).toContain('DTSTART;VALUE=DATE:20261012');
+    expect(lines).toContain('DTEND;VALUE=DATE:20261015');
+  });
+
   it('keeps lines within 75 octets as RFC 5545 asks', () => {
     const ev = parseIcs(OUTLOOK_INVITE)!;
     const long = { ...ev, title: 'Quarterly planning: onboarding v4, error messages, brand illustrations and the Lisbon offsite agenda' };
@@ -497,11 +554,29 @@ describe('googleCalendarUrl', () => {
     expect(url.searchParams.get('dates')).toBe('20261009T180000Z/20261009T190000Z');
   });
 
-  it('uses date-only values for an all-day event', () => {
-    const ev = parseIcs(
-      CRLF(['BEGIN:VCALENDAR', 'BEGIN:VEVENT', 'UID:b', 'SUMMARY:Offsite', 'DTSTART;VALUE=DATE:20261012', 'DTEND;VALUE=DATE:20261015', 'END:VEVENT', 'END:VCALENDAR']),
-    )!;
-    expect(new URL(googleCalendarUrl(ev)).searchParams.get('dates')).toBe('20261012/20261015');
+  it.each([
+    ['DTSTART;VALUE=DATE:20261012', 'DTEND;VALUE=DATE:20261015', '20261012/20261015'],
+    ['DTSTART;VALUE=DATE:20261031', undefined, '20261031/20261101'],
+    ['DTSTART:20261231', undefined, '20261231/20270101'],
+  ])('keeps the all-day event %s on its own calendar days', (start, end, dates) => {
+    const ev = parseIcs(CRLF(['BEGIN:VCALENDAR', 'BEGIN:VEVENT', 'UID:b', 'SUMMARY:Offsite', start, ...(end ? [end] : []), 'END:VEVENT', 'END:VCALENDAR']))!;
+    expect(new URL(googleCalendarUrl(ev)).searchParams.get('dates')).toBe(dates);
+  });
+});
+
+describe('zonedToUtc', () => {
+  it.each([
+    ['Pacific/Chatham', 2026, 0, 15, 9, 0, Date.UTC(2026, 0, 14, 19, 15)],
+    ['Asia/Kolkata', 2026, 9, 9, 9, 0, Date.UTC(2026, 9, 9, 3, 30)],
+    ['America/St_Johns', 2026, 9, 9, 9, 0, Date.UTC(2026, 9, 9, 11, 30)],
+    ['Europe/Berlin', 2026, 2, 29, 3, 30, Date.UTC(2026, 2, 29, 1, 30)],
+    ['America/New_York', 2026, 10, 1, 9, 0, Date.UTC(2026, 10, 1, 14, 0)],
+  ])('reads wall time in %s', (tz, y, mo, d, h, mi, utc) => {
+    expect(zonedToUtc(y, mo, d, h, mi, 0, tz)).toBe(utc);
+  });
+
+  it('is null for a zone name Intl doesn\'t know', () => {
+    expect(zonedToUtc(2026, 9, 9, 9, 0, 0, 'Pacific Standard Time')).toBeNull();
   });
 });
 
@@ -524,6 +599,27 @@ describe('detectLanguage', () => {
     expect(
       detectLanguage('Hi Alex, the kids loved the kindergarten tour. We had a real Gemütlichkeit moment at the café afterwards. See you Saturday for the run club?'),
     ).toBeNull();
+  });
+
+  it.each([
+    ['Japanese written alongside an English summary', 'お久しぶりです！来月の東京旅行、楽しみにしています。泊まる場所はもう決まりましたか？谷中のあたりが静かでおすすめです。土曜日の夜は空いているので、一緒にご飯に行きましょう。(English version because my keyboard is faster in Japanese: Looking forward to your trip! Stay in Yanaka if you can, it is quiet and great for walks.)', 'Japanese'],
+    ['Chinese', '你好，下个月我们在上海见面吧。我已经订好了酒店，离地铁站很近，走路五分钟就到。', 'Chinese'],
+    ['Korean', '안녕하세요 알렉스 씨, 다음 달 서울 출장 일정을 보내 드립니다. 호텔은 강남역 근처로 예약했습니다.', 'Korean'],
+  ])('%s', (_name, text, lang) => {
+    expect(detectLanguage(text)).toBe(lang);
+  });
+
+  it('English with a short phrase in another script is English', () => {
+    expect(detectLanguage('Thanks so much for the pastries, they were a hit with the whole team. شكرا جزيلا يا صديقي')).toBeNull();
+    expect(detectLanguage('Meeting notes attached. Our partner 山田太郎さん will join us from the Tokyo office next week.')).toBeNull();
+    expect(detectLanguage('Notes from the Kyoto visit: we met 株式会社山田製作所 (Yamada Manufacturing) and 東京大学 about the pilot, and they want a proposal by Friday.')).toBeNull();
+  });
+
+  it('is never offered for mail I wrote, and reads the body, not the subject', () => {
+    const arabic = 'مرحبا أليكس، شكرا على رسالتك. سأرسل لك التفاصيل غدا إن شاء الله.';
+    expect(messageLanguage(msg({ from: { email: ME }, bodyText: arabic }), [ME])).toBeNull();
+    expect(messageLanguage(msg({ bodyText: arabic }), [ME])).toBe('Arabic');
+    expect(messageLanguage(msg({ subject: arabic, bodyText: 'Sounds good, I will send the files over tomorrow morning before the call.' }), [ME])).toBeNull();
   });
 
   it('a short English note is English', () => {

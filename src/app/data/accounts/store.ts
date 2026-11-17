@@ -9,6 +9,7 @@ import type { View } from '../../router/routes';
 import { backendReady, prepareBackend } from '../lifecycle';
 import type { Account } from '../types';
 import { accountInfo, type AccountDirectory, type AccountInfo, type DelegatedMailbox } from './directory';
+import { wakeSnoozesElsewhere } from '../localSnooze';
 import { createMergedBackend, type MergedMember } from './merged';
 
 export type ScopeId = 'all' | `account:${string}` | `circle:${string}`;
@@ -412,4 +413,6 @@ async function refreshUnread() {
   );
   if (rest.length && directory.unread) Object.assign(counts, await directory.unread(rest).catch(() => ({})));
   useAccounts.setState((s) => ({ unread: { ...s.unread, ...counts } }));
+  const byEmail = new Map(accounts.map((a) => [norm(a.email), a]));
+  await wakeSnoozesElsewhere([...byEmail.keys()], (email) => openAccount(byEmail.get(email)!));
 }

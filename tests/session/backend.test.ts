@@ -32,6 +32,13 @@ function echo(threadId: string, messageId: string, labels: string[]) {
   return [[[[9, 0, null, 5]]], [0, null, null, null, [], [[[threadId, null, [null, null, null, null, null, null, [thread]]], 5]], 0, 5], [[]], [5]];
 }
 
+/** An /i/fd answer: one thread holding one message with these labels and date. */
+function fd(threadId: string, messageId: string, labels: string[], date = NOW) {
+  const message: Json[] = new Array(56).fill(null);
+  Object.assign(message, { 0: messageId, 1: [1, 'ada@example.com', 'Ada'], 6: date, 9: 'Hi', 10: labels, 17: date });
+  return json([0, [['Monday', 'Hi', date, threadId, [message]]], null, null, [4100999]]);
+}
+
 const CAFE = 'thread-f:1846473264892611537';
 const TRIP = 'thread-f:1846500000000000007';
 
@@ -404,23 +411,33 @@ describe('send', () => {
     expect(sent[0][1]).toEqual([1, 'ada@example.com', null, null, null, null, null, null, null, 'ada@example.com']);
   });
 
-  it('answers the message named by In-Reply-To, in place, without a draft step', async () => {
+  /** A reply is saved as a draft under the message it answers, then that draft is sent. */
+  const replySent = (calls: Call[]) => {
+    const [save, send] = calls.filter((c) => c.endpoint === 's').map((c) => (c.body as Json)[1][0][0][1][1]);
+    expect(save[1][0][10]).toEqual(DRAFT_LABELS);
+    return { replyTo: save[1][1], message: send[13][0], sentAs: send[13][1] };
+  };
+
+  it('answers the message named by In-Reply-To', async () => {
     const { fetch, calls } = fakeFetch(
       json(fixture('fd-current.json')),
+      json(fixture('s-ack-ok.json')),
       json(echo(TRIP, NEW_MESSAGE, ['^all', '^f', '^pfg'])),
     );
     await backend(fetch).send({ ...outgoing, threadId: TRIP, inReplyTo: '<CAF1=trip@mail.gmail.com>' });
-    const slot = (calls[1]!.body as Json)[1][0][0][1][1][1];
-    expect(slot[1]).toBe('msg-f:1846500000000000007');
-    expect(slot[0][15]).toBe('<CAF1=trip@mail.gmail.com>');
+    const { replyTo, message, sentAs } = replySent(calls);
+    expect(replyTo).toBe('msg-f:1846500000000000007');
+    expect(sentAs).toBe('msg-f:1846500000000000007');
+    expect(message[0]).toBe(NEW_MESSAGE);
+    expect(message[15]).toBe('<CAF1=trip@mail.gmail.com>');
   });
 
   it('answers the newest non-draft message when no In-Reply-To is given', async () => {
-    const { fetch, calls } = fakeFetch(json(fixture('fd-current.json')), json(echo(TRIP, NEW_MESSAGE, ['^f'])));
+    const { fetch, calls } = fakeFetch(json(fixture('fd-current.json')), json(fixture('s-ack-ok.json')), json(echo(TRIP, NEW_MESSAGE, ['^f'])));
     await backend(fetch).send({ ...outgoing, threadId: TRIP });
-    const slot = (calls[1]!.body as Json)[1][0][0][1][1][1];
-    expect(slot[1]).toBe('msg-f:1846500000000099001');
-    expect(slot[0][15]).toBe('<CAA2=reply@mail.gmail.com>');
+    const { replyTo, message } = replySent(calls);
+    expect(replyTo).toBe('msg-f:1846500000000099001');
+    expect(message[15]).toBe('<CAA2=reply@mail.gmail.com>');
   });
 
   it('sends a saved draft by rewriting it in place', async () => {
@@ -448,24 +465,90 @@ describe('send', () => {
     expect(err.message).toMatch(/Check Sent/);
   });
 
+  describe('when Gmail never answers the send', () => {
+    const SENT = ['^all', '^f'];
+    const DRAFT = ['^all', '^r'];
+    const keyed = { ...outgoing, sendKey: 'k1' };
+    const dropped = () => Promise.reject(new TypeError('Failed to fetch'));
+    const hangs = () => new Promise<Response>(() => {});
+    const unconfirmed = () => Array.from({ length: 3 }, () => fd(NEW_THREAD, NEW_MESSAGE, DRAFT));
+    const firstTry = () => [json(fixture('bv-current.json')), json(fixture('s-ack-ok.json'))];
+
+    it('counts the send once a re-read shows Gmail sent it', async () => {
+      const { fetch, calls } = fakeFetch(...firstTry(), hangs, fd(NEW_THREAD, NEW_MESSAGE, SENT));
+      await expect(backend(fetch, { requestTimeoutMs: 5 }).send(keyed)).resolves.toEqual({ id: NEW_MESSAGE, threadId: NEW_THREAD });
+      expect(calls.map((c) => c.endpoint)).toEqual(['bv', 's', 's', 'fd']);
+    });
+
+    it('says to check Sent, and a retry sends the saved message in place once', async () => {
+      const { fetch, calls } = fakeFetch(...firstTry(), dropped, ...unconfirmed(), fd(NEW_THREAD, NEW_MESSAGE, DRAFT), json(echo(NEW_THREAD, NEW_MESSAGE, SENT)));
+      const b = backend(fetch);
+      const err = await rejection(b.send(keyed));
+      expect(err).toMatchObject({ code: 'unknown', message: "Gmail didn't confirm the send. Check Sent before trying again." });
+      await expect(b.send(keyed)).resolves.toEqual({ id: NEW_MESSAGE, threadId: NEW_THREAD });
+      const retry = calls.slice(6);
+      expect(retry.map((c) => c.endpoint)).toEqual(['fd', 's']);
+      // An update of the draft the first try saved, not a second new conversation.
+      expect((retry[1]!.body as Json)[1][0][0][1][1][13][0][0]).toBe(NEW_MESSAGE);
+    });
+
+    it('returns the first send on a retry when it landed late, without sending again', async () => {
+      const { fetch, calls } = fakeFetch(...firstTry(), dropped, ...unconfirmed(), fd(NEW_THREAD, NEW_MESSAGE, SENT));
+      const b = backend(fetch);
+      await rejection(b.send(keyed));
+      await expect(b.send(keyed)).resolves.toEqual({ id: NEW_MESSAGE, threadId: NEW_THREAD });
+      expect(calls.filter((c) => c.endpoint === 's')).toHaveLength(2);
+    });
+
+    it('sends a retried reply as the same message, never a second one', async () => {
+      const reply = { ...keyed, threadId: TRIP };
+      const draftOfReply = () => fd(TRIP, NEW_MESSAGE, DRAFT);
+      const { fetch, calls } = fakeFetch(
+        json(fixture('fd-current.json')),
+        json(fixture('s-ack-ok.json')),
+        dropped,
+        draftOfReply(), draftOfReply(), draftOfReply(),
+        draftOfReply(),
+        json(echo(TRIP, NEW_MESSAGE, SENT)),
+      );
+      const b = backend(fetch);
+      await rejection(b.send(reply));
+      await expect(b.send(reply)).resolves.toEqual({ id: NEW_MESSAGE, threadId: TRIP });
+      const sends = calls.filter((c) => c.endpoint === 's');
+      // A draft first, then its send; the retry rewrites that same message in place.
+      expect(sends).toHaveLength(3);
+      expect((sends[2]!.body as Json)[1][0][0][1][1][13][0][0]).toBe(NEW_MESSAGE);
+    });
+
+    it('refuses a retry while the first request may still arrive', async () => {
+      const { fetch, calls } = fakeFetch(...firstTry(), hangs, ...unconfirmed(), fd(NEW_THREAD, NEW_MESSAGE, DRAFT));
+      const b = backend(fetch, { requestTimeoutMs: 5 });
+      await rejection(b.send(keyed));
+      const err = await rejection(b.send(keyed));
+      expect(err).toMatchObject({ code: 'unknown', message: 'Gmail is still working on the first send. Check Sent before trying again.' });
+      expect(calls.filter((c) => c.endpoint === 's')).toHaveLength(2);
+    });
+  });
+
   it('uploads attachments, then references the returned blob in the message', async () => {
     const uploadUrl = 'https://mail.google.com/_/upload?upload_id=XYZ&upload_protocol=resumable';
     const { fetch, calls } = fakeFetch(
       json(fixture('fd-current.json')),
       () => new Response('', { headers: { 'x-goog-upload-url': uploadUrl } }),
       () => new Response('BLOBREF123\n'),
+      json(fixture('s-ack-ok.json')),
       json(echo(TRIP, NEW_MESSAGE, ['^f'])),
     );
     const file = { id: 'local-1', filename: 'Grüße.pdf', mimeType: 'application/pdf', size: 3, data: btoa('PDF') };
     await backend(fetch).send({ ...outgoing, threadId: TRIP, attachments: [file] });
 
-    const [, start, upload, send] = calls as [Call, Call, Call, Call];
+    const [, start, upload, , send] = calls as [Call, Call, Call, Call, Call];
     expect(start.url).toBe('https://mail.google.com/_/upload?authuser=1&dcp=asu-n');
     expect(start.body).toEqual([NEW_MESSAGE]);
     expect(start.init.headers).toMatchObject({ 'X-Goog-Upload-Command': 'start', 'X-Goog-Upload-File-Name': 'Gr%C3%BC%C3%9Fe.pdf' });
     expect(upload.url).toBe(uploadUrl);
     expect(Array.from(upload.init.body as Uint8Array)).toEqual([80, 68, 70]);
-    const message = (send.body as Json)[1][0][0][1][1][1][0];
+    const message = (send.body as Json)[1][0][0][1][1][13][0];
     expect(message[11]).toEqual([['application/pdf', 'Grüße.pdf', 3, null, 'f_111111111', null, 0, [], null, 'BLOBREF123']]);
   });
 
@@ -481,12 +564,6 @@ describe('send', () => {
 describe('schedule send through Gmail\'s own page', () => {
   const outgoing = { to: [{ email: 'grace@example.org' }], cc: [], bcc: [], subject: 'Monday', html: '<div>Hi</div>', attachments: [] };
   const SEND_AT = NOW + 86_400_000;
-  /** An /i/fd answer: one thread holding one message with these labels and date. */
-  function fd(threadId: string, messageId: string, labels: string[], date = NOW) {
-    const message: Json[] = new Array(56).fill(null);
-    Object.assign(message, { 0: messageId, 1: [1, 'ada@example.com', 'Ada'], 6: date, 9: 'Hi', 10: labels, 17: date });
-    return json([0, [['Monday', 'Hi', date, threadId, [message]]], null, null, [4100999]]);
-  }
   const asDraft = () => fd(NEW_THREAD, NEW_MESSAGE, ['^all', '^r']);
   const asScheduled = (date = SEND_AT) => fd(NEW_THREAD, NEW_MESSAGE, ['^all', '^scheduled'], date);
   /** The answers to saving the app's draft again just before scheduling: its conversation, then the save. */
@@ -889,13 +966,40 @@ describe('pollChanges', () => {
     expect(await b.pollChanges()).toEqual([{ type: 'all' }]);
   });
 
-  it('falls back to interval refreshes when Gmail stops understanding the poll', async () => {
-    const { fetch, calls } = fakeFetch(json(fixture('bv-current.json')), () => new Response('not json'));
-    const b = backend(fetch);
-    await b.pollChanges();
-    expect(await b.pollChanges()).toEqual([{ type: 'all' }]);
-    expect(await b.pollChanges()).toEqual([{ type: 'all' }]);
-    expect(calls).toHaveLength(2);
+  describe('when Gmail stops understanding the poll', () => {
+    const garbled = () => new Response('not json');
+    function clocked(...responders: Parameters<typeof fakeFetch>) {
+      let now = NOW;
+      const { fetch, calls } = fakeFetch(...responders);
+      const b = backend(fetch, { now: () => now, pollIntervalMs: 20_000, sleep: async (ms) => void (now += ms) });
+      return { b, calls, advance: (ms: number) => (now += ms) };
+    }
+
+    it('rides out one odd answer without switching to full refreshes', async () => {
+      const { b } = clocked(json(fixture('bv-current.json')), garbled, json(fixture('s-poll-changed.json')));
+      await b.pollChanges();
+      expect(await b.pollChanges()).toEqual([]);
+      expect(await b.pollChanges()).toEqual([{ type: 'threads', threadIds: ['thread-f:1846473264892611537', 'thread-f:1846500000000000007'] }]);
+    });
+
+    it('falls back to a full refresh at most once a minute after three in a row', async () => {
+      const { b, calls } = clocked(json(fixture('bv-current.json')), garbled, garbled, garbled);
+      await b.pollChanges();
+      const ticks = [];
+      for (let i = 0; i < 8; i++) ticks.push(await b.pollChanges());
+      expect(ticks).toEqual([[], [], [{ type: 'all' }], [], [], [{ type: 'all' }], [], []]);
+      expect(calls).toHaveLength(4);
+    });
+
+    it('tries the real poll again after a while, and goes back to it once it answers', async () => {
+      const { b, calls, advance } = clocked(json(fixture('bv-current.json')), garbled, garbled, garbled, json(fixture('s-poll-changed.json')), json(fixture('s-poll-quiet.json')));
+      await b.pollChanges();
+      for (let i = 0; i < 3; i++) await b.pollChanges();
+      advance(10 * 60_000);
+      expect(await b.pollChanges()).toEqual([{ type: 'threads', threadIds: ['thread-f:1846473264892611537', 'thread-f:1846500000000000007'] }]);
+      expect(await b.pollChanges()).not.toContainEqual({ type: 'all' });
+      expect(calls).toHaveLength(6);
+    });
   });
 
   it('still surfaces sign-out instead of hiding it behind the fallback', async () => {

@@ -31,6 +31,11 @@ export function isSystemLabel(id: string): boolean {
 /** PNG bytes depend only on the scene, so every backend shares them. */
 const pngMemo = new Map<string, Uint8Array>();
 
+/** No PNG of this scene can be larger: raw rows, fixed Huffman's worst case of 9 bits a byte, and the chunks around them. */
+function pngBound(scene: { w: number; h: number }): number {
+  return Math.ceil((scene.h * (scene.w * 3 + 1) * 9) / 8) + 1024;
+}
+
 function pngCore(spec: Extract<AttachmentSpec, { kind: 'png' }>): Uint8Array {
   const key = JSON.stringify(spec.scene);
   let bytes = pngMemo.get(key);
@@ -132,9 +137,10 @@ export class Builder {
         break;
       }
       case 'png': {
-        const core = pngCore(spec);
-        const size = Math.max(core.length, spec.size ?? 0);
-        entry = { mimeType, size, make: () => (size > core.length ? padPng(core, size) : core) };
+        // A padded photo's size is known without encoding it, which is most of the cost of building a mailbox.
+        const padded = (spec.size ?? 0) > pngBound(spec.scene);
+        const size = padded ? spec.size! : Math.max(pngCore(spec).length, spec.size ?? 0);
+        entry = { mimeType, size, make: () => (size > pngCore(spec).length ? padPng(pngCore(spec), size) : pngCore(spec)) };
         att.previewUrl = scenePreviewUrl(spec.scene);
         if (spec.contentId) {
           att.contentId = spec.contentId;

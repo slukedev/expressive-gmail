@@ -23,6 +23,7 @@ import { useSettingsStore } from '../../state/settings';
 import { useUi } from '../../state/ui';
 import { snack, snackbarManager } from '../../ui/Snackbar';
 import { cancelDraftSave, isEmptyDraft, toOutgoing } from '../compose/send';
+import { withFetchedFiles } from '../compose/open';
 
 /** However an account's background Gmail misbehaves. */
 const OPEN_DEADLINE_MS = 30_000;
@@ -55,8 +56,11 @@ async function parkComposes(): Promise<number> {
   for (const d of open) {
     cancelDraftSave(d.key);
     if (isEmptyDraft(d) || !backend().capabilities.drafts) continue;
+    // Saving before a file from Gmail arrives would take it out of the draft.
+    const full = await withFetchedFiles(d);
+    if (!full) return -1;
     try {
-      await backend().saveDraft(toOutgoing(d));
+      await backend().saveDraft(toOutgoing(full));
       saved++;
     } catch {
       // Left open below so nothing typed is lost.

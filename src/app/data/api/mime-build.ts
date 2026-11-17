@@ -1,5 +1,5 @@
 /**
- * The RFC 2822 / MIME text messages.send and drafts.* take as `raw`: multipart/alternative (text, html), inside multipart/mixed with attachments.
+ * The RFC 2822 / MIME text messages.send and drafts.* take as `raw`: multipart/alternative (text, html), inside multipart/related with inline pictures, inside multipart/mixed with attachments.
  * Every line is 7-bit ASCII: RFC 2047 headers, RFC 2231 filenames plus an encoded-word `name` for older clients, base64 bodies at 76 columns.
  * CR and LF are stripped from header values so a subject can't inject headers.
  */
@@ -99,13 +99,34 @@ export function buildMime(message: OutgoingMessage, options: BuildOptions = {}):
     `--${altBoundary}--`,
   ].join(CRLF);
 
-  if (!message.attachments.length) {
-    return [...headers, alternative, ''].join(CRLF);
+  const inline = message.attachments.filter((a) => a.contentId);
+  const files = message.attachments.filter((a) => !a.contentId);
+  let body = alternative;
+  if (inline.length) {
+    const relatedBoundary = boundary('rel', random);
+    const related = [`Content-Type: multipart/related; boundary="${relatedBoundary}"`, '', `--${relatedBoundary}`, alternative];
+    for (const att of inline) {
+      related.push(
+        `--${relatedBoundary}`,
+        `Content-Type: ${clean(att.mimeType) || 'application/octet-stream'}; ${encodeNameParam(att.filename)}`,
+        `Content-Disposition: inline; ${encodeFilenameParams(att.filename)}`,
+        `Content-ID: <${clean(att.contentId!).replace(/[<>]/g, '')}>`,
+        'Content-Transfer-Encoding: base64',
+        '',
+        wrapBase64(att.data.replace(/\s+/g, '')),
+      );
+    }
+    related.push(`--${relatedBoundary}--`);
+    body = related.join(CRLF);
+  }
+
+  if (!files.length) {
+    return [...headers, body, ''].join(CRLF);
   }
 
   const mixedBoundary = boundary('mix', random);
-  const parts = [`--${mixedBoundary}`, alternative];
-  for (const att of message.attachments) {
+  const parts = [`--${mixedBoundary}`, body];
+  for (const att of files) {
     const mime = clean(att.mimeType) || 'application/octet-stream';
     parts.push(
       `--${mixedBoundary}`,

@@ -435,6 +435,20 @@ describe('createMergedBackend account and capabilities', () => {
     expect(merged.capabilities).toMatchObject({ filters: false, mute: false, send: true, snooze: true });
   });
 
+  it('answers for each conversation\'s own account where accounts differ', () => {
+    const main = make('main');
+    const cannot = Object.assign(Object.create(make('studio')) as MailBackend, {
+      capabilities: { ...main.capabilities, deleteForever: false },
+    });
+    const merged = createMergedBackend([
+      { key: KEY.main, email: EMAIL.main, backend: main },
+      { key: KEY.studio, email: EMAIL.studio, backend: cannot },
+    ]);
+    expect(merged.capabilities.deleteForever).toBe(false);
+    expect(merged.capabilitiesOf!(qualify(KEY.main, 't1')).deleteForever).toBe(true);
+    expect(merged.capabilitiesOf!(qualify(KEY.studio, 't1')).deleteForever).toBe(false);
+  });
+
   it('empties every account\'s Trash, not only the loaded rows, and counts them all', async () => {
     const { m, merged } = setup(['main', 'studio']);
     const before = (await all(m.main, 'in:trash')).threads.length + (await all(m.studio, 'in:trash')).threads.length;

@@ -1,7 +1,7 @@
 import { fakeBrowser } from 'wxt/testing/fake-browser';
 import { readKey } from '../../src/app/state/storage';
 import { loadLocal, local, useLocal } from '../../src/app/state/local';
-import { updateSettings, useSettingsStore } from '../../src/app/state/settings';
+import { loadSettings, updateSettings, useSettingsStore } from '../../src/app/state/settings';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -28,6 +28,7 @@ describe('extension storage failures', () => {
   });
 
   it('a write over quota keeps what changed in memory and leaves no unhandled rejection', async () => {
+    await Promise.all([loadLocal(), loadSettings()]);
     vi.spyOn(fakeBrowser.storage.local, 'set').mockRejectedValue(new Error('QUOTA_BYTES quota exceeded'));
     const errors = await unhandled(() => {
       local.togglePin('thread-f:9');
@@ -132,5 +133,47 @@ describe('settings read back from storage', () => {
     await fakeBrowser.storage.local.set({ 'bg.settings.v1': { wallpaper: 'custom:abc', wallpaperColors: ['#aa3355'] } });
     await loadSettings();
     expect(useSettingsStore.getState().settings.wallpaper).toBe('custom:abc');
+  });
+});
+
+describe('changes made while storage is still being read', () => {
+  beforeEach(() => {
+    fakeBrowser.reset();
+    vi.resetModules();
+  });
+  const fresh = async () => ({
+    ...(await import('../../src/app/state/local')),
+    ...(await import('../../src/app/state/settings')),
+  });
+
+  it('are added to what was stored, never written over it', async () => {
+    await fakeBrowser.storage.local.set({
+      'bg.local.v1': { pinned: ['thread-f:1'], notes: { 'thread-f:1': { text: 'call back', updatedAt: 1 } } },
+      'bg.settings.v1': { density: 'compact', pageSize: 100 },
+    });
+    const m = await fresh();
+    m.local.togglePin('thread-f:2');
+    m.updateSettings({ readingPane: 'none' });
+    await Promise.all([m.loadLocal(), m.loadSettings()]);
+    const stored = await readKey<Record<string, unknown>>('bg.local.v1');
+    expect(stored).toMatchObject({ pinned: ['thread-f:2', 'thread-f:1'], notes: { 'thread-f:1': { text: 'call back' } } });
+    expect(await readKey('bg.settings.v1')).toMatchObject({ density: 'compact', pageSize: 100, readingPane: 'none' });
+  });
+
+  it('stay in memory when storage can\'t be read, and nothing stored is replaced', async () => {
+    vi.useFakeTimers();
+    await fakeBrowser.storage.local.set({ 'bg.local.v1': { pinned: ['thread-f:1'] }, 'bg.settings.v1': { density: 'compact' } });
+    const m = await fresh();
+    vi.spyOn(fakeBrowser.storage.local, 'get').mockRejectedValue(new Error('Extension context invalidated.'));
+    const set = vi.spyOn(fakeBrowser.storage.local, 'set');
+    const loading = Promise.all([m.loadLocal(), m.loadSettings()]);
+    await vi.runAllTimersAsync();
+    await loading;
+    vi.useRealTimers();
+    m.local.togglePin('thread-f:2');
+    m.updateSettings({ density: 'comfortable' });
+    expect(m.useLocal.getState().pinned).toEqual(['thread-f:2']);
+    expect(m.useSettingsStore.getState().settings.density).toBe('comfortable');
+    expect(set).not.toHaveBeenCalled();
   });
 });

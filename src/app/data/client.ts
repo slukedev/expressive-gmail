@@ -1,17 +1,20 @@
 import { QueryClient, replaceEqualDeep, type InfiniteData } from '@tanstack/react-query';
 import type { BackendError, MailBackend } from './backend';
 import type { View } from '../router/routes';
-import type { Label, LabelChange, LabelId, Thread, ThreadPage, ThreadSummary } from './types';
+import type { BackendCapabilities, Label, LabelChange, LabelId, Thread, ThreadPage, ThreadSummary } from './types';
 import { stillInView } from './views';
 import { metered } from './requestMeter';
 
-/** Freshness comes from the sync loop (sync.ts), which invalidates what changed, so queries don't refetch on focus, reconnect or remount. Retries are for hiccups only; a rate limit isn't retried here. */
+/** Answers a retry can't change: the page has no Gmail session, or the account is signed out. A rate limit isn't retried here either. */
+const FINAL: ReadonlySet<BackendError['code']> = new Set(['rate-limited', 'session-unavailable', 'unauthenticated']);
+
+/** Freshness comes from the sync loop (sync.ts), which invalidates what changed, so queries don't refetch on focus, reconnect or remount. Retries are for hiccups only (a dropped connection, a 5xx). */
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 2 * 60_000,
       gcTime: 10 * 60_000,
-      retry: (count, err) => count < 2 && err instanceof Error && (err as { retryable?: boolean }).retryable === true && (err as BackendError).code !== 'rate-limited',
+      retry: (count, err) => count < 2 && err instanceof Error && (err as { retryable?: boolean }).retryable === true && !FINAL.has((err as BackendError).code),
       retryDelay: (attempt) => Math.min(30_000, 1_000 * 2 ** attempt) * (0.5 + Math.random()),
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,
@@ -26,6 +29,16 @@ export function setBackend(b: MailBackend) {
 export function backend(): MailBackend {
   if (!backendRef) throw new Error('Mail backend not ready');
   return backendRef;
+}
+
+/** What the account owning this conversation can do; in a merged scope that differs per account. */
+export function capabilitiesOf(threadId: string): BackendCapabilities {
+  const b = backend();
+  return b.capabilitiesOf?.(threadId) ?? b.capabilities;
+}
+
+export function canDeleteForever(threadIds: string[]): boolean {
+  return threadIds.length > 0 && threadIds.every((id) => capabilitiesOf(id).deleteForever);
 }
 
 export const keys = {
@@ -196,6 +209,43 @@ export function snapshotThreads(ids: string[]): Map<string, ThreadSummary> {
     if (t && !out.has(id)) out.set(id, t);
   }
   return out;
+}
+
+/** Where each row sits in each cached list, so an undo can put back a row a prune already took out. */
+export type ListPlaces = { queryKey: readonly unknown[]; page: number; index: number; id: string }[];
+
+export function listPlaces(ids: string[]): ListPlaces {
+  const idSet = new Set(ids);
+  const out: ListPlaces = [];
+  for (const [queryKey, data] of queryClient.getQueriesData<ListData>({ queryKey: keys.allThreads })) {
+    data?.pages.forEach((p, page) => p.threads.forEach((t, index) => idSet.has(t.id) && out.push({ queryKey, page, index, id: t.id })));
+  }
+  return out;
+}
+
+/** Back where they were, in lists that would still show them as they were. */
+export function reinsertThreads(places: ListPlaces, rows: Map<string, ThreadSummary>) {
+  const labels = queryClient.getQueryData<Label[]>(keys.labels) ?? [];
+  const byQuery = new Map<string, { queryKey: readonly unknown[]; places: ListPlaces }>();
+  for (const place of places) {
+    const key = JSON.stringify(place.queryKey);
+    byQuery.set(key, { queryKey: place.queryKey, places: [...(byQuery.get(key)?.places ?? []), place] });
+  }
+  for (const { queryKey, places: own } of byQuery.values()) {
+    const view = (queryKey[1] as { view?: View } | undefined)?.view;
+    queryClient.setQueryData<ListData>(queryKey, (data) => {
+      if (!data) return data;
+      const present = new Set(data.pages.flatMap((p) => p.threads.map((t) => t.id)));
+      const missing = own.filter((p) => !present.has(p.id) && rows.has(p.id) && (!view || stillInView(view, rows.get(p.id)!, labels) !== false));
+      if (!missing.length) return data;
+      const pages = data.pages.map((p) => ({ ...p, threads: [...p.threads] }));
+      for (const place of missing.sort((a, b) => a.page - b.page || a.index - b.index)) {
+        const page = pages[Math.min(place.page, pages.length - 1)];
+        page?.threads.splice(Math.min(place.index, page.threads.length), 0, rows.get(place.id)!);
+      }
+      return { ...data, pages };
+    });
+  }
 }
 
 export function findThread(id: string): ThreadSummary | undefined {

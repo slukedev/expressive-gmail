@@ -37,7 +37,7 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') {
 }
 
 /** Static fields and local bookkeeping, not requests to Google (geminiStatus reads the page Gmail already loaded). */
-const UNCOUNTED = new Set(['kind', 'capabilities', 'subscribe', 'accountHint', 'geminiStatus', 'then']);
+const UNCOUNTED = new Set(['kind', 'capabilities', 'capabilitiesOf', 'subscribe', 'accountHint', 'geminiStatus', 'then']);
 
 export function metered<B extends MailBackend>(backend: B, meter: RequestMeter = requestMeter, now: () => number = Date.now): B {
   const wrapped = new Map<PropertyKey, unknown>();

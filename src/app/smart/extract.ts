@@ -337,7 +337,7 @@ export function analyzeMessage(m: Message, categories: string[] = m.labelIds): S
 
   if ((promo || m.headers.listUnsubscribe) && !categories.includes('SPAM')) {
     const deal = findDeal(`${m.subject}\n${m.snippet}\n${t.text.slice(0, 3000)}`);
-    if (deal) out.push({ ...deal, url: deal.url ?? t.links.find((l) => /shop|buy|deal|sale|offer/i.test(l.text))?.href });
+    if (deal) out.push({ ...deal, url: deal.url ?? link(t, /shop|buy|deal|sale|offer/i) });
   }
   return out;
 }
@@ -405,6 +405,8 @@ export interface CalendarEvent {
   start: number;
   end?: number;
   allDay: boolean;
+  /** For an all-day event, its calendar dates as written (YYYYMMDD, end exclusive). No time zone can move them. */
+  days?: { start: string; end: string };
   location?: string;
   description?: string;
   organizer?: Address;
@@ -421,25 +423,136 @@ function icsUnescape(s: string) {
   return s.replace(/\\n/gi, '\n').replace(/\\([,;\\])/g, '$1');
 }
 
-function icsDate(value: string, params: string): { ms: number; allDay: boolean } {
+/** Outlook names zones the Windows way; CLDR's windowsZones maps them to IANA names. */
+const WINDOWS_ZONES: Record<string, string> = {
+  'Dateline Standard Time': 'Etc/GMT+12',
+  'UTC-11': 'Etc/GMT+11',
+  'Hawaiian Standard Time': 'Pacific/Honolulu',
+  'Aleutian Standard Time': 'America/Adak',
+  'Alaskan Standard Time': 'America/Anchorage',
+  'Pacific Standard Time (Mexico)': 'America/Tijuana',
+  'Pacific Standard Time': 'America/Los_Angeles',
+  'US Mountain Standard Time': 'America/Phoenix',
+  'Mountain Standard Time (Mexico)': 'America/Mazatlan',
+  'Mountain Standard Time': 'America/Denver',
+  'Central America Standard Time': 'America/Guatemala',
+  'Central Standard Time': 'America/Chicago',
+  'Central Standard Time (Mexico)': 'America/Mexico_City',
+  'Canada Central Standard Time': 'America/Regina',
+  'SA Pacific Standard Time': 'America/Bogota',
+  'Eastern Standard Time (Mexico)': 'America/Cancun',
+  'Eastern Standard Time': 'America/New_York',
+  'US Eastern Standard Time': 'America/Indianapolis',
+  'Venezuela Standard Time': 'America/Caracas',
+  'Atlantic Standard Time': 'America/Halifax',
+  'SA Western Standard Time': 'America/La_Paz',
+  'Central Brazilian Standard Time': 'America/Cuiaba',
+  'Pacific SA Standard Time': 'America/Santiago',
+  'Newfoundland Standard Time': 'America/St_Johns',
+  'E. South America Standard Time': 'America/Sao_Paulo',
+  'SA Eastern Standard Time': 'America/Cayenne',
+  'Argentina Standard Time': 'America/Buenos_Aires',
+  'Greenland Standard Time': 'America/Godthab',
+  'Montevideo Standard Time': 'America/Montevideo',
+  'UTC-02': 'Etc/GMT+2',
+  'Azores Standard Time': 'Atlantic/Azores',
+  'Cape Verde Standard Time': 'Atlantic/Cape_Verde',
+  'UTC': 'Etc/UTC',
+  'Coordinated Universal Time': 'Etc/UTC',
+  'GMT Standard Time': 'Europe/London',
+  'Greenwich Standard Time': 'Atlantic/Reykjavik',
+  'Morocco Standard Time': 'Africa/Casablanca',
+  'W. Europe Standard Time': 'Europe/Berlin',
+  'Central Europe Standard Time': 'Europe/Budapest',
+  'Romance Standard Time': 'Europe/Paris',
+  'Central European Standard Time': 'Europe/Warsaw',
+  'W. Central Africa Standard Time': 'Africa/Lagos',
+  'Jordan Standard Time': 'Asia/Amman',
+  'GTB Standard Time': 'Europe/Bucharest',
+  'Middle East Standard Time': 'Asia/Beirut',
+  'Egypt Standard Time': 'Africa/Cairo',
+  'E. Europe Standard Time': 'Europe/Chisinau',
+  'South Africa Standard Time': 'Africa/Johannesburg',
+  'FLE Standard Time': 'Europe/Kiev',
+  'Israel Standard Time': 'Asia/Jerusalem',
+  'Kaliningrad Standard Time': 'Europe/Kaliningrad',
+  'Arabic Standard Time': 'Asia/Baghdad',
+  'Turkey Standard Time': 'Europe/Istanbul',
+  'Arab Standard Time': 'Asia/Riyadh',
+  'Belarus Standard Time': 'Europe/Minsk',
+  'Russian Standard Time': 'Europe/Moscow',
+  'E. Africa Standard Time': 'Africa/Nairobi',
+  'Iran Standard Time': 'Asia/Tehran',
+  'Arabian Standard Time': 'Asia/Dubai',
+  'Azerbaijan Standard Time': 'Asia/Baku',
+  'Georgian Standard Time': 'Asia/Tbilisi',
+  'Caucasus Standard Time': 'Asia/Yerevan',
+  'Afghanistan Standard Time': 'Asia/Kabul',
+  'West Asia Standard Time': 'Asia/Tashkent',
+  'Pakistan Standard Time': 'Asia/Karachi',
+  'India Standard Time': 'Asia/Calcutta',
+  'Sri Lanka Standard Time': 'Asia/Colombo',
+  'Nepal Standard Time': 'Asia/Katmandu',
+  'Central Asia Standard Time': 'Asia/Almaty',
+  'Bangladesh Standard Time': 'Asia/Dhaka',
+  'Myanmar Standard Time': 'Asia/Rangoon',
+  'SE Asia Standard Time': 'Asia/Bangkok',
+  'N. Central Asia Standard Time': 'Asia/Novosibirsk',
+  'China Standard Time': 'Asia/Shanghai',
+  'North Asia East Standard Time': 'Asia/Irkutsk',
+  'Singapore Standard Time': 'Asia/Singapore',
+  'W. Australia Standard Time': 'Australia/Perth',
+  'Taipei Standard Time': 'Asia/Taipei',
+  'Ulaanbaatar Standard Time': 'Asia/Ulaanbaatar',
+  'Tokyo Standard Time': 'Asia/Tokyo',
+  'Korea Standard Time': 'Asia/Seoul',
+  'Yakutsk Standard Time': 'Asia/Yakutsk',
+  'Cen. Australia Standard Time': 'Australia/Adelaide',
+  'AUS Central Standard Time': 'Australia/Darwin',
+  'E. Australia Standard Time': 'Australia/Brisbane',
+  'AUS Eastern Standard Time': 'Australia/Sydney',
+  'West Pacific Standard Time': 'Pacific/Port_Moresby',
+  'Tasmania Standard Time': 'Australia/Hobart',
+  'Vladivostok Standard Time': 'Asia/Vladivostok',
+  'Central Pacific Standard Time': 'Pacific/Guadalcanal',
+  'New Zealand Standard Time': 'Pacific/Auckland',
+  'Fiji Standard Time': 'Pacific/Fiji',
+  'Chatham Islands Standard Time': 'Pacific/Chatham',
+  'Tonga Standard Time': 'Pacific/Tongatapu',
+  'Samoa Standard Time': 'Pacific/Apia',
+  'Line Islands Standard Time': 'Pacific/Kiritimati',
+};
+
+interface ZoneRule {
+  /** Minutes east of UTC. */
+  offset: number;
+  /** Local wall time the rule starts at each year: month (0-11), weekday (0 Sunday), which one (-1 last), hour, minute. */
+  yearly?: { month: number; weekday: number; nth: number; hour: number; minute: number };
+}
+/** A VTIMEZONE: the zone's standard and daylight rules, for TZIDs that aren't IANA names. */
+type ZoneRules = ZoneRule[];
+
+function icsDate(value: string, params: string, zones: Map<string, ZoneRules>): { ms: number; allDay: boolean; day?: string } {
   const v = value.trim();
-  if (/VALUE=DATE(?!-TIME)/.test(params) || /^\d{8}$/.test(v)) {
-    return { ms: new Date(+v.slice(0, 4), +v.slice(4, 6) - 1, +v.slice(6, 8)).getTime(), allDay: true };
+  if (/VALUE=DATE(?!-TIME)/i.test(params) || /^\d{8}$/.test(v)) {
+    const day = v.slice(0, 8);
+    return { ms: new Date(+day.slice(0, 4), +day.slice(4, 6) - 1, +day.slice(6, 8)).getTime(), allDay: true, day };
   }
   const m = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?(Z)?$/.exec(v);
   if (!m) return { ms: Date.parse(v), allDay: false };
   const [, y, mo, d, h, mi, s, z] = m;
-  const tz = /TZID=("?)([^";:]+)\1/i.exec(params)?.[2];
+  const tz = /TZID=("?)([^";:]+)\1/i.exec(params)?.[2]?.trim();
   if (z) return { ms: Date.UTC(+y, +mo - 1, +d, +h, +mi, +(s ?? 0)), allDay: false };
   if (tz) {
-    const zoned = zonedToUtc(+y, +mo - 1, +d, +h, +mi, +(s ?? 0), tz);
+    const iana = WINDOWS_ZONES[tz] ?? tz;
+    const zoned = zonedToUtc(+y, +mo - 1, +d, +h, +mi, +(s ?? 0), iana) ?? ruledToUtc(+y, +mo - 1, +d, +h, +mi, +(s ?? 0), zones.get(tz));
     if (zoned !== null) return { ms: zoned, allDay: false };
   }
   return { ms: new Date(+y, +mo - 1, +d, +h, +mi, +(s ?? 0)).getTime(), allDay: false };
 }
 
 /** Wall-clock time in an IANA zone to epoch ms. */
-function zonedToUtc(y: number, mo: number, d: number, h: number, mi: number, s: number, tz: string): number | null {
+export function zonedToUtc(y: number, mo: number, d: number, h: number, mi: number, s: number, tz: string): number | null {
   let fmt: Intl.DateTimeFormat;
   try {
     fmt = new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -457,6 +570,98 @@ function zonedToUtc(y: number, mo: number, d: number, h: number, mi: number, s: 
   return guess;
 }
 
+/** Wall-clock time under a VTIMEZONE's own rules: the rule that started most recently before it wins. */
+function ruledToUtc(y: number, mo: number, d: number, h: number, mi: number, s: number, rules: ZoneRules | undefined): number | null {
+  if (!rules?.length) return null;
+  const wall = Date.UTC(y, mo, d, h, mi, s);
+  const fixed = rules.find((r) => !r.yearly) ?? rules[0]!;
+  const yearly = rules.filter((r) => r.yearly);
+  if (yearly.length < 2) return wall - fixed.offset * 60_000;
+  const startOf = (r: ZoneRule, year: number) => {
+    const { month, weekday, nth, hour, minute } = r.yearly!;
+    const first = new Date(Date.UTC(year, month, 1)).getUTCDay();
+    const days = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    let day = 1 + ((weekday - first + 7) % 7) + (nth > 0 ? (nth - 1) * 7 : 0);
+    if (nth < 0) while (day + 7 <= days) day += 7;
+    return Date.UTC(year, month, day, hour, minute);
+  };
+  let current: ZoneRule | undefined;
+  let latest = -Infinity;
+  for (const r of yearly) {
+    for (const year of [y - 1, y]) {
+      const at = startOf(r, year);
+      if (at <= wall && at > latest) {
+        latest = at;
+        current = r;
+      }
+    }
+  }
+  return wall - (current ?? fixed).offset * 60_000;
+}
+
+const WEEKDAYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+
+function zoneRule(lines: string[]): ZoneRule | undefined {
+  const prop = (name: string) => lines.find((l) => l.toUpperCase().startsWith(`${name}:`))?.slice(name.length + 1).trim();
+  const to = /^([+-])(\d{2})(\d{2})/.exec(prop('TZOFFSETTO') ?? '');
+  if (!to) return undefined;
+  const offset = (to[1] === '-' ? -1 : 1) * (+to[2]! * 60 + +to[3]!);
+  const rrule = prop('RRULE') ?? '';
+  const month = /BYMONTH=(\d{1,2})/i.exec(rrule)?.[1];
+  const byday = /BYDAY=([+-]?\d)?(SU|MO|TU|WE|TH|FR|SA)/i.exec(rrule);
+  const start = /T(\d{2})(\d{2})/.exec(prop('DTSTART') ?? '');
+  if (!month || !byday) return { offset };
+  return {
+    offset,
+    yearly: { month: +month - 1, weekday: WEEKDAYS.indexOf(byday[2]!.toUpperCase()), nth: +(byday[1] ?? 1), hour: +(start?.[1] ?? 0), minute: +(start?.[2] ?? 0) },
+  };
+}
+
+/** Each VTIMEZONE's rules by TZID. */
+function zoneRules(lines: string[]): Map<string, ZoneRules> {
+  const zones = new Map<string, ZoneRules>();
+  let tzid: string | undefined;
+  let rules: ZoneRules = [];
+  let part: string[] | undefined;
+  for (const line of lines) {
+    const upper = line.toUpperCase();
+    if (upper === 'BEGIN:VTIMEZONE') {
+      tzid = undefined;
+      rules = [];
+    } else if (upper === 'END:VTIMEZONE') {
+      if (tzid) zones.set(tzid, rules);
+    } else if (upper === 'BEGIN:STANDARD' || upper === 'BEGIN:DAYLIGHT') {
+      part = [];
+    } else if (upper === 'END:STANDARD' || upper === 'END:DAYLIGHT') {
+      const rule = part && zoneRule(part);
+      if (rule) rules.push(rule);
+      part = undefined;
+    } else if (part) {
+      part.push(line);
+    } else if (upper.startsWith('TZID:')) {
+      tzid = line.slice(5).trim();
+    }
+  }
+  return zones;
+}
+
+/** The colon that ends the parameters: one inside a quoted value (CN="Doe: PM") doesn't count. */
+function splitProperty(line: string): { name: string; params: string; value: string } | null {
+  let quoted = false;
+  const cuts: number[] = [];
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') quoted = !quoted;
+    else if (!quoted && ch === ';') cuts.push(i);
+    else if (!quoted && ch === ':') {
+      const head = line.slice(0, i);
+      const first = cuts[0] ?? i;
+      return { name: head.slice(0, first), params: cuts.length ? head.slice(first + 1) : '', value: line.slice(i + 1) };
+    }
+  }
+  return null;
+}
+
 function mailto(value: string, params: string): Address {
   const email = value.replace(/^mailto:/i, '').trim();
   const cn = /CN=("([^"]*)"|[^;:]*)/i.exec(params);
@@ -468,19 +673,19 @@ export function parseIcs(ics: string): CalendarEvent | null {
   const text = unfold(ics);
   if (!/BEGIN:VEVENT/i.test(text)) return null;
   const method = /^METHOD:(.+)$/im.exec(text)?.[1]?.trim();
+  const zones = zoneRules(text.split(/\r?\n/));
   const body = text.slice(text.search(/BEGIN:VEVENT/i), text.search(/END:VEVENT/i));
   const ev: CalendarEvent = { uid: '', method, title: '(No title)', start: 0, allDay: false, attendees: [], raw: ics };
+  let endDay: string | undefined;
   // Properties of nested components (VALARM) belong to them.
   let depth = 0;
   for (const line of body.split(/\r?\n/)) {
     if (/^BEGIN:/i.test(line)) depth++;
     else if (/^END:/i.test(line)) depth--;
     if (depth !== 1) continue;
-    const idx = line.indexOf(':');
-    if (idx < 0) continue;
-    const [name, ...paramParts] = line.slice(0, idx).split(';');
-    const params = paramParts.join(';');
-    const value = line.slice(idx + 1);
+    const prop = splitProperty(line);
+    if (!prop) continue;
+    const { name, params, value } = prop;
     switch (name.toUpperCase()) {
       case 'UID':
         ev.uid = value.trim();
@@ -495,14 +700,18 @@ export function parseIcs(ics: string): CalendarEvent | null {
         ev.description = icsUnescape(value).trim() || undefined;
         break;
       case 'DTSTART': {
-        const d = icsDate(value, params);
+        const d = icsDate(value, params, zones);
         ev.start = d.ms;
         ev.allDay = d.allDay;
+        if (d.day) ev.days = { start: d.day, end: nextDay(d.day) };
         break;
       }
-      case 'DTEND':
-        ev.end = icsDate(value, params).ms;
+      case 'DTEND': {
+        const d = icsDate(value, params, zones);
+        ev.end = d.ms;
+        endDay = d.day;
         break;
+      }
       case 'SEQUENCE':
         ev.sequence = Number(value) || 0;
         break;
@@ -514,7 +723,15 @@ export function parseIcs(ics: string): CalendarEvent | null {
         break;
     }
   }
+  if (ev.days && endDay && endDay > ev.days.start) ev.days.end = endDay;
+  if (!ev.allDay) delete ev.days;
   return ev.start ? ev : null;
+}
+
+/** The calendar day after YYYYMMDD. */
+function nextDay(day: string): string {
+  const d = new Date(Date.UTC(+day.slice(0, 4), +day.slice(4, 6) - 1, +day.slice(6, 8) + 1));
+  return `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}`;
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -537,8 +754,9 @@ export function buildIcsReply(ev: CalendarEvent, me: Address, answer: Rsvp, now 
     'BEGIN:VEVENT',
     `UID:${ev.uid}`,
     `DTSTAMP:${stamp(now)}`,
-    `DTSTART:${stamp(ev.start)}`,
-    ...(ev.end ? [`DTEND:${stamp(ev.end)}`] : []),
+    ...(ev.allDay && ev.days
+      ? [`DTSTART;VALUE=DATE:${ev.days.start}`, `DTEND;VALUE=DATE:${ev.days.end}`]
+      : [`DTSTART:${stamp(ev.start)}`, ...(ev.end ? [`DTEND:${stamp(ev.end)}`] : [])]),
     `SEQUENCE:${ev.sequence ?? 0}`,
     `SUMMARY:${esc(ev.title)}`,
     ...(ev.organizer ? [`ORGANIZER${ev.organizer.name ? `;CN=${esc(ev.organizer.name)}` : ''}:mailto:${ev.organizer.email}`] : []),
@@ -570,25 +788,23 @@ function fold(line: string): string {
 
 /** Google Calendar's "add event" link. */
 export function googleCalendarUrl(ev: CalendarEvent): string {
-  const dates = ev.allDay
-    ? `${new Date(ev.start).toISOString().slice(0, 10).replace(/-/g, '')}/${new Date(ev.end ?? ev.start + 86_400_000).toISOString().slice(0, 10).replace(/-/g, '')}`
-    : `${stamp(ev.start)}/${stamp(ev.end ?? ev.start + 3_600_000)}`;
+  const dates = ev.allDay && ev.days ? `${ev.days.start}/${ev.days.end}` : `${stamp(ev.start)}/${stamp(ev.end ?? ev.start + 3_600_000)}`;
   const p = new URLSearchParams({ action: 'TEMPLATE', text: ev.title, dates });
   if (ev.location) p.set('location', ev.location);
   if (ev.description) p.set('details', ev.description.slice(0, 1500));
   return `https://calendar.google.com/calendar/render?${p}`;
 }
 
+const KANA = /[\u3040-\u30ff]/g;
+const HAN = /[\u3400-\u4dbf\u4e00-\u9fff]/g;
+const HANGUL = /[\uac00-\ud7af\u1100-\u11ff]/g;
 const SCRIPTS: [RegExp, string][] = [
-  [/[\u3040-\u30ff]/, 'Japanese'],
-  [/[\uac00-\ud7af]/, 'Korean'],
-  [/[\u4e00-\u9fff]/, 'Chinese'],
-  [/[\u0600-\u06ff]/, 'Arabic'],
-  [/[\u0590-\u05ff]/, 'Hebrew'],
-  [/[\u0400-\u04ff]/, 'Russian'],
-  [/[\u0e00-\u0e7f]/, 'Thai'],
-  [/[\u0900-\u097f]/, 'Hindi'],
-  [/[\u0370-\u03ff]/, 'Greek'],
+  [/[\u0600-\u06ff]/g, 'Arabic'],
+  [/[\u0590-\u05ff]/g, 'Hebrew'],
+  [/[\u0400-\u04ff]/g, 'Russian'],
+  [/[\u0e00-\u0e7f]/g, 'Thai'],
+  [/[\u0900-\u097f]/g, 'Hindi'],
+  [/[\u0370-\u03ff]/g, 'Greek'],
 ];
 const STOPWORDS: [string, string[]][] = [
   ['Spanish', ['que', 'de', 'el', 'los', 'por', 'para', 'con', 'una', 'está', 'muy', 'pero', 'hola']],
@@ -602,9 +818,19 @@ const ENGLISH = ['the', 'and', 'you', 'that', 'for', 'with', 'this', 'are', 'hav
 /** For the "Translate message" offer. Null for English. */
 export function detectLanguage(text: string): string | null {
   const sample = text.slice(0, 2000);
+  const letters = (sample.match(/\p{L}/gu) ?? []).length;
+  const count = (re: RegExp) => (sample.match(re) ?? []).length;
+  // A name or a short phrase in another script doesn't make the message that language. One CJK character carries about a word, so a third of the letters is enough there; other scripts need half.
+  const cjk = (n: number) => n >= 6 && n >= letters / 3;
+  const kana = count(KANA);
+  const han = count(HAN);
+  const hangul = count(HANGUL);
+  if (kana && cjk(kana + han)) return 'Japanese';
+  if (hangul && cjk(hangul + han)) return 'Korean';
+  if (!kana && !hangul && cjk(han)) return 'Chinese';
   for (const [re, name] of SCRIPTS) {
-    const count = (sample.match(new RegExp(re.source, 'g')) ?? []).length;
-    if (count >= 6) return name;
+    const n = count(re);
+    if (n >= 6 && n >= letters / 2) return name;
   }
   const words = sample.toLowerCase().match(/\p{L}+/gu) ?? [];
   if (words.length < 8) return null;
@@ -616,6 +842,11 @@ export function detectLanguage(text: string): string | null {
     if (!best || s > best[1]) best = [name, s];
   }
   return best && best[1] > 0.12 && best[1] > en * 1.5 ? best[0] : null;
+}
+
+/** What the translate offer reads: the body only, and never mail I wrote. */
+export function messageLanguage(m: Pick<Message, 'from' | 'bodyHtml' | 'bodyText' | 'snippet' | 'subject'>, me: Me): string | null {
+  return isMe(m.from.email, me) ? null : detectLanguage(messageText(m).text);
 }
 
 export function translateUrl(text: string): string {

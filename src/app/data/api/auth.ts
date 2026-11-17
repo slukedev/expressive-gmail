@@ -149,10 +149,24 @@ type SendMessage = (message: OAuthMessage) => Promise<unknown>;
 
 const defaultSend: SendMessage = (message) => browser.runtime.sendMessage(message);
 
+/** What a failed sign-in says on screen; Google's own wording stays in `cause` for diagnostics. */
+function signInFailure(res: OAuthError): BackendError {
+  const shown: Partial<Record<OAuthErrorCode, string>> = {
+    'safari-unsupported': res.message,
+    'no-client-id': res.message,
+    'interaction-required': res.message,
+    'access-denied': 'Sign-in was cancelled. Sign in again to use the Gmail API.',
+    cancelled: 'Sign-in was cancelled. Sign in again to use the Gmail API.',
+  };
+  const err = new BackendError(shown[res.error] ?? "Couldn't sign in with Google. Try again.", res.error === 'safari-unsupported' ? 'unsupported' : 'unauthenticated');
+  err.cause = res.message;
+  return err;
+}
+
 /** Must follow a user gesture. */
 export async function signIn(loginHint?: string, send: SendMessage = defaultSend): Promise<OAuthToken> {
   const res = (await send({ type: 'oauth:getToken', interactive: true, loginHint })) as OAuthResponse;
-  if (isOAuthError(res)) throw new BackendError(res.message, res.error === 'safari-unsupported' ? 'unsupported' : 'unauthenticated');
+  if (isOAuthError(res)) throw signInFailure(res);
   return res as OAuthToken;
 }
 

@@ -20,22 +20,21 @@ async function inflate(data: Uint8Array): Promise<Uint8Array> {
   return new Uint8Array(await new Response(stream).arrayBuffer());
 }
 
+const everyAttachment = await (async () => {
+  const page = await b.listThreads({ q: 'has:attachment OR filename:png', pageSize: 500 });
+  const threads = await Promise.all(page.threads.map((s) => b.getThread(s.id)));
+  return threads.flatMap((t) => t.messages.flatMap((m) => m.attachments));
+})();
+
 describe('attachments are real files', () => {
-  it('every attachment returns exactly as many bytes as its size says', async () => {
-    const page = await b.listThreads({ q: 'has:attachment OR filename:png', pageSize: 500 });
-    let n = 0;
-    for (const s of page.threads) {
-      const t = await b.getThread(s.id);
-      for (const m of t.messages) {
-        for (const a of m.attachments) {
-          const res = await b.getAttachment(m.id, a.id);
-          expect({ file: a.filename, size: fromBase64(res.data).length }).toEqual({ file: a.filename, size: a.size });
-          expect(res.mimeType).toBe(a.mimeType);
-          n++;
-        }
-      }
-    }
-    expect(n).toBeGreaterThan(25);
+  it('lists enough of them to mean something', () => {
+    expect(everyAttachment.length).toBeGreaterThan(25);
+  });
+
+  it.each(everyAttachment.map((a) => [a.filename, a] as const))('%s returns exactly as many bytes as its size says', async (_name, a) => {
+    const res = await b.getAttachment(a.messageId, a.id);
+    expect(fromBase64(res.data).length).toBe(a.size);
+    expect(res.mimeType).toBe(a.mimeType);
   });
 
   it('PNGs decode: signature, header, and an IDAT stream that inflates to the full image', async () => {

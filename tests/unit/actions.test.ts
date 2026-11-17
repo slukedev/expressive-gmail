@@ -83,6 +83,25 @@ describe('mail actions undo', () => {
     expect(calls).toEqual([{ ids: ['t'], change: { add: ['TRASH'], remove: ['INBOX'] } }]);
   });
 
+  it('undoing Mute brings the conversation back to the inbox, not just unmuted', async () => {
+    const { b, calls } = fakeBackend();
+    const muted: [string[], boolean][] = [];
+    (b as { muteThreads?: unknown }).muteThreads = vi.fn(async (ids: string[], on: boolean) => void muted.push([[...ids], on]));
+    setBackend(b);
+    const data: InfiniteData<ThreadPage> = { pages: [{ threads: [summary('m', ['INBOX']), summary('n', [])] }], pageParams: [undefined] };
+    queryClient.setQueryData(keys.threads('in:all', { kind: 'folder', folder: 'all' }), data);
+
+    await mail.mute(['m', 'n']);
+    undoLast();
+    await flush();
+
+    expect(muted).toEqual([
+      [['m', 'n'], true],
+      [['m', 'n'], false],
+    ]);
+    expect(calls).toEqual([{ ids: ['m'], change: { add: ['INBOX'] } }]);
+  });
+
   it('undo from the snackbar cannot be run a second time with z', async () => {
     const { b, calls } = fakeBackend();
     setBackend(b);
@@ -108,6 +127,20 @@ describe('mail actions undo', () => {
     // Gmail hasn't caught up with the undo yet: the thread still reads as archived.
     const stale = withRecentChanges({ threads: [summary('u', [])] }, inbox);
     expect(stale.threads.map((t) => [t.id, t.labelIds])).toEqual([['u', ['INBOX']]]);
+  });
+
+  it('undo puts a row that already folded away back in its place at once, before Gmail answers', async () => {
+    const b = { kind: 'demo', capabilities: {}, modifyThreads: vi.fn(async (_ids: string[], change: LabelChange) => change.add?.includes('INBOX') ? new Promise<void>(() => {}) : undefined) } as unknown as MailBackend;
+    setBackend(b);
+    const inbox = { kind: 'folder', folder: 'inbox' } as const;
+    const key = keys.threads('in:inbox', inbox);
+    queryClient.setQueryData(key, { pages: [{ threads: ['p', 'u', 'q'].map((id) => summary(id, ['INBOX'])) }], pageParams: [undefined] });
+    await mail.archive(['u']);
+    await new Promise((r) => setTimeout(r, 600));
+    const rows = () => queryClient.getQueryData<InfiniteData<ThreadPage>>(key)!.pages[0]!.threads.map((t) => t.id);
+    expect(rows()).toEqual(['p', 'q']);
+    undoLast();
+    expect(rows()).toEqual(['p', 'u', 'q']);
   });
 
   it('undo goes to the backend the action went to, even after a switch', async () => {
@@ -161,6 +194,21 @@ describe('moving to Trash and deleting forever', () => {
     queryClient.setQueryData(keys.threads('in:trash', trash), list(summary('d', ['TRASH'])));
     await mail.deleteForever(['d']);
     expect(withRecentChanges({ threads: [summary('d', ['TRASH']), summary('k', ['TRASH'])] }, trash).threads.map((t) => t.id)).toEqual(['k']);
+  });
+
+  it('deletes forever only where the conversation\'s own account can, and hands the rest to classic Gmail', async () => {
+    const b = {
+      kind: 'session',
+      capabilities: { deleteForever: false },
+      capabilitiesOf: (id: string) => ({ deleteForever: id.startsWith('home~') }),
+      deleteThreadsForever: vi.fn(async () => {}),
+    } as unknown as MailBackend;
+    setBackend(b);
+    await mail.deleteForever(['home~a']);
+    expect(b.deleteThreadsForever).toHaveBeenCalledWith(['home~a']);
+    await mail.deleteForever(['home~a', 'other~b']);
+    expect(b.deleteThreadsForever).toHaveBeenCalledTimes(1);
+    expect(snacks.at(-1)?.message).toBe('Deleting forever only works in classic Gmail');
   });
 
   it('a delete forever that fails puts the conversation back in Trash', async () => {
@@ -231,7 +279,7 @@ describe('emptying Trash and Spam', () => {
   it('shows progress, then how many conversations went', async () => {
     setBackend(withEmpty(vi.fn(async () => 1234)));
     await mail.emptyFolder('trash');
-    expect(snacks.map((s) => s.message)).toEqual(['Emptying Trash…', 'Trash emptied. 1,234 conversations deleted forever']);
+    expect(snacks.map((s) => s.message)).toEqual(['Emptying Trash…', `Trash emptied. ${(1234).toLocaleString()} conversations deleted forever`]);
   });
 
   it('passes on what the backend says is left, with a way to classic Gmail', async () => {

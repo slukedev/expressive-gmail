@@ -45,6 +45,7 @@ import {
   MUTED_STORAGE_KEY,
   SNOOZE_LABEL_NAME,
   SNOOZE_STORAGE_KEY,
+  updateKey,
   type KeyValueStore,
 } from './storage';
 import { toThread, toThreadSummary, type SummaryContext } from './threads';
@@ -54,6 +55,9 @@ import { parseListUnsubscribe, parseMailto } from '../../lib/unsubscribe';
 export const UPLOAD_THRESHOLD_BYTES = 5 * 1024 * 1024;
 const LIST_HEADERS = ['From', 'To', 'Subject', 'Date', 'List-Unsubscribe'];
 const MAX_PAGE = 50;
+/** Re-reads of Sent after a send Gmail never answered, this far apart. */
+const SEND_CONFIRM_TRIES = 3;
+const SEND_CONFIRM_MS = 2_000;
 
 export interface ApiBackendOptions extends HttpOptions {
   storage?: KeyValueStore;
@@ -75,12 +79,19 @@ const API_CAPABILITIES: BackendCapabilities = {
   filters: true,
   contacts: true,
   attachments: true,
-  deleteForever: true,
+  // threads.delete needs the full https://mail.google.com/ scope, which this backend never asks for.
+  deleteForever: false,
   changes: true,
 };
 
 const enc = encodeURIComponent;
 
+
+function withoutKeys<T>(map: Record<string, T>, keys: string[]): Record<string, T> {
+  const out = { ...map };
+  for (const key of keys) delete out[key];
+  return out;
+}
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -103,12 +114,17 @@ export class GmailApiBackend implements MailBackend {
   private readonly helperIds: Partial<Record<HelperKind, string>> = {};
   private readonly attachmentTypes = new Map<string, string>();
   private historyId?: string;
+  private address?: string;
+  private readonly sleep: (ms: number) => Promise<void>;
+  /** Send keys of sends Gmail never answered. */
+  private readonly unconfirmedSends = new Set<string>();
 
   constructor(getToken: TokenProvider, options: ApiBackendOptions = {}) {
     this.http = new HttpClient(getToken, options);
     this.fetchImpl = options.fetchImpl ?? ((input, init) => fetch(input, init));
     this.storage = options.storage ?? browserLocalStore();
     this.now = options.now ?? Date.now;
+    this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     this.postOneClickImpl = options.postOneClick;
     this.contacts = new ContactSearch(this.http, this.now);
   }
@@ -116,6 +132,7 @@ export class GmailApiBackend implements MailBackend {
   async getAccount(): Promise<Account> {
     const profile = await this.http.request<GmailProfile>(`${GMAIL_API}/profile`);
     this.historyId ??= profile.historyId;
+    this.address = profile.emailAddress;
     let sendAs: GmailSendAs[] = [];
     try {
       sendAs = (await this.http.request<{ sendAs?: GmailSendAs[] }>(`${GMAIL_API}/settings/sendAs`)).sendAs ?? [];
@@ -268,17 +285,20 @@ export class GmailApiBackend implements MailBackend {
     const results = await this.http.batch(entries.map((t) => ({ method: 'GET', path: metadataPath(t.id, LIST_HEADERS) })));
     const ctx = await this.summaryContext();
     let firstError: BackendError | undefined;
+    let failed = 0;
     results.forEach((r, i) => {
       if (r.status >= 200 && r.status < 300 && r.body) {
         page.threads.push(toThreadSummary(r.body as GmailThread, { ...ctx, listSnippet: entries[i].snippet }));
       } else if (r.status !== 404) {
-        // A thread deleted between list and get is skipped; other failures are only fatal when nothing could be loaded.
+        // A thread deleted between list and get is skipped.
+        failed++;
         firstError ??= r.status === 0
           ? new BackendError('Batch part missing from response', 'unknown', true)
           : errorFromResponse(r.status, r.body, r.text);
       }
     });
-    if (!page.threads.length && firstError) throw firstError;
+    // A page missing most of its rows would read as a short inbox; failing lets the list say so and try again.
+    if (firstError && failed >= page.threads.length) throw firstError;
     return page;
   }
 
@@ -320,18 +340,8 @@ export class GmailApiBackend implements MailBackend {
     await this.perThread(threadIds, (id) => ({ method: 'POST', path: `/gmail/v1/users/me/threads/${enc(id)}/untrash` }));
   }
 
-  async deleteThreadsForever(threadIds: string[]): Promise<void> {
-    try {
-      await this.perThread(threadIds, (id) => ({ method: 'DELETE', path: `/gmail/v1/users/me/threads/${enc(id)}` }));
-    } catch (err) {
-      if (err instanceof BackendError && err.code === 'unsupported') {
-        throw new BackendError(
-          'Deleting forever needs the full https://mail.google.com/ scope, which Expressive Gmail does not request. Empty the trash in Gmail instead.',
-          'unsupported',
-        );
-      }
-      throw err;
-    }
+  deleteThreadsForever(threadIds: string[]): Promise<void> {
+    return this.perThread(threadIds, (id) => ({ method: 'DELETE', path: `/gmail/v1/users/me/threads/${enc(id)}` }));
   }
 
   /** A direct request for a single id, a batch for more. */
@@ -348,18 +358,14 @@ export class GmailApiBackend implements MailBackend {
   async snoozeThreads(threadIds: string[], until: number): Promise<void> {
     if (!threadIds.length) return;
     await this.modifyWithHelper('snoozed', threadIds, (label) => ({ add: [label], remove: ['INBOX'] }));
-    const map = (await this.storage.get<Record<string, number>>(SNOOZE_STORAGE_KEY)) ?? {};
-    for (const id of threadIds) map[id] = until;
-    await this.storage.set(SNOOZE_STORAGE_KEY, map);
+    await updateKey<Record<string, number>>(this.storage, SNOOZE_STORAGE_KEY, (map = {}) => ({ ...map, ...Object.fromEntries(threadIds.map((id) => [id, until])) }));
   }
 
   async unsnoozeThreads(threadIds: string[]): Promise<void> {
     if (!threadIds.length) return;
     const label = await this.helperLabelId('snoozed', false);
     await this.modifyThreads(threadIds, { add: ['INBOX'], remove: label ? [label] : [] });
-    const map = (await this.storage.get<Record<string, number>>(SNOOZE_STORAGE_KEY)) ?? {};
-    for (const id of threadIds) delete map[id];
-    await this.storage.set(SNOOZE_STORAGE_KEY, map);
+    await updateKey<Record<string, number>>(this.storage, SNOOZE_STORAGE_KEY, (map = {}) => withoutKeys(map, threadIds));
   }
 
   /** Returns the woken thread ids. */
@@ -373,31 +379,25 @@ export class GmailApiBackend implements MailBackend {
     const results = await this.http.batch(
       due.map((id) => ({ method: 'POST', path: `/gmail/v1/users/me/threads/${enc(id)}/modify`, body })),
     );
-    const woken: string[] = [];
-    // Read again: a tab may have snoozed something while the batch was out.
-    const next = { ...((await this.storage.get<Record<string, number>>(SNOOZE_STORAGE_KEY)) ?? {}) };
-    results.forEach((r, i) => {
-      const ok = r.status >= 200 && r.status < 300;
-      // A thread deleted meanwhile (404) is dropped too, or it would retry forever.
-      if ((ok || r.status === 404) && next[due[i]] === map[due[i]]) delete next[due[i]];
-      if (ok) woken.push(due[i]);
-    });
-    await this.storage.set(SNOOZE_STORAGE_KEY, next);
+    const woken = due.filter((_, i) => results[i]!.status >= 200 && results[i]!.status < 300);
+    // A thread deleted meanwhile (404) is dropped too, or it would retry forever.
+    const done = due.filter((_, i) => results[i]!.status === 404 || woken.includes(due[i]!));
+    // Snoozed again while the batch was out: that newer time stays.
+    await updateKey<Record<string, number>>(this.storage, SNOOZE_STORAGE_KEY, (next = {}) => withoutKeys(next, done.filter((id) => next[id] === map[id])));
     return woken;
   }
 
   async muteThreads(threadIds: string[], muted: boolean): Promise<void> {
     if (!threadIds.length) return;
-    const list = new Set((await this.storage.get<string[]>(MUTED_STORAGE_KEY)) ?? []);
     if (muted) {
       await this.modifyWithHelper('muted', threadIds, (label) => ({ add: [label], remove: ['INBOX'] }));
-      for (const id of threadIds) list.add(id);
     } else {
       const label = await this.helperLabelId('muted', false);
       if (label) await this.modifyThreads(threadIds, { remove: [label] });
-      for (const id of threadIds) list.delete(id);
     }
-    await this.storage.set(MUTED_STORAGE_KEY, [...list]);
+    await updateKey<string[]>(this.storage, MUTED_STORAGE_KEY, (list = []) =>
+      muted ? [...new Set([...list, ...threadIds])] : list.filter((id) => !threadIds.includes(id)),
+    );
   }
 
   private async postRaw(
@@ -453,14 +453,72 @@ export class GmailApiBackend implements MailBackend {
     if (message.sendAt && message.sendAt > this.now() + 60_000) {
       throw new BackendError('Schedule send is not available with the Gmail API backend.', 'unsupported');
     }
-    const raw = buildMime(message);
+    const rfcId = this.rfcMessageId(message);
+    const key = message.sendKey;
+    if (key && this.unconfirmedSends.has(key)) {
+      const landed = rfcId ? await this.findSent(rfcId, 1) : undefined;
+      if (landed) return this.confirmSend(key, landed);
+      if (message.draftId && !(await this.draftExists(message.draftId))) {
+        throw new BackendError('This message seems to have gone out already. Check Sent before trying again.', 'unknown');
+      }
+      this.unconfirmedSends.delete(key);
+    }
+    const raw = buildMime(message, rfcId ? { extraHeaders: { 'Message-ID': rfcId } } : {});
     const size = this.attachmentBytes(message);
     const thread = message.threadId ? { threadId: message.threadId } : {};
-    const sent = message.draftId
-      ? await this.postRaw('/drafts/send', 'POST', raw, { id: message.draftId, message: thread }, size)
-      : await this.postRaw('/messages/send', 'POST', raw, thread, size);
-    const m = sent as GmailMessage;
-    return { id: m.id, threadId: m.threadId };
+    let sent: GmailMessage;
+    try {
+      sent = (message.draftId
+        ? await this.postRaw('/drafts/send', 'POST', raw, { id: message.draftId, message: thread }, size)
+        : await this.postRaw('/messages/send', 'POST', raw, thread, size)) as GmailMessage;
+    } catch (err) {
+      // A dropped connection or a server error may come after Gmail sent it.
+      if (!(err instanceof BackendError) || !(err.code === 'network' || (err.code === 'unknown' && err.retryable))) throw err;
+      if (key) {
+        this.unconfirmedSends.add(key);
+        cap(this.unconfirmedSends, 50);
+      }
+      const landed = rfcId ? await this.findSent(rfcId, SEND_CONFIRM_TRIES) : undefined;
+      if (landed) return this.confirmSend(key, landed);
+      throw new BackendError("Gmail didn't confirm the send. Check Sent before trying again.", 'unknown');
+    }
+    return this.confirmSend(key, { id: sent.id, threadId: sent.threadId });
+  }
+
+  private confirmSend(sendKey: string | undefined, sent: { id: string; threadId: string }) {
+    if (sendKey) this.unconfirmedSends.delete(sendKey);
+    return sent;
+  }
+
+  /** Ours, so Sent can be searched for it after a send Gmail never answered. Stable per send key, so every try carries the same one. */
+  private rfcMessageId(message: OutgoingMessage): string | undefined {
+    const domain = (message.from?.email ?? this.address)?.split('@')[1]?.replace(/[^A-Za-z0-9.-]/g, '');
+    if (!domain) return undefined;
+    const local = (message.sendKey ?? crypto.randomUUID()).replace(/[^A-Za-z0-9.-]/g, '');
+    return `<${local}@${domain}>`;
+  }
+
+  private async findSent(rfcId: string, tries: number): Promise<{ id: string; threadId: string } | undefined> {
+    for (let i = 0; i < tries; i++) {
+      if (i) await this.sleep(SEND_CONFIRM_MS);
+      const found = await this.http
+        .request<{ messages?: { id: string; threadId: string }[] }>(`${GMAIL_API}/messages`, {
+          query: { q: `in:sent rfc822msgid:${rfcId.slice(1, -1)}`, maxResults: 1 },
+        })
+        .catch(() => undefined);
+      const m = found?.messages?.[0];
+      if (m) return { id: m.id, threadId: m.threadId };
+    }
+    return undefined;
+  }
+
+  private async draftExists(draftId: string): Promise<boolean> {
+    try {
+      await this.http.request(`${GMAIL_API}/drafts/${enc(draftId)}`, { query: { format: 'minimal' } });
+      return true;
+    } catch (err) {
+      return !(err instanceof BackendError && err.code === 'not-found');
+    }
   }
 
   async saveDraft(message: OutgoingMessage): Promise<Draft> {

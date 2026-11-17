@@ -21,12 +21,15 @@ export type BackendKind = 'demo' | 'session' | 'api';
 export interface MailBackend {
   readonly kind: BackendKind;
   readonly capabilities: BackendCapabilities;
+  /** One conversation's own account's, where accounts differ (merged scopes). */
+  capabilitiesOf?(threadId: string): BackendCapabilities;
 
   getAccount(): Promise<Account>;
   listLabels(): Promise<Label[]>;
   listThreads(query: ThreadQuery): Promise<ThreadPage>;
   getThread(threadId: string): Promise<Thread>;
 
+  /** Writes on several threads aren't atomic: a rejection can leave some of them changed, so callers refetch after a failure. */
   modifyThreads(threadIds: string[], change: LabelChange): Promise<void>;
   trashThreads(threadIds: string[]): Promise<void>;
   untrashThreads(threadIds: string[]): Promise<void>;

@@ -120,6 +120,12 @@ class MergedBackend implements MailBackend {
     }
   }
 
+  capabilitiesOf(threadId: string): BackendCapabilities {
+    const { key, raw } = splitId(threadId);
+    const m = this.byKey.get(key ?? this.known.get(raw) ?? '');
+    return m?.backend.capabilities ?? this.capabilities;
+  }
+
   private account(m: MergedMember): Promise<Account> {
     let p = this.accounts.get(m.key);
     if (!p) {

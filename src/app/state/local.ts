@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { readKey, watchKey, writeKey } from './storage';
+import { readKeyStrict, watchKey, writeKey } from './storage';
 import { rawId } from '../data/accounts/ids';
 import { threadAccount } from '../data/accounts/threads';
 
@@ -45,6 +45,10 @@ interface LocalStore extends LocalData {
   update: (fn: (d: LocalData) => Partial<LocalData>) => void;
 }
 
+/** Changes made before what's stored has been read are applied on top of it, so an early write can't replace everything with them alone. Storage that can't be read is never written. */
+let saving: 'after-load' | 'on' | 'off' = 'after-load';
+const early: ((d: LocalData) => Partial<LocalData>)[] = [];
+
 export const useLocal = create<LocalStore>((set, get) => ({
   ...EMPTY,
   update: (fn) => {
@@ -52,7 +56,8 @@ export const useLocal = create<LocalStore>((set, get) => ({
     void _u;
     const next = prune({ ...data, ...fn(data) });
     set(next);
-    writeKey(KEY, next).catch(() => undefined);
+    if (saving === 'after-load') early.push(fn);
+    else if (saving === 'on') writeKey(KEY, next).catch(() => undefined);
   },
 }));
 
@@ -104,9 +109,32 @@ export function prune(d: LocalData, now = Date.now()): LocalData {
   };
 }
 
+const READ_TRIES = 3;
+
+/** If storage can't be read, this session keeps its changes in memory rather than wipe what's stored. */
 export async function loadLocal() {
-  useLocal.setState(prune(sanitize(await readKey(KEY))));
-  watchKey(KEY, (v) => v && typeof v === 'object' && useLocal.setState(sanitize(v)));
+  watchKey(KEY, (v) => {
+    if (!isRecord(v)) return;
+    saving = 'on';
+    useLocal.setState(sanitize(v));
+  });
+  for (let i = 0; i < READ_TRIES; i++) {
+    if (i) await new Promise((r) => setTimeout(r, 500 * i));
+    let stored: unknown;
+    try {
+      stored = await readKeyStrict(KEY);
+    } catch {
+      continue;
+    }
+    const pending = early.splice(0);
+    const data = pending.reduce((d, fn) => prune({ ...d, ...fn(d) }), prune(sanitize(stored)));
+    saving = 'on';
+    useLocal.setState(data);
+    if (pending.length) writeKey(KEY, data).catch(() => undefined);
+    return;
+  }
+  saving = 'off';
+  early.length = 0;
 }
 
 export const local = {

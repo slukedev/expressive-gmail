@@ -70,7 +70,6 @@ export function listHeadersFrom(body: string): Partial<Message['headers']> {
   if (h.get('list-unsubscribe')) out.listUnsubscribe = h.get('list-unsubscribe');
   if (h.get('list-unsubscribe-post')) out.listUnsubscribePost = h.get('list-unsubscribe-post');
   if (h.get('list-id')) out.listId = h.get('list-id');
-  if (h.get('bimi-selector')) out.bimiSelector = h.get('bimi-selector');
   return out;
 }
 

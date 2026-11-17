@@ -13,8 +13,10 @@ export function threadAccount(threadId: string): string | undefined {
 
 /** Unknown accounts always belong. */
 export function inCurrentScope(account: string | undefined): boolean {
-  const { accounts, scope } = useAccounts.getState();
+  const { accounts, scope, focus } = useAccounts.getState();
   if (!account || !scope || accounts.length < 2) return true;
+  // Narrowed to one account, the others' conversations can't be opened.
+  if (focus && isMergedScope(scope)) return account.toLowerCase() === focus;
   return scopeAccounts(scope, accounts, useSettingsStore.getState().settings).some((a) => a.email.toLowerCase() === account);
 }
 

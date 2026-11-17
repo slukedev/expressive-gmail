@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, onTestFinished, vi } from 'vitest';
 import { parseAddressList, formatAddress } from '../../src/app/data/api/address';
 import { base64ToBytes, base64UrlToBase64, decodeBase64UrlText } from '../../src/app/data/api/base64';
 import { parseBatchResponse } from '../../src/app/data/api/batch';
@@ -36,6 +36,32 @@ describe('base64url bodies', () => {
   it('turns invalid UTF-8 into replacement characters rather than throwing', () => {
     const broken = btoa('ok \xf0\x9f').replace(/=+$/, '');
     expect(decodeBase64UrlText(broken)).toBe('ok �');
+  });
+});
+
+describe('base64 without the engine\'s own codec', () => {
+  it.each([
+    ['the engine\'s codec', false],
+    ['the fallback', true],
+  ])('round-trips every length and byte with %s, as btoa does', async (_name, fallback) => {
+    const own = [
+      [Uint8Array, 'fromBase64'],
+      [Uint8Array.prototype, 'toBase64'],
+    ] as const;
+    const saved = own.map(([target, key]) => Object.getOwnPropertyDescriptor(target, key));
+    if (fallback) {
+      own.forEach(([target, key]) => delete (target as unknown as Record<string, unknown>)[key]);
+      vi.resetModules();
+    }
+    const { base64ToBytes: decode, bytesToBase64: encode } = await import('../../src/app/data/api/base64');
+    onTestFinished(() => own.forEach(([target, key], i) => saved[i] && Object.defineProperty(target, key, saved[i]!)));
+    for (let n = 0; n < 70; n++) {
+      const bytes = Uint8Array.from({ length: n }, (_, i) => (i * 97 + n * 31) & 255);
+      const expected = btoa(String.fromCharCode(...bytes));
+      expect(encode(bytes)).toBe(expected);
+      expect(Array.from(decode(expected))).toEqual(Array.from(bytes));
+      expect(Array.from(decode(expected.replace(/=+$/, '')))).toEqual(Array.from(bytes));
+    }
   });
 });
 
@@ -150,6 +176,18 @@ describe('Gmail payload parsing', () => {
       body: { attachmentId: 'BIG', size: 9_000_000 },
     };
     expect(parsePayload(payload, 'm').html).toEqual({ attachmentId: 'BIG', charset: 'windows-1252' });
+  });
+
+  it('lists an Outlook invite carried only as a nameless calendar part as invite.ics', () => {
+    const payload = {
+      mimeType: 'multipart/alternative',
+      parts: [
+        { partId: '0', mimeType: 'text/plain', body: { data: 'aGk', size: 2 } },
+        { partId: '1', mimeType: 'text/html', body: { data: 'PHA-aGk8L3A-', size: 9 } },
+        { partId: '2', mimeType: 'text/calendar', headers: [{ name: 'Content-Type', value: 'text/calendar; charset="utf-8"; method=REQUEST' }], body: { data: 'QkVHSU46VkNBTEVOREFS', size: 15 } },
+      ],
+    };
+    expect(parsePayload(payload, 'm').attachments).toEqual([{ id: 'part:2', messageId: 'm', filename: 'invite.ics', mimeType: 'text/calendar', size: 15 }]);
   });
 
   it('builds a Message with parsed addresses and threading headers', () => {

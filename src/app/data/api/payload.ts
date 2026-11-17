@@ -174,17 +174,19 @@ function collectAttachments(
   }
   const attachmentId = part.body?.attachmentId;
   const disposition = parseHeaderParams(header(part.headers, 'Content-Disposition'));
-  const isFile = !!part.filename || !!attachmentId || disposition.value === 'attachment' || mime === 'message/rfc822';
+  // Outlook sends an invite only as a nameless text/calendar part next to the body.
+  const calendar = mime === 'text/calendar' || mime === 'application/ics';
+  const isFile = !!part.filename || !!attachmentId || disposition.value === 'attachment' || mime === 'message/rfc822' || calendar;
   if (!isFile) return;
   // Bare multipart containers aren't files.
   if (mime.startsWith('multipart/')) return;
   const contentId = header(part.headers, 'Content-ID')?.trim().replace(/^<|>$/g, '') || undefined;
-  const inline = disposition.value === 'inline' || (!!contentId && disposition.value !== 'attachment');
+  const inline = !calendar && (disposition.value === 'inline' || (!!contentId && disposition.value !== 'attachment'));
   const filename =
     part.filename ||
     disposition.params.filename ||
     parseHeaderParams(header(part.headers, 'Content-Type')).params.name ||
-    (mime === 'message/rfc822' ? 'message.eml' : 'attachment');
+    (mime === 'message/rfc822' ? 'message.eml' : calendar ? 'invite.ics' : 'attachment');
   out.push({
     id: attachmentId ?? `part:${part.partId ?? out.length}`,
     messageId,
@@ -234,7 +236,6 @@ function parseMessageHeaders(headers: GmailHeader[] | undefined): Message['heade
   set('listUnsubscribe', 'List-Unsubscribe');
   set('listUnsubscribePost', 'List-Unsubscribe-Post');
   set('listId', 'List-Id');
-  set('bimiSelector', 'BIMI-Selector');
   return out;
 }
 

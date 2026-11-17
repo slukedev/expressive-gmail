@@ -696,7 +696,7 @@ class DemoBackend implements MailBackend {
       const data = a.data;
       const bytes = fromBase64(data);
       this.builder.addFile(attId, { mimeType: a.mimeType, size: bytes.length, make: () => bytes });
-      return { id: attId, messageId: id, filename: a.filename, mimeType: a.mimeType, size: bytes.length };
+      return { id: attId, messageId: id, filename: a.filename, mimeType: a.mimeType, size: bytes.length, ...(a.contentId ? { contentId: a.contentId, inline: true } : {}) };
     });
     const text = htmlToText(msg.html);
     const from = msg.from ?? { name: this.self.name, email: this.self.email };

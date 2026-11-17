@@ -26,6 +26,14 @@ export interface ComposeDraft {
   quoteHtml?: string;
   /** Send schedules it for then. */
   sendAt?: number;
+  /** Kept when a send comes back unconfirmed, so pressing Send again finds the first try instead of sending twice. */
+  sendKey?: string;
+  /** What that try sent; an edit since then gets a new key, so the edit goes out rather than matching the first copy. */
+  sentContent?: string;
+  /** Files on their way from Gmail (a forward's originals, a saved draft's attachments). Send and saves wait for them. */
+  fetchingFiles?: { id: string; filename: string; size: number; inline?: boolean }[];
+  /** Pictures the body shows by `cid:` (a saved draft's, a forwarded message's). They go out as inline parts while the body still has them. */
+  inlineImages?: OutgoingAttachment[];
   /** Files to attach once the window opens (shared to or opened with the installed app). Taken once. */
   incomingFiles?: File[];
 }

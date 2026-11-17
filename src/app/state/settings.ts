@@ -5,7 +5,7 @@ import { PICTURE_SHAPES, type PictureShape } from '../features/wallpaper/shapes'
 import { DEFAULT_SEED, isPresetSeed, normalizeHex, randomSeed, type SchemeVariant } from '../theme/color';
 import { crossfadeTheme } from '../theme/crossfade';
 import { isUiScale } from '../../shared/uiScale';
-import { readKey, watchKey, writeKey } from './storage';
+import { readKeyStrict, watchKey, writeKey } from './storage';
 
 export type Density = 'comfortable' | 'default' | 'compact';
 export type ReadingPane = 'auto' | 'right' | 'none';
@@ -212,15 +212,21 @@ interface SettingsStore {
   update: (patch: Partial<Settings> | ((s: Settings) => Partial<Settings>)) => void;
 }
 
+type SettingsPatch = Partial<Settings> | ((s: Settings) => Partial<Settings>);
+/** Changes made before what's stored has been read are applied on top of it, so an early write can't put defaults over every saved setting. Storage that can't be read is never written. */
+let saving: 'after-load' | 'on' | 'off' = 'after-load';
+const early: SettingsPatch[] = [];
+const applyPatch = (s: Settings, patch: SettingsPatch): Settings => ({ ...s, ...(typeof patch === 'function' ? patch(s) : patch) });
+
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
   settings: DEFAULT_SETTINGS,
   loaded: false,
   update: (patch) => {
-    const current = get().settings;
-    const next = { ...current, ...(typeof patch === 'function' ? patch(current) : patch) };
+    const next = applyPatch(get().settings, patch);
     set({ settings: next });
+    if (saving === 'after-load') early.push(patch);
     // Unsaved, the change still holds for this page.
-    writeKey(KEY, next).catch(() => undefined);
+    else if (saving === 'on') writeKey(KEY, next).catch(() => undefined);
   },
 }));
 
@@ -288,18 +294,40 @@ export function rollTabRandom() {
   updateSettings(rollRandom(tabRandom));
 }
 
+const READ_TRIES = 3;
+
+/** If storage can't be read, nothing is written either: this session keeps its changes in memory rather than replace what's stored with defaults. */
 export async function loadSettings(overrides?: Partial<Settings>) {
-  let settings = fromStorage(await readKey(KEY));
-  // A random theme rolls on every load, to the colour saved for it last time, which theme-boot.js already painted.
-  if (isRandomTheme(settings)) {
-    tabRandom = settings.nextRandomSeed || randomSeed(settings.seed);
-    settings = { ...settings, ...rollRandom(tabRandom) };
-    writeKey(KEY, settings).catch(() => undefined);
-  }
-  useSettingsStore.setState({ settings: { ...settings, ...overrides }, loaded: true });
   watchKey(KEY, (value) => {
-    if (value && typeof value === 'object') useSettingsStore.setState({ settings: { ...withTabRandom(fromStorage(value)), ...overrides } });
+    if (!value || typeof value !== 'object') return;
+    saving = 'on';
+    useSettingsStore.setState({ settings: { ...withTabRandom(fromStorage(value)), ...overrides }, loaded: true });
   });
+  for (let i = 0; i < READ_TRIES; i++) {
+    if (i) await new Promise((r) => setTimeout(r, 500 * i));
+    let stored: unknown;
+    try {
+      stored = await readKeyStrict(KEY);
+    } catch {
+      continue;
+    }
+    let settings = fromStorage(stored);
+    let changed = early.length > 0;
+    // A random theme rolls on every load, to the colour saved for it last time, which theme-boot.js already painted.
+    if (isRandomTheme(settings)) {
+      tabRandom = settings.nextRandomSeed || randomSeed(settings.seed);
+      settings = { ...settings, ...rollRandom(tabRandom) };
+      changed = true;
+    }
+    settings = early.splice(0).reduce(applyPatch, settings);
+    saving = 'on';
+    if (changed) writeKey(KEY, settings).catch(() => undefined);
+    useSettingsStore.setState({ settings: { ...settings, ...overrides }, loaded: true });
+    return;
+  }
+  saving = 'off';
+  early.length = 0;
+  useSettingsStore.setState((s) => ({ settings: { ...s.settings, ...overrides }, loaded: true }));
 }
 
 export function useSettings<T>(selector: (s: Settings) => T): T {

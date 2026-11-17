@@ -19,16 +19,25 @@ const REFRESH_TIMEOUT_MS = 4_000;
 export const REQUEST_TIMEOUT_MS = 45_000;
 
 /** Races rather than passing an AbortSignal: Firefox's page-context `content.fetch` can refuse a signal from the content script's world. */
-export async function fetchWithin(fetchImpl: typeof fetch, ms: number, url: string, init: RequestInit): Promise<Response> {
+async function within(request: Promise<Response>, ms: number): Promise<Response> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const late = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new DOMException('Gmail took too long to answer.', 'AbortError')), ms);
   });
   try {
-    return await Promise.race([fetchImpl(url, init), late]);
+    return await Promise.race([request, late]);
   } finally {
     clearTimeout(timer);
   }
+}
+
+export async function fetchWithin(fetchImpl: typeof fetch, ms: number, url: string, init: RequestInit): Promise<Response> {
+  return within(fetchImpl(url, init), ms);
+}
+
+export interface CallOptions {
+  /** Each request that leaves, settling once the network answers or fails, even after the call itself gave up on it. */
+  onRequest?: (settled: Promise<void>) => void;
 }
 
 /** Same-origin POSTs to /sync/u/N/i/*, signed with the headers Gmail's own client uses. */
@@ -60,19 +69,19 @@ export class SyncClient {
     return this.options.tokens.waitUntilReady(this.options.sessionTimeoutMs ?? 15_000);
   }
 
-  async call(endpoint: Endpoint, body: unknown): Promise<unknown> {
+  async call(endpoint: Endpoint, body: unknown, options: CallOptions = {}): Promise<unknown> {
     const session = await this.session();
-    const first = await this.send(session, endpoint, body);
+    const first = await this.send(session, endpoint, body, options);
     if (first.status !== 403) return this.read(first);
     // A stale XSRF token answers 403; Gmail's own next request carries a fresh one.
     const fresh = await this.options.tokens.waitUntilReady(REFRESH_TIMEOUT_MS, session.capturedAt).catch(() => undefined);
     if (!fresh) {
       throw new BackendError('Gmail rejected the session. Reload the Gmail tab to refresh it.', 'session-unavailable', true);
     }
-    return this.read(await this.send(fresh, endpoint, body));
+    return this.read(await this.send(fresh, endpoint, body, options));
   }
 
-  private async send(session: ReadySession, endpoint: Endpoint, body: unknown): Promise<Response> {
+  private async send(session: ReadySession, endpoint: Endpoint, body: unknown, options: CallOptions): Promise<Response> {
     const params = new URLSearchParams({ hl: session.hl ?? 'en', c: String(this.counter++), rt: 'r', pt: 'ji' });
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -82,12 +91,17 @@ export class SyncClient {
     };
     if (session.storageRequest) headers['X-Gmail-Storage-Request'] = session.storageRequest;
     try {
-      return await fetchWithin(this.options.fetch, this.options.requestTimeoutMs ?? REQUEST_TIMEOUT_MS, `${this.origin}${session.syncPath}/i/${endpoint}?${params}`, {
+      const request = this.options.fetch(`${this.origin}${session.syncPath}/i/${endpoint}?${params}`, {
         method: 'POST',
         credentials: 'include',
         headers,
         body: JSON.stringify(body),
       });
+      options.onRequest?.(request.then(
+        () => undefined,
+        () => undefined,
+      ));
+      return await within(request, this.options.requestTimeoutMs ?? REQUEST_TIMEOUT_MS);
     } catch (err) {
       if ((err as Error)?.name === 'AbortError') throw new BackendError('Gmail took too long to answer.', 'network', true);
       throw new BackendError("Couldn't reach Gmail. Check your connection.", 'network', true);

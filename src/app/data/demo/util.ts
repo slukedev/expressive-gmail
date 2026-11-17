@@ -122,43 +122,8 @@ export function utf8(s: string): Uint8Array {
   return new TextEncoder().encode(s);
 }
 
-const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-
 /** Standard (not url-safe). Works without Buffer. */
-export function toBase64(bytes: Uint8Array): string {
-  let out = '';
-  const n = bytes.length;
-  let i = 0;
-  for (; i + 2 < n; i += 3) {
-    const v = (bytes[i]! << 16) | (bytes[i + 1]! << 8) | bytes[i + 2]!;
-    out += B64[(v >> 18) & 63]! + B64[(v >> 12) & 63]! + B64[(v >> 6) & 63]! + B64[v & 63]!;
-  }
-  if (i < n) {
-    const a = bytes[i]!;
-    const b = i + 1 < n ? bytes[i + 1]! : 0;
-    const v = (a << 16) | (b << 8);
-    out += B64[(v >> 18) & 63]! + B64[(v >> 12) & 63]!;
-    out += i + 1 < n ? B64[(v >> 6) & 63]! + '=' : '==';
-  }
-  return out;
-}
-
-export function fromBase64(s: string): Uint8Array {
-  const clean = s.replace(/[^A-Za-z0-9+/]/g, '');
-  const out = new Uint8Array(Math.floor((clean.length * 3) / 4));
-  let o = 0;
-  for (let i = 0; i < clean.length; i += 4) {
-    const v =
-      (B64.indexOf(clean[i]!) << 18) |
-      (B64.indexOf(clean[i + 1] ?? 'A') << 12) |
-      ((i + 2 < clean.length ? B64.indexOf(clean[i + 2]!) : 0) << 6) |
-      (i + 3 < clean.length ? B64.indexOf(clean[i + 3]!) : 0);
-    out[o++] = (v >> 16) & 255;
-    if (i + 2 < clean.length) out[o++] = (v >> 8) & 255;
-    if (i + 3 < clean.length) out[o++] = v & 255;
-  }
-  return out.slice(0, o);
-}
+export { bytesToBase64 as toBase64, base64ToBytes as fromBase64 } from '../api/base64';
 
 export function svgDataUri(svg: string): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.replace(/\s{2,}/g, ' '))}`;

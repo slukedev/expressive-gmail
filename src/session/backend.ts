@@ -104,6 +104,13 @@ const VERIFY_RETRY_MS = 1_000;
 /** Re-reads after a permanent delete: Gmail can list a big folder for a while after emptying it. */
 const SETTLE_TRIES = 15;
 const SETTLE_POLL_MS = 2_000;
+/** Polls in a row that fail before lists refresh on a timer instead. */
+const FALLBACK_AFTER = 3;
+const FALLBACK_REFRESH_MS = 60_000;
+/** How long the timer stands in before the real poll is tried again. */
+const POLL_RETRY_MS = 10 * 60_000;
+/** Re-reads after a send Gmail never answered. */
+const SEND_CONFIRM_TRIES = 3;
 /** Presses of Empty Trash now before giving up, in case Gmail empties a huge folder in parts. */
 const EMPTY_ROUNDS = 3;
 /** Gmail schedules to the minute; anything further off is a time the user didn't pick. */
@@ -175,9 +182,13 @@ export class SessionBackend implements MailBackend {
   private readonly drafts = new Map<string, DraftContext>();
   private labelCounts: string | undefined;
   private lastPoll = 0;
-  private pollFallback = false;
+  /** Set once Gmail's poll keeps failing: lists refresh on a timer instead, and the poll is tried again now and then. */
+  private pollFallback: { since: number; lastAll: number } | undefined;
+  private pollFailures = 0;
   /** Threads this tab changed: the write's own history id hides them from the next poll. */
   private readonly written = new Set<string>();
+  /** Sends Gmail never confirmed, by the compose window's send key. */
+  private readonly unconfirmedSends = new Map<string, SendAttempt>();
   /** Schedule sends in flight, by draft and time. */
   private readonly scheduling = new Map<string, Promise<{ id: string; threadId: string }>>();
   private readonly diagnostic: (line: string) => void;
@@ -587,34 +598,83 @@ export class SessionBackend implements MailBackend {
 
   async send(message: OutgoingMessage): Promise<{ id: string; threadId: string }> {
     if (message.sendAt !== undefined) return this.schedule(message, message.sendAt);
+    const earlier = message.sendKey ? this.unconfirmedSends.get(message.sendKey) : undefined;
+    if (earlier) {
+      const landed = await this.sentCopy(earlier, 1);
+      if (landed) return this.confirmSend(message.sendKey, landed);
+      if (!earlier.settled) throw new BackendError('Gmail is still working on the first send. Check Sent before trying again.', 'unknown');
+      this.unconfirmedSends.delete(message.sendKey!);
+      // The first try saved its message as a draft; sending that same message again can't make a second one.
+      this.drafts.set(earlier.messageId, earlier.draft);
+      message = { ...message, draftId: earlier.messageId, threadId: earlier.threadId };
+    }
     const ctx = await this.composeContext(message);
 
-    if (ctx.isNewThread) {
-      // Gmail's client saves a new thread as a draft before sending it; crouton-labs/capture does the same.
+    if (ctx.isNewMessage) {
+      // Saved as a draft first, as Gmail's client does for a new thread (crouton-labs/capture too): a retry then sends this same message, never a second copy.
       const draft = this.buildMessage(message, ctx, DRAFT_LABELS);
-      const op = newThreadOp(this.client.nextOpIds(1), ctx.threadId, message.subject, draft, this.now());
+      const opId = this.client.nextOpIds(1);
+      const op = ctx.isNewThread
+        ? newThreadOp(opId, ctx.threadId, message.subject, draft, this.now())
+        : appendOp(opId, ctx.threadId, draft, ctx.replyToId, this.now());
       const historyId = await this.historyId();
       assertAccepted(await this.client.call('s', composeBody('save', [op], historyId, this.client.clock())));
     }
 
     const outgoing = this.buildMessage(message, ctx, SEND_LABELS);
-    const opId = this.client.nextOpIds(1);
-    const op = ctx.isNewMessage && !ctx.isNewThread
-      ? appendOp(opId, ctx.threadId, outgoing, ctx.replyToId, this.now())
-      : updateOp(opId, ctx.threadId, outgoing, ctx.replyToId, this.now());
-    const root = await this.client.call('s', composeBody('send', [op], undefined, this.client.clock()));
+    const op = updateOp(this.client.nextOpIds(1), ctx.threadId, outgoing, ctx.replyToId, this.now());
+    const attempt: SendAttempt = {
+      threadId: ctx.threadId,
+      messageId: ctx.messageId,
+      draft: { threadId: ctx.threadId, replyToId: ctx.replyToId, ...(ctx.inReplyTo ? { inReplyTo: ctx.inReplyTo } : {}) },
+      settled: true,
+    };
+    let root: unknown;
+    try {
+      root = await this.client.call('s', composeBody('send', [op], undefined, this.client.clock()), {
+        onRequest: (settled) => {
+          attempt.settled = false;
+          void settled.then(() => (attempt.settled = true));
+        },
+      });
+    } catch (err) {
+      // A request that timed out or dropped may still have reached Gmail.
+      if (!(err instanceof BackendError) || err.code !== 'network') throw err;
+      return this.unanswered(message.sendKey, attempt);
+    }
     assertAccepted(root);
 
     const echoed = findMessage(parseUpdatedThreads(root), ctx.messageId);
-    if (!echoed || !echoed.message.labelIds.includes('SENT')) {
-      throw new BackendError(
-        "Gmail accepted the message but didn't confirm it was sent. Check Sent before trying again.",
-        'unknown',
-      );
+    if (!echoed || !echoed.message.labelIds.includes('SENT')) return this.unanswered(message.sendKey, attempt);
+    return this.confirmSend(message.sendKey, { id: echoed.message.id, threadId: echoed.threadId });
+  }
+
+  /** Re-reads before giving up, and remembers the try so a retry checks for it instead of sending again. */
+  private async unanswered(sendKey: string | undefined, attempt: SendAttempt): Promise<{ id: string; threadId: string }> {
+    if (sendKey) {
+      this.unconfirmedSends.set(sendKey, attempt);
+      cap(this.unconfirmedSends, 50);
     }
-    this.drafts.delete(ctx.messageId);
-    this.messageIds.delete(echoed.threadId);
-    return { id: echoed.message.id, threadId: echoed.threadId };
+    const landed = await this.sentCopy(attempt, SEND_CONFIRM_TRIES);
+    if (landed) return this.confirmSend(sendKey, landed);
+    throw new BackendError("Gmail didn't confirm the send. Check Sent before trying again.", 'unknown');
+  }
+
+  private confirmSend(sendKey: string | undefined, sent: { id: string; threadId: string }) {
+    if (sendKey) this.unconfirmedSends.delete(sendKey);
+    this.drafts.delete(sent.id);
+    this.messageIds.delete(sent.threadId);
+    return sent;
+  }
+
+  private async sentCopy(attempt: SendAttempt, tries: number): Promise<{ id: string; threadId: string } | undefined> {
+    for (let i = 0; i < tries; i++) {
+      if (i) await this.sleep(SETTLE_POLL_MS);
+      const [thread] = await this.fetchThreads([attempt.threadId]).catch((): Thread[] => []);
+      const sent = thread?.messages.find((m) => m.id === attempt.messageId && !m.isDraft && m.labelIds.includes('SENT'));
+      if (sent) return { id: sent.id, threadId: thread!.id };
+    }
+    return undefined;
   }
 
   async saveDraft(message: OutgoingMessage): Promise<Draft> {
@@ -952,8 +1012,10 @@ export class SessionBackend implements MailBackend {
     const wait = this.lastPoll + this.pollIntervalMs - this.now();
     if (wait > 0) await this.sleep(wait);
     this.lastPoll = this.now();
-    if (this.pollFallback) {
+    if (this.pollFallback && this.now() - this.pollFallback.since < POLL_RETRY_MS) {
       this.written.clear();
+      if (this.now() - this.pollFallback.lastAll < FALLBACK_REFRESH_MS) return [];
+      this.pollFallback.lastAll = this.now();
       return [{ type: 'all' }];
     }
 
@@ -966,12 +1028,17 @@ export class SessionBackend implements MailBackend {
     try {
       root = await this.client.call('s', pollBody(before, this.client.clock()));
     } catch (err) {
-      if (err instanceof BackendError && (err.code === 'unsupported' || err.code === 'unknown')) {
-        this.pollFallback = true;
+      if (!(err instanceof BackendError && (err.code === 'unsupported' || err.code === 'unknown'))) throw err;
+      // One odd answer (a captive portal, an interstitial) is skipped; the next poll still covers everything since `before`.
+      if (this.pollFallback || ++this.pollFailures >= FALLBACK_AFTER) {
+        this.pollFallback = { since: this.now(), lastAll: this.now() };
+        this.written.clear();
         return [{ type: 'all' }];
       }
-      throw err;
+      return [];
     }
+    this.pollFailures = 0;
+    this.pollFallback = undefined;
     const poll = parsePoll(root);
     const changes: MailChange[] = [];
     const threadIds = [...new Set([...poll.threadIds, ...this.written])];
@@ -988,6 +1055,15 @@ export class SessionBackend implements MailBackend {
   private async accountIndex(): Promise<number> {
     return accountIndexFromPath((await this.client.session()).syncPath);
   }
+}
+
+interface SendAttempt {
+  threadId: string;
+  messageId: string;
+  /** Where the draft it saved first lives, so a retry sends that draft. */
+  draft: DraftContext;
+  /** False while the request may still reach Gmail. */
+  settled: boolean;
 }
 
 interface ComposeContext extends DraftTarget {

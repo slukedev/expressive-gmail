@@ -163,13 +163,24 @@ describe('retries and errors', () => {
     expect(page.threads.map((t) => t.id)).toEqual(['a1', 'b2', 'c3']);
   });
 
-  it('explains that delete forever needs a scope the extension does not request', async () => {
+  it.each([
+    [['b2'], ['a1', 'c3']],
+    [['a1', 'b2'], null],
+  ])('with %j still rate limited after every retry, shows the rest only while most of the page loaded', async (failing, shown) => {
     const { net, backend } = setup();
-    net.on('DELETE', /\/threads\/t1$/, () => json(SCOPE_INSUFFICIENT, 403));
-    await expect(backend.deleteThreadsForever(['t1'])).rejects.toMatchObject({
-      code: 'unsupported',
-      message: expect.stringContaining('mail.google.com'),
-    });
+    net
+      .on('GET', /\/threads\?/, () => json({ threads: [{ id: 'a1' }, { id: 'b2' }, { id: 'c3' }] }))
+      .on('POST', /\/batch\/gmail\/v1$/, batchHandler((line) => {
+        const id = /threads\/(\w+)\?/.exec(line)![1]!;
+        return failing.includes(id) ? ['429 Too Many Requests', RATE_LIMITED] : ['200 OK', { ...metadataThread(), id }];
+      }));
+    const page = backend.listThreads({ q: '' });
+    if (shown) expect((await page).threads.map((t) => t.id)).toEqual(shown);
+    else await expect(page).rejects.toMatchObject({ code: 'rate-limited', retryable: true });
+  });
+
+  it('does not offer delete forever, which needs a scope it never asks for', () => {
+    expect(setup().backend.capabilities.deleteForever).toBe(false);
   });
 });
 
@@ -335,6 +346,20 @@ describe('emulated snooze and mute', () => {
   });
 });
 
+describe('emulated snooze and mute from two places at once', () => {
+  it('keeps both writes', async () => {
+    const store = memoryStore({ [HELPER_LABELS_STORAGE_KEY]: { snoozed: 'Label_s', muted: 'Label_m' } });
+    // Every read waits a turn, so two unserialized writers would both read the empty map.
+    const slow = { get: async <T,>(k: string) => (await new Promise((r) => setTimeout(r, 1)), store.get<T>(k)), set: store.set };
+    const a = setup(slow as typeof store);
+    const b = setup(slow as typeof store);
+    for (const { net } of [a, b]) net.on('POST', /\/threads\/\w+\/modify$/, () => json({}));
+    await Promise.all([a.backend.snoozeThreads(['t1'], 5_000_000), b.backend.snoozeThreads(['t2'], 6_000_000), a.backend.muteThreads(['t3'], true), b.backend.muteThreads(['t4'], true)]);
+    expect(store.data[SNOOZE_STORAGE_KEY]).toEqual({ t1: 5_000_000, t2: 6_000_000 });
+    expect(new Set(store.data[MUTED_STORAGE_KEY] as string[])).toEqual(new Set(['t3', 't4']));
+  });
+});
+
 describe('pollChanges', () => {
   it('starts from the profile historyId, follows pages, and resyncs with type all on 404', async () => {
     const { net, backend } = setup();
@@ -449,16 +474,70 @@ describe('contacts', () => {
 });
 
 describe('send and drafts', () => {
+  const hi = { from: { email: 'ada@example.com' }, to: [{ email: 'a@b.com' }], cc: [], bcc: [], subject: 'Hi', html: '<p>x</p>', attachments: [] };
+  const rawOf = (call: Call) => atob(JSON.parse(call.body).raw.replace(/-/g, '+').replace(/_/g, '/'));
+  const sentSearch = /\/messages\?q=in%3Asent\+rfc822msgid%3A/;
+  const sends = (calls: Call[]) => calls.filter((c) => /\/(messages|drafts)\/send$/.test(c.url));
+
   it.each([
     ['a dropped connection', () => {
       throw new TypeError('Failed to fetch');
     }],
     ['a server error', () => json({ error: { code: 503, message: 'Backend Error' } }, 503)],
-  ])('does not send again after %s, which may have gone out', async (_name, fail) => {
+  ])('does not send again after %s, and says to check Sent when Sent has nothing', async (_name, fail) => {
     const { net, backend } = setup();
-    net.on('POST', /\/messages\/send$/, fail);
-    await expect(backend.send({ to: [{ email: 'a@b.com' }], cc: [], bcc: [], subject: 'Hi', html: '<p>x</p>', attachments: [] })).rejects.toBeInstanceOf(BackendError);
-    expect(net.calls).toHaveLength(1);
+    net.on('POST', /\/messages\/send$/, fail).on('GET', sentSearch, () => json({ resultSizeEstimate: 0 }));
+    await expect(backend.send(hi)).rejects.toMatchObject({ code: 'unknown', message: "Gmail didn't confirm the send. Check Sent before trying again." });
+    expect(sends(net.calls)).toHaveLength(1);
+  });
+
+  it('counts a dropped send that Sent shows, found by the Message-ID it went out with', async () => {
+    const { net, backend } = setup();
+    net
+      .on('POST', /\/messages\/send$/, () => {
+        throw new TypeError('Failed to fetch');
+      })
+      .on('GET', sentSearch, () => json({ messages: [{ id: 'm1', threadId: 't1' }] }));
+    await expect(backend.send({ ...hi, sendKey: 'k1' })).resolves.toEqual({ id: 'm1', threadId: 't1' });
+    expect(rawOf(net.calls[0])).toMatch(/\r\nMessage-ID: <k1@example\.com>\r\n/);
+    expect(decodeURIComponent(net.calls[1].url)).toContain('rfc822msgid:k1@example.com');
+  });
+
+  it('on a retry, returns the first send if it has reached Sent since, and only then sends again with the same Message-ID', async () => {
+    const landed = setup();
+    landed.net
+      .on('POST', /\/messages\/send$/, () => {
+        throw new TypeError('Failed to fetch');
+      })
+      .on('GET', sentSearch, (_c, n) => json(n < 3 ? {} : { messages: [{ id: 'm1', threadId: 't1' }] }));
+    await expect(landed.backend.send({ ...hi, sendKey: 'k1' })).rejects.toMatchObject({ code: 'unknown' });
+    await expect(landed.backend.send({ ...hi, sendKey: 'k1' })).resolves.toEqual({ id: 'm1', threadId: 't1' });
+    expect(sends(landed.net.calls)).toHaveLength(1);
+
+    const lost = setup();
+    lost.net
+      .on('POST', /\/messages\/send$/, (_c, n) => {
+        if (!n) throw new TypeError('Failed to fetch');
+        return json({ id: 'm2', threadId: 't2' });
+      })
+      .on('GET', sentSearch, () => json({}));
+    await expect(lost.backend.send({ ...hi, sendKey: 'k1' })).rejects.toMatchObject({ code: 'unknown' });
+    await expect(lost.backend.send({ ...hi, sendKey: 'k1' })).resolves.toEqual({ id: 'm2', threadId: 't2' });
+    expect(sends(lost.net.calls).map((c) => /Message-ID: (\S+)/.exec(rawOf(c))?.[1])).toEqual(['<k1@example.com>', '<k1@example.com>']);
+  });
+
+  it('refuses a retry once the draft the first send used is gone', async () => {
+    const { net, backend } = setup();
+    net
+      .on('POST', /\/drafts\/send$/, () => {
+        throw new TypeError('Failed to fetch');
+      })
+      .on('GET', sentSearch, () => json({}))
+      .on('GET', /\/drafts\/r1\?format=minimal$/, () => json(NOT_FOUND, 404));
+    const draft = { ...hi, draftId: 'r1', sendKey: 'k1' };
+    await expect(backend.send(draft)).rejects.toMatchObject({ code: 'unknown' });
+    await expect(backend.send(draft)).rejects.toMatchObject({ code: 'unknown', message: 'This message seems to have gone out already. Check Sent before trying again.' });
+    expect(sends(net.calls)).toHaveLength(1);
   });
 
   it('does send again after a rate limit, which refused the message', async () => {

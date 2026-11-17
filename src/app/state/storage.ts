@@ -44,17 +44,17 @@ function wire() {
 
 /** Undefined when nothing is stored or storage can't be read (a context gone after an update). */
 export async function readKey<T>(key: string): Promise<T | undefined> {
+  return readKeyStrict<T>(key).catch(() => undefined);
+}
+
+/** Rejects when storage can't be read, so a caller can tell that from nothing stored. */
+export async function readKeyStrict<T>(key: string): Promise<T | undefined> {
   const ext = extStorage();
-  if (ext) {
-    try {
-      return (await ext.local.get(key))[key] as T | undefined;
-    } catch {
-      return undefined;
-    }
-  }
+  if (ext) return (await ext.local.get(key))[key] as T | undefined;
+  const raw = localStorage.getItem(key);
+  if (raw == null) return undefined;
   try {
-    const raw = localStorage.getItem(key);
-    return raw == null ? undefined : (JSON.parse(raw) as T);
+    return JSON.parse(raw) as T;
   } catch {
     return undefined;
   }
@@ -87,4 +87,19 @@ export function watchKey(key: string, fn: Listener): () => void {
   if (!set) listeners.set(key, (set = new Set()));
   set.add(fn);
   return () => set!.delete(fn);
+}
+
+const queues = new Map<string, Promise<unknown>>();
+
+/** Runs `fn` with no other holder of `name` running, in any page of the extension or its background (Web Locks); without them, only within this page. */
+export async function withLock<T>(name: string, fn: () => Promise<T>): Promise<T> {
+  const locks = (globalThis.navigator as Navigator | undefined)?.locks;
+  if (locks) return locks.request(name, fn);
+  const next = (queues.get(name) ?? Promise.resolve()).catch(() => undefined).then(fn);
+  queues.set(name, next);
+  try {
+    return await next;
+  } finally {
+    if (queues.get(name) === next) queues.delete(name);
+  }
 }

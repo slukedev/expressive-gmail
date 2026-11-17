@@ -1,12 +1,14 @@
 import { useEffect } from 'react';
 import { mail } from '../data/actions';
 import { backend, keys, queryClient } from '../data/client';
+import { myAddresses } from '../data/hooks';
 import type { Account, ThreadSummary } from '../data/types';
 import { navigate } from '../router/useRoute';
+import { HOST } from '../lib/appHost';
 import { useLocal } from '../state/local';
 import { useSettings, useSettingsStore } from '../state/settings';
 import { pauseActive } from '../features/pause/pause';
-import { participantsLine } from '../lib/format';
+import { participantsLine, type Me } from '../lib/format';
 import { findCode } from './extract';
 import { onMailArrived } from '../data/sync';
 import { browserWatcherEnv, startMailWatcher } from './mailWatcher';
@@ -16,7 +18,7 @@ type ExtRuntime = { runtime?: { id?: string; sendMessage?: (m: unknown) => Promi
 const ext = (globalThis as unknown as { browser?: ExtRuntime; chrome?: ExtRuntime }).browser ?? (globalThis as unknown as { chrome?: ExtRuntime }).chrome;
 
 /** Through the extension when possible, so it works with the tab in the background. */
-async function notify(t: ThreadSummary, me?: string) {
+async function notify(t: ThreadSummary, me: Me) {
   const from = participantsLine(t.participants.slice(-1), me);
   const code = findCode(t.subject, t.snippet);
   const title = code ? `${code.display} is your code` : from;
@@ -59,7 +61,7 @@ export function useMailWatchers() {
         spam: async (ids) => {
           await mail.spam(ids);
         },
-        notify: (t) => notify(t, queryClient.getQueryData<Account>(keys.account)?.email),
+        notify: (t) => notify(t, myAddresses(queryClient.getQueryData<Account>(keys.account))),
         paused: () => pauseActive(useSettingsStore.getState().settings.inboxPause),
         // A "Delivered" for a tracked package updates it here, no search needed.
         sawInbox: (threads) => useSettingsStore.getState().settings.smartFeatures && ingestSummaries(threads),
@@ -73,7 +75,7 @@ export function useMailWatchers() {
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
       const d = e.data as { source?: string; type?: string; threadId?: string };
-      if (e.source !== window.parent || d?.source !== 'better-gmail/content' || d.type !== 'open-thread' || !d.threadId) return;
+      if (e.source !== window.parent || e.origin !== HOST || d?.source !== 'better-gmail/content' || d.type !== 'open-thread' || !d.threadId) return;
       navigate({ view: { kind: 'folder', folder: 'inbox' }, threadId: d.threadId });
     };
     window.addEventListener('message', onMessage);

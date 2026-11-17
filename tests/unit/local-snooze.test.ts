@@ -1,7 +1,7 @@
 import { fakeBrowser } from 'wxt/testing/fake-browser';
 import type { MailBackend } from '../../src/app/data/backend';
 import { createDemoBackend } from '../../src/app/data/demo';
-import { withLocalSnooze } from '../../src/app/data/localSnooze';
+import { wakeSnoozesElsewhere, withLocalSnooze } from '../../src/app/data/localSnooze';
 import { BackendError } from '../../src/app/data/backend';
 import { readKey, writeKey } from '../../src/app/state/storage';
 
@@ -248,5 +248,34 @@ describe('withLocalSnooze wake-ups', () => {
     // The same account read from another account's tab finds the same list.
     await withLocalSnooze(fake('a@example.com').b, 'a@example.com').pollChanges();
     expect(await stored('a@example.com')).toEqual({});
+  });
+});
+
+describe('snoozes of accounts this tab is not showing', () => {
+  beforeEach(() => {
+    fakeBrowser.reset();
+    localStorage.clear();
+  });
+
+  it('open the account whose snooze is due, and only that one', async () => {
+    await writeKey('bg.localSnooze.v1:due@example.com', { 'thread-f:1': NOW - HOUR });
+    await writeKey('bg.localSnooze.v1:later@example.com', { 'thread-f:2': NOW + HOUR });
+    const open = vi.fn(async () => undefined);
+    await wakeSnoozesElsewhere(['due@example.com', 'later@example.com', 'none@example.com'], open, NOW);
+    expect(open.mock.calls).toEqual([['due@example.com']]);
+  });
+
+  it('wake through the account\'s backend when this tab already has it', async () => {
+    const inner = demoWithoutSnooze();
+    const [id] = await ids(inner, 'in:inbox');
+    const backend = withLocalSnooze(inner, 'Open@Example.com');
+    await backend.snoozeThreads([id!], Date.now() + HOUR);
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(Date.now() + 2 * HOUR);
+    const open = vi.fn(async () => undefined);
+    await wakeSnoozesElsewhere(['open@example.com'], open);
+    vi.useRealTimers();
+    expect(open).not.toHaveBeenCalled();
+    expect(await ids(inner, 'in:inbox')).toContain(id);
   });
 });

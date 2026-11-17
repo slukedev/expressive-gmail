@@ -7,14 +7,17 @@ import {
   adjustUnread,
   applyLabelChange,
   backend,
+  canDeleteForever,
   findThread,
   forgetChange,
   keys,
+  listPlaces,
   patchThreads,
   pruneAfterCollapse,
   markArriving,
   pruneLists,
   queryClient,
+  reinsertThreads,
   rememberChange,
   rememberGone,
   snapshotThreads,
@@ -181,6 +184,7 @@ async function modify(options: ModifyOptions): Promise<void> {
   // Undo goes to the account the action went to, even if the scope changes meanwhile.
   const b = backend();
   const before = snapshotThreads(ids);
+  const places = leaves ? listPlaces(ids) : [];
 
   const apply = (t: ThreadSummary) => (patch ? patch(applyLabelChange(t, change)) : applyLabelChange(t, change));
   patchThreads(ids, apply);
@@ -221,6 +225,7 @@ async function modify(options: ModifyOptions): Promise<void> {
   const restore = () => {
     markArriving(ids);
     forgetChange(ids);
+    reinsertThreads(places, before);
     patchThreads(ids, (t) => before.get(t.id) ?? t);
     void queryClient.invalidateQueries({ queryKey: keys.labels });
   };
@@ -319,6 +324,7 @@ export const mail = {
     if (!ids.length) return;
     const b = backend();
     const before = snapshotThreads(ids);
+    const places = listPlaces(ids);
     const change: LabelChange = { remove: ['DRAFT'] };
     advanceFrom(ids);
     patchThreads(ids, (t) => ({ ...applyLabelChange(t, change), draftCount: 0 }));
@@ -339,6 +345,7 @@ export const mail = {
       snack(count === 1 ? 'Draft discarded' : `${count} drafts discarded`);
     } catch (err) {
       forgetChange(ids);
+      reinsertThreads(places, before);
       patchThreads(ids, (t) => before.get(t.id) ?? t);
       snack(errorMessage(err, "Couldn't discard the draft."), { state: 'error', ...(retryable(err) ? { action: { label: 'Retry', onClick: () => void mail.discardDrafts(ids) } } : {}) });
     }
@@ -350,14 +357,15 @@ export const mail = {
     if (!ids.length) return;
     const view = getRoute().view;
     const classic = classicAction(view.kind === 'folder' && view.folder === 'spam' ? '#spam' : '#trash');
-    // Session mode can't delete forever; Gmail's own page can. Hand off instead of failing.
-    if (!backend().capabilities.deleteForever) {
+    // Gmail's own page can where this connection can't (session mode away from the tab's account, the API without the full scope).
+    if (!canDeleteForever(ids)) {
       snack('Deleting forever only works in classic Gmail', { action: classic });
       return;
     }
     // The account it was asked of, even if the view changes while this waits for fresh mail.
     const b = backend();
     const before = snapshotThreads(ids);
+    const places = listPlaces(ids);
     advanceFrom(ids);
     patchThreads(ids, (t) => ({ ...t, labelIds: [] }));
     rememberGone(ids);
@@ -372,6 +380,7 @@ export const mail = {
       progress.done(`${convo(ids.length)} deleted forever`);
     } catch (err) {
       forgetChange(ids);
+      reinsertThreads(places, before);
       patchThreads(ids, (t) => before.get(t.id) ?? t);
       progress.fail(deleteFailure(err, "Couldn't delete forever."), { action: classic });
     }
@@ -474,6 +483,9 @@ export const mail = {
     });
   },
   mute(ids: string[]) {
+    // Unmuting alone leaves a conversation archived.
+    const before = snapshotThreads(ids);
+    const backToInbox = ids.filter((id) => before.get(id)?.labelIds.includes('INBOX'));
     return modify({
       ids,
       change: { add: ['MUTED' as LabelId], remove: ['INBOX'] },
@@ -481,7 +493,10 @@ export const mail = {
       message: `${convo(ids.length)} muted`,
       failed: "Couldn't mute.",
       run: (b) => b.muteThreads(ids, true),
-      inverseRun: (b) => b.muteThreads(ids, false),
+      inverseRun: async (b) => {
+        await b.muteThreads(ids, false);
+        if (backToInbox.length) await b.modifyThreads(backToInbox, { add: ['INBOX'] });
+      },
     });
   },
   /** The scheduled message turns back into a draft. Resolves with the conversation afterwards (to open the draft), or undefined when it couldn't be cancelled. */

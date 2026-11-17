@@ -1,4 +1,5 @@
 import type { InfiniteData } from '@tanstack/react-query';
+import { BackendError } from '../../src/app/data/backend';
 import { adjustUnread, applyLabelChange, forgetChange, keys, patchThreads, pruneAfterCollapse, pruneLists, queryClient, rememberChange, shareListById, withPendingUnread, withRecentChanges } from '../../src/app/data/client';
 import type { Label, LabelId, Message, Thread, ThreadPage, ThreadSummary } from '../../src/app/data/types';
 import type { View } from '../../src/app/router/routes';
@@ -240,5 +241,24 @@ describe('shareListById', () => {
     const shared = shareListById(list(summary('a', ['INBOX']), b), list({ ...b, labelIds: ['INBOX', 'STARRED'] })) as InfiniteData<ThreadPage>;
     expect(shared.pages[0]!.threads[0]).not.toBe(b);
     expect(shared.pages[0]!.threads[0]!.labelIds).toEqual(['INBOX', 'STARRED']);
+  });
+});
+
+describe('query retries', () => {
+  const retry = queryClient.getDefaultOptions().queries!.retry as (count: number, err: unknown) => boolean;
+
+  it.each([
+    ['a dropped connection', new BackendError("Couldn't reach Gmail. Check your connection.", 'network', true), true],
+    ['a server error', new BackendError('Gmail had a server error (503). Try again.', 'network', true), true],
+    ['a page with no Gmail session', new BackendError('Gmail did not finish loading.', 'session-unavailable', true), false],
+    ['a signed-out account', new BackendError('You are signed out of Gmail.', 'unauthenticated', true), false],
+    ['a rate limit', new BackendError('Gmail is rate limiting requests.', 'rate-limited', true), false],
+    ['an error the backend calls final', new BackendError('Gmail answered with HTTP 400.', 'unknown'), false],
+  ])('after %s: %s', (_name, err, again) => {
+    expect(retry(0, err)).toBe(again);
+  });
+
+  it('gives up after two tries', () => {
+    expect(retry(2, new BackendError("Couldn't reach Gmail.", 'network', true))).toBe(false);
   });
 });
