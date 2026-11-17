@@ -60,28 +60,16 @@ export function NudgeRows({ nudges, open }: { nudges: ReturnType<typeof useSentN
         const to = t.recipients![0];
         return (
           <div key={t.id} className="row-wrap">
-            <div
-              className="row nudge-row"
-              role="button"
-              tabIndex={0}
-              onClick={() => open(t.id)}
-              onKeyDown={(e) => e.key === 'Enter' && open(t.id)}
-            >
-              <Avatar name={to.name} email={to.email} size={40} />
-              <span className="nudge-row__text">
-                <span className="md-title-small">To: {participantsLine(t.recipients!, me)}</span>
-                <span className="md-body-medium nudge-row__subject">{t.subject || '(no subject)'}</span>
-                <span className="md-body-medium row__nudge">Sent {days} days ago. Follow up?</span>
-              </span>
-              <IconButton
-                icon="close"
-                label="Dismiss this nudge"
-                size="xs"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  local.dismissNudge(t.id);
-                }}
-              />
+            <div className="row nudge-row">
+              <button type="button" className="nudge-row__open" onClick={() => open(t.id)}>
+                <Avatar name={to.name} email={to.email} size={40} />
+                <span className="nudge-row__text">
+                  <span className="md-title-small">To: {participantsLine(t.recipients!, me)}</span>
+                  <span className="md-body-medium nudge-row__subject">{t.subject || '(no subject)'}</span>
+                  <span className="md-body-medium row__nudge">Sent {days} days ago. Follow up?</span>
+                </span>
+              </button>
+              <IconButton icon="close" label="Dismiss this nudge" size="xs" className="nudge-row__dismiss" onClick={() => local.dismissNudge(t.id)} />
             </div>
           </div>
         );

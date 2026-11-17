@@ -5,6 +5,8 @@ export interface MotionToken {
 
 // Reading a token after a DOM change forces a style recalc of the whole document, so each is read once, ideally at idle, never mid-animation.
 const tokens = new Map<string, MotionToken>();
+// Reduced motion redefines the tokens.
+if (typeof matchMedia === 'function') matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', () => tokens.clear());
 
 /** For the Web Animations API ("300ms linear(...)"). */
 export function motionToken(name: string): MotionToken {

@@ -36,7 +36,6 @@ export function SplitEditor({ open, split, onClose }: { open: boolean; split?: S
       open={open}
       onOpenChange={(o) => !o && onClose()}
       title={split ? 'Edit split' : 'New split'}
-      description="A split is a saved search that gets its own place in the menu."
       actions={
         <>
           <Button variant="text" onClick={onClose}>

@@ -18,13 +18,15 @@ interface Step {
   text: string;
   /** The Gemini step: its switch and its mark. */
   gemini?: boolean;
+  /** Only for a device with a keyboard. */
+  keys?: boolean;
 }
 
 const STEPS: Step[] = [
-  { icon: 'mail', title: 'This is still your Gmail', text: 'You’re still signed in at mail.google.com, and anything you do here happens in your Gmail account.' },
-  { icon: 'keyboard_command_key', title: 'Everything is a keystroke away', text: `Press ${keyLabel('Ctrl K')} for the command palette, or ? to see every shortcut.` },
-  { icon: 'filter_alt', title: 'Make Gmail yours', text: 'Save any search as a split, pin threads to the top, set follow-up reminders and clean out newsletters in Subscriptions.' },
-  { icon: 'swap_horiz', title: 'Classic Gmail is one click away', text: 'Switch to classic Gmail from your account menu or settings. Classic Gmail then keeps a button in its corner to bring you back.' },
+  { icon: 'mail', title: 'Still your Gmail', text: 'You’re signed in at mail.google.com, and everything you do here happens in your Gmail account.' },
+  { icon: 'keyboard_command_key', title: 'Keyboard shortcuts', text: `Press ${keyLabel('Ctrl K')} for the command palette, or ? to see every shortcut.`, keys: true },
+  { icon: 'filter_alt', title: 'Splits and reminders', text: 'Save any search as a split, pin threads to the top, set follow-up reminders and clean out newsletters in Subscriptions.' },
+  { icon: 'swap_horiz', title: 'Back to classic Gmail', text: 'Switch to classic Gmail from your account menu or settings. Classic Gmail then keeps a button in its corner to bring you back.' },
 ];
 
 const GEMINI_STEP: Step = { icon: 'forum', title: 'Gemini in Gmail', text: 'Summaries, replies and Help me write.', gemini: true };
@@ -34,7 +36,10 @@ const GEMINI_STEP: Step = { icon: 'forum', title: 'Gemini in Gmail', text: 'Summ
  * nothing, since the untouched setting follows Gmail and Settings explains why it's off. Before Classic Gmail, which stays last.
  */
 function onboardingSteps(withGemini: boolean): Step[] {
-  return withGemini ? [...STEPS.slice(0, -1), GEMINI_STEP, STEPS.at(-1)!] : STEPS;
+  // A phone or tablet with only a touchscreen has no shortcuts to learn.
+  const touchOnly = typeof matchMedia === 'function' && !matchMedia('(any-pointer: fine)').matches;
+  const steps = touchOnly ? STEPS.filter((s) => !s.keys) : STEPS;
+  return withGemini ? [...steps.slice(0, -1), GEMINI_STEP, steps.at(-1)!] : steps;
 }
 
 // The demo mailbox skips the welcome; ?onboarding shows it there for review.

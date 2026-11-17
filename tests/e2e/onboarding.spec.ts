@@ -18,7 +18,7 @@ async function geminiSwitchInSettings(page: Page) {
 test.describe('First-run setup', () => {
   test('offers Gemini on, as Gmail has it; turning it off there is the same setting as in Settings', async ({ mail, page }) => {
     await mail.open('inbox', 'onboarding');
-    await expect(heading(page)).toHaveText('This is still your Gmail');
+    await expect(heading(page)).toHaveText('Still your Gmail');
     await expect(dots(page)).toHaveCount(5);
     for (let i = 0; i < 3; i++) await welcome(page).getByRole('button', { name: 'Next' }).click();
     await expect(heading(page)).toHaveText('Gemini in Gmail');
@@ -28,7 +28,7 @@ test.describe('First-run setup', () => {
     await welcome(page).getByText('Use Gemini').click();
     await expect(use).not.toBeChecked();
     await welcome(page).getByRole('button', { name: 'Next' }).click();
-    await expect(heading(page)).toHaveText('Classic Gmail is one click away');
+    await expect(heading(page)).toHaveText('Back to classic Gmail');
     await welcome(page).getByRole('button', { name: 'Get started' }).click();
     await expect(welcome(page)).toBeHidden();
 
@@ -44,14 +44,22 @@ test.describe('First-run setup', () => {
 
   test('skips Gemini for an account Gmail shows no Gemini for, and Settings shows it off and fixed', async ({ mail, page }) => {
     await mail.open('inbox', 'onboarding&gemini=plan');
-    await expect(heading(page)).toHaveText('This is still your Gmail');
+    await expect(heading(page)).toHaveText('Still your Gmail');
     await expect(dots(page)).toHaveCount(4);
     for (let i = 0; i < 3; i++) await welcome(page).getByRole('button', { name: 'Next' }).click();
-    await expect(heading(page)).toHaveText('Classic Gmail is one click away');
+    await expect(heading(page)).toHaveText('Back to classic Gmail');
     await welcome(page).getByRole('button', { name: 'Get started' }).click();
 
     const master = await geminiSwitchInSettings(page);
     await expect(master).not.toBeChecked();
     await expect(master).toBeDisabled();
+  });
+
+  test('a touchscreen skips the shortcuts @phone', async ({ mail, page }) => {
+    await mail.open('inbox', 'onboarding');
+    await expect(heading(page)).toHaveText('Still your Gmail');
+    await expect(dots(page)).toHaveCount(4);
+    await welcome(page).getByRole('button', { name: 'Next' }).click();
+    await expect(heading(page)).toHaveText('Splits and reminders');
   });
 });

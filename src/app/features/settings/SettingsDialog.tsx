@@ -155,7 +155,9 @@ export function SettingsDialog() {
           <header className="settings__appbar">
             <IconButton icon="close" label="Close settings" onClick={close} />
             <span className="md-title-large settings__appbar-title">Settings</span>
-            <IconButton icon="swap_horiz" label="Switch to classic Gmail" onClick={() => classicGmail()} />
+            <Button variant="text" onClick={() => classicGmail()}>
+              Classic Gmail
+            </Button>
           </header>
           <nav ref={navRef} className="settings__nav" aria-label="Settings sections">
             <BaseDialog.Title className="md-headline-small settings__title">Settings</BaseDialog.Title>
@@ -397,7 +399,7 @@ function General() {
       <Toggle
         k="attachmentReminder"
         title="Attachment reminder"
-        description={'Asks before sending if your message says "attached" but has no files.'}
+        description="Asks before sending if your message says “attached” but has no files."
       />
       </Block>
       <Block title="Reading">
@@ -959,6 +961,20 @@ function Connection() {
   const kind = useBackendKind();
   const [clientId, setClientId] = useState(s.oauthClientId);
   const [busy, setBusy] = useState(false);
+  const connect = async () => {
+    setBusy(true);
+    try {
+      const api = await import('../../data/api');
+      await api.setClientId(clientId);
+      await api.signIn();
+      updateSettings({ oauthClientId: clientId, backend: 'api' });
+      snack('Connected with the Gmail API');
+    } catch (err) {
+      snack(err instanceof Error ? err.message : "Couldn't sign in with Google. Try again.", { state: 'error', action: { label: 'Try again', onClick: () => void connect() } });
+    } finally {
+      setBusy(false);
+    }
+  };
   const apiRef = useRef<HTMLDivElement>(null);
   const options: { value: Settings['backend']; title: string; text: string; icon: IconName }[] = [
     { value: 'session', title: 'Your Gmail session', text: 'Works right away with the account you’re signed in to. Uses Gmail’s own internal connection, which Google can change without notice.', icon: 'mail' },
@@ -1009,20 +1025,7 @@ function Connection() {
               <Button
                 variant="filled"
                 disabled={!clientId || busy}
-                onClick={async () => {
-                  setBusy(true);
-                  try {
-                    const api = await import('../../data/api');
-                    await api.setClientId(clientId);
-                    await api.signIn();
-                    updateSettings({ oauthClientId: clientId, backend: 'api' });
-                    snack('Connected with the Gmail API');
-                  } catch (err) {
-                    snack(err instanceof Error ? err.message : "Couldn't sign in with Google.");
-                  } finally {
-                    setBusy(false);
-                  }
-                }}
+                onClick={() => void connect()}
               >
                 Sign in with Google
               </Button>
@@ -1079,7 +1082,7 @@ function GeminiSettings() {
               ]}
             />
           </Row>
-          <Toggle k="geminiReplies" title="Suggested replies by Gemini" keywords="smart reply quick answers" description="Off, you get short answers from simple rules instead." />
+          <Toggle k="geminiReplies" title="Suggested replies by Gemini" keywords="smart reply quick answers" description="When off, suggestions come from simple rules." />
           <Toggle k="geminiSearch" title="Answers in search" keywords="ask gmail ai overview question" description="Searches that read as a question get Gemini’s answer above the results." />
         </Block>
       )}

@@ -7,7 +7,8 @@ import { Icon } from '../ui/Icon';
 import { snack } from '../ui/Snackbar';
 import { local, useLocal } from '../state/local';
 import { rawId } from '../data/accounts/ids';
-import { detectLanguage, messageText, phishingSignals, translateUrl } from './extract';
+import { useMe } from '../data/hooks';
+import { messageLanguage, messageText, phishingSignals, translateUrl } from './extract';
 
 /** Gmail's "Why is this message in spam?" banner. */
 export function SpamBanner({ thread }: { thread: Thread }) {
@@ -62,18 +63,15 @@ export function PhishingBanner({ message }: { message: Message }) {
 /** Like Gmail's translate bar. */
 export function TranslateBanner({ message }: { message: Message }) {
   const [dismissed, setDismissed] = useState(false);
-  const { language, text } = useMemo(() => {
-    const t = messageText(message).text;
-    return { language: detectLanguage(`${message.subject}\n${t}`), text: t };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [message.id, message.bodyHtml, message.bodyText]);
+  const me = useMe();
+  const { language, text } = useMemo(() => ({ language: messageLanguage(message, me), text: messageText(message).text }), [message, me]);
   if (dismissed || !language) return null;
   return (
     <div className="banner banner--quiet" role="note">
       <Icon name="translate" size={20} className="banner__icon" />
       <p className="banner__text md-body-medium">This message is in {language}.</p>
       <span className="banner__actions">
-        <Button variant="text" size="xs" onClick={() => openUrl(translateUrl(`${message.subject}\n\n${text}`))}>
+        <Button variant="text" size="xs" onClick={() => openUrl(translateUrl(text))}>
           Translate to English
         </Button>
         <Button variant="text" size="xs" onClick={() => setDismissed(true)}>

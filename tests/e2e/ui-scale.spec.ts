@@ -46,7 +46,7 @@ for (const [size, zoom] of [
   test(`at ${size} the app fills the window and menus stay on their anchors`, async ({ mail, page }) => {
     await mail.page.goto('/preview/frame.html?latency=0#inbox');
     const app = page.frameLocator('iframe');
-    await expect(app.getByRole('list', { name: 'Conversations' }).getByRole('listitem').first()).toBeVisible();
+    await expect(app.locator('.thread-list').getByRole('listitem').first()).toBeVisible();
     await pickSize(page, app, size);
     await expect.poll(() => applied(page)).toBe(zoom);
 
@@ -86,7 +86,7 @@ for (const [size, zoom] of [
     await expect(menu).toBeHidden();
 
     // A context menu opens at the pointer.
-    const row = app.getByRole('list', { name: 'Conversations' }).getByRole('listitem').filter({ hasText: 'I GOT IT' }).first();
+    const row = app.locator('.thread-list').getByRole('listitem').filter({ hasText: 'I GOT IT' }).first();
     await row.evaluate((e) => e.scrollIntoView({ block: 'center' }));
     const at = await point(page, row);
     await page.mouse.click(at.x, at.y, { button: 'right' });
@@ -103,12 +103,12 @@ for (const [size, zoom] of [
 test('the size comes back with a reload and goes back to 100%', async ({ mail, page }) => {
   await mail.page.goto('/preview/frame.html?latency=0#inbox');
   const app = page.frameLocator('iframe');
-  await expect(app.getByRole('list', { name: 'Conversations' }).getByRole('listitem').first()).toBeVisible();
+  await expect(app.locator('.thread-list').getByRole('listitem').first()).toBeVisible();
   await pickSize(page, app, '90%');
   await page.reload();
   // The host applies its own copy before the app loads, so the first frame is already at size.
   await expect.poll(() => applied(page)).toBe(0.9);
-  await expect(app.getByRole('list', { name: 'Conversations' }).getByRole('listitem').first()).toBeVisible();
+  await expect(app.locator('.thread-list').getByRole('listitem').first()).toBeVisible();
   await pickSize(page, app, '100%');
   await expect.poll(() => applied(page)).toBe(1);
 });
@@ -125,7 +125,7 @@ test('outside a host page there is no Interface size', async ({ mail, page }) =>
 test('Settings changes the size as soon as it is picked', async ({ mail, page }) => {
   await mail.page.goto('/preview/frame.html?latency=0#inbox');
   const app = page.frameLocator('iframe');
-  await expect(app.getByRole('list', { name: 'Conversations' }).getByRole('listitem').first()).toBeVisible();
+  await expect(app.locator('.thread-list').getByRole('listitem').first()).toBeVisible();
   await app.getByRole('banner').getByRole('button', { name: 'Settings' }).dispatchEvent('click');
   await app.getByText('See all settings').dispatchEvent('click');
   await app.locator('.settings').getByText('Appearance', { exact: true }).first().dispatchEvent('click');
@@ -140,7 +140,7 @@ test('Settings changes the size as soon as it is picked', async ({ mail, page })
 test('the command palette makes the interface smaller and larger', async ({ mail, page }) => {
   await mail.page.goto('/preview/frame.html?latency=0#inbox');
   const app = page.frameLocator('iframe');
-  await expect(app.getByRole('list', { name: 'Conversations' }).getByRole('listitem').first()).toBeVisible();
+  await expect(app.locator('.thread-list').getByRole('listitem').first()).toBeVisible();
   await app.locator('body').evaluate(() => window.focus());
   const input = app.getByRole('dialog', { name: 'Command palette' }).getByRole('combobox');
   for (const [command, zoom] of [

@@ -4,7 +4,6 @@ import { cx } from './Button';
 
 interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> {
   label: string;
-  variant?: 'outlined' | 'filled';
   leadingIcon?: IconName;
   trailing?: ReactNode;
   supporting?: ReactNode;
@@ -15,7 +14,6 @@ interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'si
 
 export function TextField({
   label,
-  variant = 'outlined',
   leadingIcon,
   trailing,
   supporting,
@@ -29,7 +27,7 @@ export function TextField({
   const inputId = id ?? autoId;
   const supportId = `${inputId}-support`;
   return (
-    <div className={cx('m3-field', `m3-field--${variant}`, error && 'm3-field--error', className)}>
+    <div className={cx('m3-field', 'm3-field--outlined', error && 'm3-field--error', className)}>
       <div className="m3-field__container" data-has-leading={leadingIcon ? '' : undefined}>
         {leadingIcon && <Icon name={leadingIcon} className="m3-field__leading" />}
         <input
@@ -45,7 +43,7 @@ export function TextField({
           {label}
         </label>
         {trailing && <span className="m3-field__trailing">{trailing}</span>}
-        {variant === 'outlined' && <span className="m3-field__outline" aria-hidden="true" />}
+        <span className="m3-field__outline" aria-hidden="true" />
       </div>
       {(supporting || error) && (
         <div id={supportId} className="m3-field__supporting">

@@ -34,9 +34,13 @@
 .glance-picture--mark > .m3-ripple {
   display: none;
 }
-.glance-picture--mark:hover,
 .glance-picture[data-drop] {
   scale: 1.06;
+}
+@media (hover: hover) and (pointer: fine) {
+  .glance-picture--mark:hover {
+    scale: 1.06;
+  }
 }
 
 /* With a picture: the mark itself, grown, a cookie on a tonal ring. */
@@ -220,7 +224,7 @@
   fill: currentColor;
   transition: scale var(--md-sys-motion-spatial-fast);
 }
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .picture-editor__shape:hover {
     background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
   }
@@ -298,7 +302,7 @@
   opacity: 0;
   transition: opacity var(--md-sys-motion-effects-fast);
 }
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .glance-badge:hover::after {
     opacity: 0.08;
   }
@@ -368,5 +372,19 @@
   .glance-badge__count[data-bump],
   .glance-badge--clear {
     animation: none;
+  }
+}
+
+/* Reduced motion: the same entrances without the movement. */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes glance-badge-bump {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes glance-badge-clear {
+    from {
+      opacity: 0;
+    }
   }
 }

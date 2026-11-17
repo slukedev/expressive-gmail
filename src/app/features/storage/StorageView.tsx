@@ -126,7 +126,7 @@ function LargeMail() {
           {current.list.hasNextPage && (
             <div className="storage__more">
               <Button variant="text" onClick={() => void current.list.fetchNextPage()} disabled={current.list.isFetchingNextPage}>
-                {current.list.isFetchingNextPage ? 'Loading...' : 'Show more'}
+                {current.list.isFetchingNextPage ? 'Loading…' : 'Show more'}
               </Button>
             </div>
           )}
@@ -220,7 +220,7 @@ function BucketRow({ bucket }: { bucket: Bucket }) {
         <span className="storage-bucket__text">
           <span className="md-title-small">{bucket.title}</span>
           <span className="md-body-medium storage-bucket__meta">
-            {list.isPending ? 'Counting...' : list.isError ? "Couldn't check" : n ? `${count} ${n === 1 ? 'conversation' : 'conversations'}` : 'Nothing here'}
+            {list.isPending ? 'Counting…' : list.isError ? "Couldn't check" : n ? `${count} ${n === 1 ? 'conversation' : 'conversations'}` : 'Nothing here'}
           </span>
         </span>
         {list.isError ? (
@@ -261,7 +261,7 @@ function BinRow({ folder }: { folder: 'spam' | 'trash' }) {
   const name = folder === 'spam' ? 'Spam' : 'Trash';
   // Mail here counts against storage until it's gone for good.
   const meta = list.isPending
-    ? 'Counting...'
+    ? 'Counting…'
     : n
       ? `${count} ${n === 1 ? 'conversation' : 'conversations'}. Deleted for good after 30 days.`
       : 'Empty';

@@ -19,9 +19,20 @@
   --app-star: #f4b400;
   /* Gmail's darker star rim; keeps the yellow at 3:1 on tinted rows. */
   --app-star-edge: #b06000;
+  /* Google's file-type colours (PDF, Sheets, Docs, Calendar), brand colours like the star. */
+  --app-file-pdf: #d93025;
+  --app-file-sheet: #188038;
+  --app-file-doc: #1a73e8;
+  --app-file-event: #9334e6;
+  /* Designed emails assume a white page, whatever the theme. */
+  --app-mail-canvas: #ffffff;
 }
 :root[data-theme-mode='dark'] {
   --app-star: #fdd663;
+  --app-file-pdf: #f28b82;
+  --app-file-sheet: #81c995;
+  --app-file-doc: #8ab4f8;
+  --app-file-event: #c58af9;
 }
 :root[data-theme-source='google'] {
   --app-compose: var(--md-sys-color-secondary-container);
@@ -219,8 +230,10 @@
   opacity: 0;
   transition: opacity var(--md-sys-motion-effects-fast);
 }
-.account-btn:hover::after {
-  opacity: 0.08;
+@media (hover: hover) and (pointer: fine) {
+  .account-btn:hover::after {
+    opacity: 0.08;
+  }
 }
 .account-btn--placeholder {
   width: 40px;
@@ -455,7 +468,7 @@
   background: var(--search-bg);
   transition: background-color var(--md-sys-motion-effects-default);
 }
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .search__bar:hover {
     background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, var(--search-bg));
   }
@@ -478,9 +491,11 @@
   padding: 0 8px;
   color: var(--md-sys-color-on-surface);
   caret-color: var(--md-sys-color-primary);
+  text-overflow: ellipsis;
 }
 .search__input::placeholder {
   color: var(--md-sys-color-on-surface-variant);
+  text-overflow: ellipsis;
 }
 .search--compact .search__input::placeholder {
   text-align: center;
@@ -589,8 +604,10 @@
   border-radius: 999px;
   cursor: pointer;
 }
-.text-toggle:hover {
-  background: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .text-toggle:hover {
+    background: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
+  }
 }
 
 /* As wide as the search bar it drops from. */
@@ -750,7 +767,7 @@
 .rail__fab.m3-fab[data-lowered] {
   box-shadow: none;
 }
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .rail__fab.m3-fab[data-lowered]:hover {
     box-shadow: var(--md-sys-elevation-1);
   }
@@ -839,7 +856,7 @@
 .rail-item .m3-ripple {
   color: var(--md-sys-color-on-secondary-container);
 }
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .rail-item:hover .rail-item__pill > .m3-ripple::before {
     opacity: 0.08;
   }
@@ -861,10 +878,14 @@
   opacity: 0;
   transition: opacity var(--md-sys-motion-effects-fast);
 }
-.rail-label:hover .rail-label__more,
 .rail-label:focus-within .rail-label__more,
 .rail-label[data-options] .rail-label__more {
   opacity: 1;
+}
+@media (hover: hover) and (pointer: fine) {
+  .rail-label:hover .rail-label__more {
+    opacity: 1;
+  }
 }
 @media (hover: none) {
   .rail-label__more {
@@ -956,7 +977,7 @@
   border-radius: var(--md-sys-shape-corner-full);
   transition: background-color var(--md-sys-motion-effects-default);
 }
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .rail--collapsed .rail__primary .rail-item:hover .rail-item__indicator {
     background: color-mix(in srgb, var(--md-sys-color-on-secondary-container) 8%, transparent);
   }
@@ -1155,10 +1176,6 @@
   letter-spacing: 0.1px;
   color: var(--md-sys-color-on-surface-variant);
 }
-.rail__hint {
-  padding: 0 24px 8px calc(var(--rail-item-start) + 16px);
-  color: var(--md-sys-color-on-surface-variant);
-}
 
 /* Beside a collapsed rail the modal rail unfolds from its edge; the clip runs 24px past so the shadow shows. */
 @keyframes rail-unfold {
@@ -1340,9 +1357,13 @@ body:has(.app[data-compact] .offline) .m3-snackbar-viewport {
     margin var(--md-sys-motion-spatial-fast),
     border-radius var(--md-sys-motion-spatial-fast);
 }
-.pane-handle:hover::after,
 .pane-handle:focus-visible::after {
   opacity: 0.6;
+}
+@media (hover: hover) and (pointer: fine) {
+  .pane-handle:hover::after {
+    opacity: 0.6;
+  }
 }
 /* Pressed: 12 x 52 with 12 corners (DragHandleTokens). */
 .pane-handle:active::after {
@@ -1792,6 +1813,9 @@ body:has(.app[data-compact] .offline) .m3-snackbar-viewport {
 .thread-list .seg-list > .row-context:nth-child(4) > .row-wrap { animation-delay: 60ms; }
 .thread-list .seg-list > .row-context:nth-child(5) > .row-wrap { animation-delay: 80ms; }
 .thread-list .seg-list > .row-context:nth-child(n + 6) > .row-wrap { animation-delay: 100ms; }
+.list-scroll[data-returned] .seg-list > .row-context > .row-wrap:not([data-entering]) {
+  animation: none;
+}
 @keyframes row-in {
   from {
     opacity: 0;
@@ -1844,7 +1868,7 @@ body:has(.app[data-compact] .offline) .m3-snackbar-viewport {
   z-index: -1;
 }
 /* data-hover is :hover kept by rowHover.ts, for a row that slides in under a still pointer. */
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .row:hover,
   .row[data-hover] {
     border-radius: var(--md-sys-shape-corner-medium);
@@ -1896,6 +1920,10 @@ body:has(.app[data-compact] .offline) .m3-snackbar-viewport {
   box-shadow: inset 0 0 0 2px var(--md-sys-color-secondary);
   border-radius: var(--md-sys-shape-corner-large);
   animation: none;
+}
+/* j / k and x run all day: while the keyboard drives the list, rows change state at once. */
+.thread-list:has(.row:focus-visible) :is(.row, .row__hover, .row__date) {
+  transition: none;
 }
 .row__lead {
   grid-area: lead;
@@ -1951,7 +1979,7 @@ body:has(.app[data-compact] .offline) .m3-snackbar-viewport {
   clip-path: inset(0 0 0 0);
   transition: clip-path var(--md-sys-motion-spatial-default) 60ms;
 }
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .row__lead:hover .row__lead-front {
     transform: scale(0.92);
   }
@@ -2114,7 +2142,7 @@ body:has(.app[data-compact] .offline) .m3-snackbar-viewport {
   white-space: nowrap;
 }
 .att-chip__icon[data-kind='image'] {
-  color: #d93025;
+  color: var(--app-file-pdf);
 }
 .att-chip--more {
   padding: 0 12px;
@@ -2195,7 +2223,7 @@ button.att-chip:focus-visible {
 .row__hover .m3-icon-button {
   --pressed: var(--round);
 }
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .list-pane:not([data-selecting]) .row:not(.row--selected):hover .row__hover,
   .list-pane:not([data-selecting]) .row:not(.row--selected)[data-hover] .row__hover,
   .list-pane:not([data-selecting]) .row:not(.row--selected):focus-within .row__hover {
@@ -2261,9 +2289,11 @@ button.att-chip:focus-visible {
   cursor: pointer;
   opacity: 0.7;
 }
-.label-chip__remove:hover {
-  opacity: 1;
-  background: color-mix(in srgb, currentColor 14%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .label-chip__remove:hover {
+    opacity: 1;
+    background: color-mix(in srgb, currentColor 14%, transparent);
+  }
 }
 
 /* Wide list: Gmail web's one-line rows. */
@@ -2848,7 +2878,7 @@ button.att-chip:focus-visible {
   cursor: pointer;
   outline: none;
 }
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .msg--collapsed:hover {
     background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, var(--md-sys-color-surface-container-low));
     border-radius: var(--md-sys-shape-corner-medium);
@@ -2940,7 +2970,7 @@ button.att-chip:focus-visible {
   letter-spacing: 0.4px;
   color: var(--md-sys-color-on-surface-variant);
 }
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .msg__email {
     opacity: 0;
     transition: opacity var(--md-sys-motion-effects-fast);
@@ -2994,8 +3024,10 @@ button.att-chip:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.msg__to:hover {
-  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .msg__to:hover {
+    background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+  }
 }
 .msg__actions {
   display: flex;
@@ -3061,9 +3093,13 @@ button.att-chip:focus-visible {
   border-radius: var(--md-sys-shape-corner-medium);
   transition: background-color var(--md-sys-motion-effects-fast);
 }
-.details-popover__person:hover,
 .details-popover__person:focus-within {
   background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+}
+@media (hover: hover) and (pointer: fine) {
+  .details-popover__person:hover {
+    background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+  }
 }
 .details-popover__names {
   display: flex;
@@ -3087,7 +3123,7 @@ button.att-chip:focus-visible {
   font-weight: 400;
 }
 /* The copy button waits for the pointer, but stays reachable by keyboard and touch. */
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .details-popover__copy {
     opacity: 0;
     transition: opacity var(--md-sys-motion-effects-fast);
@@ -3198,7 +3234,7 @@ button.att-chip:focus-visible {
   position: relative;
 }
 .msg__body[data-designed] {
-  background: #ffffff;
+  background: var(--app-mail-canvas);
   border-radius: var(--md-sys-shape-corner-large);
   overflow: hidden;
 }
@@ -3240,9 +3276,11 @@ button.att-chip:focus-visible {
 .msg__body[data-designed] .msg__trimmed {
   margin: 0 16px 12px;
 }
-.msg__trimmed:hover {
-  background: var(--md-sys-color-secondary-container);
-  color: var(--md-sys-color-on-secondary-container);
+@media (hover: hover) and (pointer: fine) {
+  .msg__trimmed:hover {
+    background: var(--md-sys-color-secondary-container);
+    color: var(--md-sys-color-on-secondary-container);
+  }
 }
 .messages__fold {
   --fold-card: var(--md-sys-color-surface-container-low);
@@ -3290,7 +3328,7 @@ button.att-chip:focus-visible {
     background-color var(--md-sys-motion-effects-fast),
     border-radius var(--md-sys-motion-spatial-fast);
 }
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .messages__fold:hover {
     --fold-card: color-mix(in srgb, var(--md-sys-color-primary) 8%, var(--md-sys-color-surface-container-low));
   }
@@ -3313,9 +3351,11 @@ button.att-chip:focus-visible {
   --r-top: var(--md-sys-shape-corner-large);
 }
 @media (prefers-reduced-motion: reduce) {
-  .messages__fold:hover::before,
-  .messages__fold:hover::after {
-    transform: none;
+  @media (hover: hover) and (pointer: fine) {
+    .messages__fold:hover::before,
+    .messages__fold:hover::after {
+      transform: none;
+    }
   }
 }
 .thread-sk__fold {
@@ -3374,9 +3414,11 @@ button.att-chip:focus-visible {
     transform var(--md-sys-motion-spatial-fast),
     box-shadow var(--md-sys-motion-effects-default);
 }
-.att-card:hover {
-  border-radius: var(--md-sys-shape-corner-extra-large);
-  box-shadow: var(--md-sys-elevation-1);
+@media (hover: hover) and (pointer: fine) {
+  .att-card:hover {
+    border-radius: var(--md-sys-shape-corner-extra-large);
+    box-shadow: var(--md-sys-elevation-1);
+  }
 }
 .att-card__open {
   display: flex;
@@ -3440,37 +3482,17 @@ button.att-chip:focus-visible {
   mask-image: linear-gradient(to bottom, #000 65%, transparent);
   animation: fade-in var(--md-sys-motion-effects-default);
 }
-.att-card[data-kind='pdf'] .att-card__thumb,
-.att-card[data-kind='pdf'] .att-card__type {
-  color: #d93025;
+.att-card[data-kind='pdf'] :is(.att-card__thumb, .att-card__type) {
+  color: var(--app-file-pdf);
 }
-.att-card[data-kind='sheet'] .att-card__thumb,
-.att-card[data-kind='sheet'] .att-card__type {
-  color: #188038;
+.att-card[data-kind='sheet'] :is(.att-card__thumb, .att-card__type) {
+  color: var(--app-file-sheet);
 }
-.att-card[data-kind='doc'] .att-card__thumb,
-.att-card[data-kind='doc'] .att-card__type {
-  color: #1a73e8;
+.att-card[data-kind='doc'] :is(.att-card__thumb, .att-card__type) {
+  color: var(--app-file-doc);
 }
-.att-card[data-kind='event'] .att-card__thumb,
-.att-card[data-kind='event'] .att-card__type {
-  color: #9334e6;
-}
-:root[data-theme-mode='dark'] .att-card[data-kind='pdf'] .att-card__thumb,
-:root[data-theme-mode='dark'] .att-card[data-kind='pdf'] .att-card__type {
-  color: #f28b82;
-}
-:root[data-theme-mode='dark'] .att-card[data-kind='sheet'] .att-card__thumb,
-:root[data-theme-mode='dark'] .att-card[data-kind='sheet'] .att-card__type {
-  color: #81c995;
-}
-:root[data-theme-mode='dark'] .att-card[data-kind='doc'] .att-card__thumb,
-:root[data-theme-mode='dark'] .att-card[data-kind='doc'] .att-card__type {
-  color: #8ab4f8;
-}
-:root[data-theme-mode='dark'] .att-card[data-kind='event'] .att-card__thumb,
-:root[data-theme-mode='dark'] .att-card[data-kind='event'] .att-card__type {
-  color: #c58af9;
+.att-card[data-kind='event'] :is(.att-card__thumb, .att-card__type) {
+  color: var(--app-file-event);
 }
 .att-card__meta {
   display: flex;
@@ -3503,10 +3525,15 @@ button.att-chip:focus-visible {
     opacity var(--md-sys-motion-effects-fast),
     transform var(--md-sys-motion-spatial-fast);
 }
-.att-card:hover .att-card__dl,
 .att-card:focus-within .att-card__dl {
   opacity: 1;
   transform: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .att-card:hover .att-card__dl {
+    opacity: 1;
+    transform: none;
+  }
 }
 .att-card__thread {
   margin: 0 12px 12px 40px;
@@ -3555,6 +3582,19 @@ button.att-chip:focus-visible {
 }
 .reply-bar[data-over]::before {
   opacity: 1;
+}
+/* On a short window (a laptop at 200% zoom, a phone on its side) pinned bars would cover a third of the mail, so the whole pane scrolls. */
+@media (max-height: 520px) {
+  .reply-bar {
+    position: static;
+  }
+  .detail-pane {
+    overflow-y: auto;
+  }
+  .detail-pane > .thread-scroll {
+    flex: none;
+    overflow: visible;
+  }
 }
 .reply-bar__buttons {
   display: flex;
@@ -3842,12 +3882,6 @@ button.att-chip:focus-visible {
   padding: 4px 0;
   cursor: text;
 }
-.recipients {
-  background-image: linear-gradient(var(--md-sys-color-outline), var(--md-sys-color-outline));
-  background-size: 100% 1px;
-  background-position: bottom;
-  background-repeat: no-repeat;
-}
 /* Chips wrap; the label and Cc/Bcc stay on the first line. */
 .recipients {
   align-items: flex-start;
@@ -3924,8 +3958,10 @@ button.att-chip:focus-visible {
   color: inherit;
   cursor: pointer;
 }
-.recipient-chip__remove:hover {
-  background: color-mix(in srgb, currentColor 12%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .recipient-chip__remove:hover {
+    background: color-mix(in srgb, currentColor 12%, transparent);
+  }
 }
 .recipients__menu {
   position: absolute;
@@ -4481,8 +4517,10 @@ button.att-chip:focus-visible {
   opacity: 0;
   transition: opacity var(--md-sys-motion-effects-fast);
 }
-.settings-jump:hover::before {
-  opacity: 0.08;
+@media (hover: hover) and (pointer: fine) {
+  .settings-jump:hover::before {
+    opacity: 0.08;
+  }
 }
 .settings-jump:active::before {
   opacity: 0.1;
@@ -4545,8 +4583,10 @@ button.att-chip:focus-visible {
   opacity: 0;
   transition: opacity var(--md-sys-motion-effects-fast);
 }
-.settings-nav-item:hover::before {
-  opacity: 0.08;
+@media (hover: hover) and (pointer: fine) {
+  .settings-nav-item:hover::before {
+    opacity: 0.08;
+  }
 }
 .settings-nav-item:active::before {
   opacity: 0.1;
@@ -4627,6 +4667,7 @@ button.att-chip:focus-visible {
 }
 .setting-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 24px;
   min-height: 72px;
@@ -4653,7 +4694,8 @@ button.att-chip:focus-visible {
   margin-top: 14px;
 }
 .setting-row__text {
-  flex: 1;
+  /* Below this the control moves under the text instead of covering it. */
+  flex: 1 1 160px;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -4664,6 +4706,14 @@ button.att-chip:focus-visible {
 }
 .setting-row__control {
   flex: none;
+  max-width: 100%;
+  margin-left: auto;
+}
+.setting-row__control > .button-group {
+  max-width: 100%;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  row-gap: 2px;
 }
 .settings-note {
   margin: 0 0 12px;
@@ -4792,8 +4842,10 @@ button.att-chip:focus-visible {
   cursor: grab;
   touch-action: none;
 }
-.arrange-row__handle:hover {
-  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .arrange-row__handle:hover {
+    background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+  }
 }
 .arrange-row__handle:focus-visible {
   outline: 2px solid var(--md-sys-color-secondary);
@@ -4912,8 +4964,10 @@ button.att-chip:focus-visible {
     border-radius var(--md-sys-motion-spatial-fast),
     background-color var(--md-sys-motion-effects-default);
 }
-.choice-card:hover {
-  background: var(--md-sys-color-surface-container);
+@media (hover: hover) and (pointer: fine) {
+  .choice-card:hover {
+    background: var(--md-sys-color-surface-container);
+  }
 }
 .choice-card--selected {
   background: var(--md-sys-color-secondary-container) !important;
@@ -5416,10 +5470,37 @@ body:has(.app[data-compact]) .m3-snackbar-viewport {
 @media (forced-colors: active) {
   .row--selected,
   .row--active,
-  .rail-item[data-active],
+  .rail-item[data-active] .rail-item__active,
   .settings-nav-item[data-active] {
     outline: 2px solid Highlight;
     outline-offset: -2px;
+  }
+  .search__bar,
+  .settings-search:not(:focus-within) {
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
+  }
+  .search__bar:focus-within {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+  .nudge-row:has(.nudge-row__open:focus-visible) {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+  /* A colour choice is its colour. */
+  .swatch,
+  .swatch-wallpaper__disc {
+    forced-color-adjust: none;
+  }
+  .swatch:not(:focus-visible),
+  .swatch-wallpaper:not(:focus-visible, :has(input:focus-visible)) {
+    outline: 1px solid ButtonText;
+    outline-offset: 1px;
+  }
+  .swatch[aria-pressed='true']:not(:focus-visible),
+  .swatch-wallpaper:is([aria-pressed='true'], [data-selected]):not(:focus-visible, :has(input:focus-visible)) {
+    outline: 3px solid Highlight;
   }
   .row[data-range='add'] {
     outline: 2px dashed Highlight;
@@ -5453,7 +5534,7 @@ body:has(.app[data-compact]) .m3-snackbar-viewport {
     background-color var(--md-sys-motion-effects-fast),
     border-radius var(--md-sys-motion-spatial-fast);
 }
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .m3-select-field:hover {
     background: color-mix(in srgb, var(--md-sys-color-on-surface-variant) 8%, transparent);
   }
@@ -5714,7 +5795,7 @@ body:has(.app[data-compact]) .m3-snackbar-viewport {
 .smart-chip .m3-icon {
   color: var(--md-sys-color-primary);
 }
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .smart-chip:not(.smart-chip--static):hover {
     background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
   }
@@ -5754,12 +5835,19 @@ body:has(.app[data-compact]) .m3-snackbar-viewport {
     color var(--md-sys-motion-effects-default),
     box-shadow var(--md-sys-motion-effects-default);
 }
-.smart-chip[data-confirmed],
-.smart-chip[data-confirmed]:hover {
+.smart-chip[data-confirmed] {
   background: var(--md-sys-color-tertiary-container);
   color: var(--md-sys-color-on-tertiary-container);
   box-shadow: none;
   border-radius: var(--md-sys-shape-corner-full);
+}
+@media (hover: hover) and (pointer: fine) {
+  .smart-chip[data-confirmed]:hover {
+    background: var(--md-sys-color-tertiary-container);
+    color: var(--md-sys-color-on-tertiary-container);
+    box-shadow: none;
+    border-radius: var(--md-sys-shape-corner-full);
+  }
 }
 .smart-chip[data-confirmed] .m3-icon {
   color: inherit;
@@ -5793,7 +5881,6 @@ body:has(.app[data-compact]) .m3-snackbar-viewport {
   border-radius: var(--md-sys-shape-corner-extra-large);
   background: var(--md-sys-color-surface-container-high);
   color: var(--md-sys-color-on-surface);
-  animation: m3-pop 360ms var(--md-sys-motion-easing-emphasized-decelerate);
 }
 .smart-card__head {
   display: flex;
@@ -6243,6 +6330,37 @@ body:has(.app[data-compact]) .m3-snackbar-viewport {
   background: var(--row-unread);
   color: var(--md-sys-color-on-surface);
 }
+/* The whole row opens the conversation; Dismiss sits above the stretched button. */
+.nudge-row__open {
+  grid-column: 1 / 3;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  column-gap: 16px;
+  align-items: center;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  outline: none;
+}
+.nudge-row__open::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.nudge-row:has(.nudge-row__open:focus-visible) {
+  box-shadow: inset 0 0 0 2px var(--md-sys-color-secondary);
+  border-radius: var(--md-sys-shape-corner-large);
+}
+.nudge-row__dismiss {
+  position: relative;
+  z-index: 1;
+}
 .nudge-row__text {
   display: flex;
   flex-direction: column;
@@ -6309,7 +6427,7 @@ body:has(.app[data-compact]) .m3-snackbar-viewport {
 .diagnostics summary::-webkit-details-marker {
   display: none;
 }
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .diagnostics summary:hover {
     background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
   }
@@ -6592,8 +6710,10 @@ body:has(.app[data-compact]) .m3-snackbar-viewport {
   border-bottom-left-radius: var(--md-sys-shape-corner-large);
   border-bottom-right-radius: var(--md-sys-shape-corner-large);
 }
-.circle-member:hover {
-  border-radius: var(--md-sys-shape-corner-medium);
+@media (hover: hover) and (pointer: fine) {
+  .circle-member:hover {
+    border-radius: var(--md-sys-shape-corner-medium);
+  }
 }
 .circle-member[data-selected] {
   border-radius: var(--md-sys-shape-corner-large);
@@ -6718,15 +6838,10 @@ body:has(.app[data-compact]) .m3-snackbar-viewport {
     padding: 0 16px 24px;
   }
   .setting-row {
-    flex-wrap: wrap;
     gap: 12px;
   }
   .setting-row__text {
-    flex: 1 1 220px;
-  }
-  .setting-row__control {
-    margin-left: auto;
-    max-width: 100%;
+    flex-basis: 220px;
   }
 }
 
@@ -6999,7 +7114,7 @@ body:has(.app[data-compact]) .m3-snackbar-viewport {
 }
 @keyframes inbox-zero-pop {
   from {
-    scale: 0;
+    scale: 0.5;
     opacity: 0;
   }
 }
@@ -7018,4 +7133,114 @@ body:has(.app[data-compact]) .m3-snackbar-viewport {
 }
 .page__mark {
   margin-bottom: 4px;
+}
+
+/* Reduced motion: the same entrances and exits without the movement. */
+@media (prefers-reduced-motion: reduce) {
+  .settings[data-starting-style],
+  .settings[data-ending-style] {
+    transform: none;
+  }
+  .side-sheet[data-starting-style],
+  .side-sheet[data-ending-style] {
+    opacity: 0;
+    transform: none;
+  }
+  .side-sheet[data-ending-style] {
+    transition: opacity var(--md-sys-motion-effects-fast);
+  }
+  @keyframes m3-pop {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes rail-unfold {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes rail-modal-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes row-open {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes row-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes empty-art-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes empty-icon-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes pane-in-single {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes thread-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes msg-reveal {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes settings-section-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes list-notice-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes account-travel-card-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes glance-mark-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes inbox-zero-pop {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes rail-modal-out {
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes search-panel {
+  }
+  @keyframes rail-more-in {
+  }
+  @keyframes rail-fold {
+  }
+  @keyframes offline-in {
+  }
+  @keyframes selection-in {
+  }
+  @keyframes row-open-pad {
+  }
+  @keyframes shuffle-turn {
+  }
 }

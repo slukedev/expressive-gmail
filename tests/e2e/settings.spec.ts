@@ -114,6 +114,15 @@ test.describe('a connection that can’t edit labels', () => {
   test('has no Labels section, in the sidebar, in search or in the command palette', async ({ mail, page }) => {
     await mail.open('inbox');
     await expect(mail.rows.first()).toBeVisible();
+    await expect(mail.nav.getByRole('button', { name: 'Create split' })).toBeVisible();
+    await expect(mail.nav.getByRole('button', { name: 'Create new label' })).toHaveCount(0);
+    await mail.rows.first().click();
+    await expect(mail.threadHeading).toBeVisible();
+    await page.keyboard.press('l');
+    await expect(page.getByRole('menu').getByRole('menuitemcheckbox').first()).toBeVisible();
+    await expect(page.getByRole('menu').getByRole('menuitem', { name: /^Create/ })).toHaveCount(0);
+    await page.keyboard.press('Escape');
+
     const settings = await openAllSettings(page);
     const nav = settings.getByRole('navigation', { name: 'Settings sections' });
     await expect(nav.getByRole('button', { name: 'Splits' })).toBeVisible();
@@ -198,7 +207,8 @@ test('Random color rolls a new theme on every click, in Quick settings and Setti
   // Swatches are discs at every width (Safari once stretched them into ovals).
   await expect(colors.getByRole('button', { name: 'Random color' })).toBeVisible();
   // Layout sizes, untouched by the sheet's opening scale.
-  const shapes = await colors.locator('.swatch-wallpaper').evaluateAll((els) => els.map((e) => (e as HTMLElement).offsetWidth === (e as HTMLElement).offsetHeight));
+  // One evaluate on the group: evaluateAll crashes Playwright's Firefox here.
+  const shapes = await colors.evaluate((el) => [...el.querySelectorAll<HTMLElement>('.swatch-wallpaper')].map((e) => e.offsetWidth === e.offsetHeight));
   expect(shapes).not.toContain(false);
 
   const seen = [await primary()];
@@ -236,4 +246,26 @@ test('A random theme gives each tab its own color, and a new tab leaves the open
   // The new tab's roll is saved for the next load, but the open tab keeps its colour.
   await page.waitForTimeout(800);
   expect(await primary(page)).toBe(first);
+});
+
+test('a Gmail settings link opens that section of Settings over the inbox', async ({ mail, page }) => {
+  await mail.open('settings/appearance');
+  const settings = page.getByRole('dialog', { name: 'Settings' });
+  await expect(settings.getByRole('heading', { name: 'Appearance' })).toBeVisible();
+  await expect(page).toHaveURL(/#inbox$/);
+  await page.keyboard.press('Escape');
+  await expect(settings).toBeHidden();
+  await expect(mail.rows.first()).toBeVisible();
+});
+
+test('on a tablet, a setting’s choices move under its name instead of covering it', async ({ mail, page }) => {
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await mail.open('settings/appearance');
+  const settings = page.getByRole('dialog', { name: 'Settings' });
+  const choices = settings.getByRole('radiogroup', { name: 'Color source' });
+  await expect(choices).toBeVisible();
+  const title = settings.getByText('Colors', { exact: true });
+  const [t, c, scroller] = await Promise.all([title.boundingBox(), choices.boundingBox(), settings.locator('.settings__scroll').boundingBox()]);
+  expect(c!.y).toBeGreaterThanOrEqual(t!.y + t!.height);
+  expect(c!.x + c!.width).toBeLessThanOrEqual(scroller!.x + scroller!.width);
 });

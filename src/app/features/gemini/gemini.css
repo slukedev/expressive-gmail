@@ -96,8 +96,10 @@
   cursor: pointer;
   transition: background-color var(--md-sys-motion-effects-fast);
 }
-.gemini-cite:hover {
-  background: color-mix(in srgb, var(--md-sys-color-on-secondary-container) 12%, var(--md-sys-color-secondary-container));
+@media (hover: hover) and (pointer: fine) {
+  .gemini-cite:hover {
+    background: color-mix(in srgb, var(--md-sys-color-on-secondary-container) 12%, var(--md-sys-color-secondary-container));
+  }
 }
 .gemini-cite:focus-visible {
   outline: 2px solid var(--md-sys-color-secondary);
@@ -338,9 +340,11 @@
   border-bottom-left-radius: 16px;
   border-bottom-right-radius: 16px;
 }
-.gemini-prompt:hover {
-  background: var(--md-sys-color-surface-container);
-  border-radius: 12px;
+@media (hover: hover) and (pointer: fine) {
+  .gemini-prompt:hover {
+    background: var(--md-sys-color-surface-container);
+    border-radius: 12px;
+  }
 }
 .gemini-prompt:active {
   border-radius: 16px;
@@ -465,8 +469,10 @@
   border-bottom-left-radius: 12px;
   border-bottom-right-radius: 12px;
 }
-.gemini-source:hover {
-  background: var(--md-sys-color-surface-container);
+@media (hover: hover) and (pointer: fine) {
+  .gemini-source:hover {
+    background: var(--md-sys-color-surface-container);
+  }
 }
 .gemini-source:focus-visible {
   outline: 2px solid var(--md-sys-color-secondary);
@@ -613,8 +619,10 @@
     background-color var(--md-sys-motion-effects-fast),
     border-radius var(--md-sys-motion-spatial-fast);
 }
-.gemini-summarize:hover {
-  background: var(--md-sys-color-surface-container-high);
+@media (hover: hover) and (pointer: fine) {
+  .gemini-summarize:hover {
+    background: var(--md-sys-color-surface-container-high);
+  }
 }
 .gemini-summarize:active {
   border-radius: 12px;
@@ -732,8 +740,10 @@
   color: var(--md-sys-color-primary);
   cursor: pointer;
 }
-.gemini-answer__more:hover {
-  background: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .gemini-answer__more:hover {
+    background: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
+  }
 }
 .gemini-sources--inline .gemini-source {
   background: var(--md-sys-color-surface-container-low);
@@ -771,8 +781,10 @@
     background-color var(--md-sys-motion-effects-fast),
     border-radius var(--md-sys-motion-spatial-fast);
 }
-.reply-suggest__card:hover {
-  background: var(--md-sys-color-surface-container-high);
+@media (hover: hover) and (pointer: fine) {
+  .reply-suggest__card:hover {
+    background: var(--md-sys-color-surface-container-high);
+  }
 }
 .reply-suggest__card:active {
   border-radius: 8px;
@@ -830,8 +842,10 @@
     background-color var(--md-sys-motion-effects-fast),
     border-radius var(--md-sys-motion-spatial-fast);
 }
-.reply-suggest__quick:hover {
-  background: var(--md-sys-color-surface-container-high);
+@media (hover: hover) and (pointer: fine) {
+  .reply-suggest__quick:hover {
+    background: var(--md-sys-color-surface-container-high);
+  }
 }
 .reply-suggest__quick:active {
   border-radius: 12px;
@@ -913,8 +927,10 @@
   cursor: pointer;
   transition: background-color var(--md-sys-motion-effects-fast);
 }
-.hmw__mode:hover {
-  background: var(--md-sys-color-surface-container-highest);
+@media (hover: hover) and (pointer: fine) {
+  .hmw__mode:hover {
+    background: var(--md-sys-color-surface-container-highest);
+  }
 }
 .hmw__mode:focus-visible {
   outline: 2px solid var(--md-sys-color-secondary);
@@ -1016,9 +1032,11 @@
     background-color var(--md-sys-motion-effects-fast),
     border-radius var(--md-sys-motion-spatial-fast);
 }
-.hmw__chip:hover {
-  background: var(--md-sys-color-surface-container-highest);
-  border-radius: 12px;
+@media (hover: hover) and (pointer: fine) {
+  .hmw__chip:hover {
+    background: var(--md-sys-color-surface-container-highest);
+    border-radius: 12px;
+  }
 }
 .hmw__chip:focus-visible {
   outline: 2px solid var(--md-sys-color-secondary);
@@ -1157,8 +1175,10 @@
   text-align: start;
   cursor: pointer;
 }
-.ai-todo__open:hover {
-  background: color-mix(in srgb, var(--md-sys-color-on-surface) 6%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .ai-todo__open:hover {
+    background: color-mix(in srgb, var(--md-sys-color-on-surface) 6%, transparent);
+  }
 }
 .ai-todo__open:focus-visible {
   outline: 2px solid var(--md-sys-color-secondary);
@@ -1201,8 +1221,10 @@
 .ai-done > summary::-webkit-details-marker {
   display: none;
 }
-.ai-done > summary:hover {
-  background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .ai-done > summary:hover {
+    background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+  }
 }
 .ai-done[open] > summary > :first-child {
   transform: rotate(180deg);
@@ -1254,8 +1276,10 @@
   text-align: start;
   cursor: pointer;
 }
-.ai-topic__thread:hover {
-  background: var(--md-sys-color-surface-container);
+@media (hover: hover) and (pointer: fine) {
+  .ai-topic__thread:hover {
+    background: var(--md-sys-color-surface-container);
+  }
 }
 .ai-topic__thread:focus-visible {
   outline: 2px solid var(--md-sys-color-secondary);
@@ -1305,5 +1329,24 @@
   .gemini-answer__more {
     animation: fade-in 120ms linear backwards;
     animation-delay: 0s !important;
+  }
+}
+
+/* Reduced motion: the same entrances without the movement. */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes gemini-panel-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes gemini-panel-up {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes gemini-rise {
+    from {
+      opacity: 0;
+    }
   }
 }

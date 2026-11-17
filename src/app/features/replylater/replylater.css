@@ -89,7 +89,7 @@
   transition: opacity var(--md-sys-motion-effects-fast);
   z-index: -1;
 }
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .aside__head:hover::before {
     opacity: 0.08;
   }
@@ -283,5 +283,14 @@
   from {
     opacity: 0;
     transform: translateY(-8px);
+  }
+}
+
+/* Reduced motion: the same entrances without the movement. */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes aside-session-in {
+    from {
+      opacity: 0;
+    }
   }
 }

@@ -121,8 +121,7 @@ test.describe('phone @phone', () => {
   test('coming back from a conversation finds the list where it was left', async ({ mail, page }) => {
     await mail.open('inbox');
     await expect(mail.rows.nth(12)).toBeAttached();
-    const scroller = page.locator('.list-scroll');
-    const top = await scroller.evaluate((el) => {
+    const top = await page.locator('.list-scroll').evaluate((el) => {
       el.scrollTop = Math.min(900, el.scrollHeight - el.clientHeight - 20);
       return el.scrollTop;
     });
@@ -131,12 +130,16 @@ test.describe('phone @phone', () => {
     const index = await page.evaluate(() => document.elementFromPoint(innerWidth / 2, innerHeight / 2)?.closest('[data-row-index]')?.getAttribute('data-row-index'));
     expect(index).toBeTruthy();
     const row = mail.list.locator(`[data-row-index="${index}"]`);
-    await row.locator('.row__subject-text').tap();
-    await expect(mail.threadHeading).toBeVisible();
+    const subject = await row.locator('.row__subject-text').innerText();
+    const before = (await row.boundingBox())!.y;
+    // At the point, as a finger would: a locator's tap scrolls its target again first.
+    const at = (await row.locator('.row__subject-text').boundingBox())!;
+    await page.touchscreen.tap(at.x + at.width / 2, at.y + at.height / 2);
+    await expect(mail.threadHeading).toContainText(subject);
 
     await mail.threadToolbar.getByRole('button', { name: 'Back to list' }).tap();
 
-    await expect(row).toBeInViewport();
-    expect(Math.abs((await scroller.evaluate((el) => el.scrollTop)) - top)).toBeLessThan(4);
+    await expect(row).toContainText(subject);
+    await expect.poll(async () => Math.abs((await row.boundingBox())!.y - before)).toBeLessThan(4);
   });
 });

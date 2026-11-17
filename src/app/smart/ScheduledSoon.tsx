@@ -29,16 +29,18 @@ export function ScheduledSoon() {
           const when = describeTime(t.scheduledFor!);
           return (
             <div key={t.id} className="row-wrap">
-              <div className="row nudge-row" role="button" tabIndex={0} onClick={() => openThread(t.id, SCHEDULED)} onKeyDown={(e) => e.key === 'Enter' && openThread(t.id, SCHEDULED)}>
-                <Avatar name={to?.name} email={to?.email ?? ''} size={40} />
-                <span className="nudge-row__text">
-                  <span className="md-title-small">To: {t.recipients?.length ? participantsLine(t.recipients, me) : '(no recipients)'}</span>
-                  <span className="md-body-medium nudge-row__subject">{t.subject || '(no subject)'}</span>
-                  <span className="md-body-medium scheduled-soon__when">
-                    <Icon name="schedule_send" size={16} />
-                    Sends {when}
+              <div className="row nudge-row">
+                <button type="button" className="nudge-row__open" onClick={() => openThread(t.id, SCHEDULED)}>
+                  <Avatar name={to?.name} email={to?.email ?? ''} size={40} />
+                  <span className="nudge-row__text">
+                    <span className="md-title-small">To: {t.recipients?.length ? participantsLine(t.recipients, me) : '(no recipients)'}</span>
+                    <span className="md-body-medium nudge-row__subject">{t.subject || '(no subject)'}</span>
+                    <span className="md-body-medium scheduled-soon__when">
+                      <Icon name="schedule_send" size={16} />
+                      Sends {when}
+                    </span>
                   </span>
-                </span>
+                </button>
               </div>
             </div>
           );
