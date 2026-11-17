@@ -2,7 +2,7 @@
 
 Expressive Gmail is a browser extension that redraws Gmail on `mail.google.com`. It has no server, and its developer never receives your data.
 
-Last updated: November 8, 2026.
+Last updated: November 16, 2026.
 
 ## What it reads
 
@@ -13,11 +13,9 @@ To show your mail, the extension reads the Gmail account you're signed in to in 
 
 ## Where it goes
 
-Your mail and account data go only to Google: `mail.google.com`, `accounts.google.com`, `peoplestack-pa.clients6.google.com` (contact suggestions and photos, as Gmail's own compose asks for them), `gmail.googleapis.com`, `people.googleapis.com`, `oauth2.googleapis.com` (signing out of the Gmail API connection), `googleusercontent.com`, `lh3.google.com`, `gstatic.com` and `dns.google`.
+Your mail and account data go only to Google: `mail.google.com`, `accounts.google.com`, `peoplestack-pa.clients6.google.com` (contact suggestions and photos, as Gmail's own compose asks for them), `gmail.googleapis.com`, `people.googleapis.com`, `oauth2.googleapis.com` (signing out of the Gmail API connection), `googleusercontent.com`, `lh3.google.com` and `gstatic.com`.
 
 On a phone, requests to `mail.google.com` name the browser as its desktop version (as "Request desktop website" does), so Gmail serves the page the extension works with. Nothing else about the requests changes, and other sites are left alone.
-
-One exception, the same one Gmail makes: a company that publishes a verified logo (BIMI) names an address for it in its DNS records, which the extension reads through Google's resolver at `dns.google`. That logo image is then loaded from the address the company published (often `vmc.digicert.com` or the company's own server), once per company, as a plain image request with no referrer. It carries nothing about you or your mail.
 
 Two things reach a sender, both the same as in Gmail:
 
@@ -48,7 +46,7 @@ Package tracking, verification codes, invites, bills and the other smart cards a
 
 If your Google account includes Gemini in Gmail, the extension can use it: summaries, Help me write, Proofread, suggested replies, answers to questions about your mail and AI Inbox. It does this through Gmail's own page and your own account, the same way Gmail does when you use Gemini there, so Google's Gemini terms for your account apply. The extension never sends your mail to any other AI service. Turn it off under Settings > Gemini, and nothing more goes to Gemini from the extension.
 
-Some things you click open another site in a new tab, the same way Gmail does: links in messages, a Google search for the tracking number from **Track package**, Google Calendar from **Add to Google Calendar**, and Google Translate (with the message text in the address) from **Translate**.
+Some things you click open another site in a new tab, the same way Gmail does: links in messages; from **Track package**, the tracking link in the email, the carrier's tracking page (UPS, USPS, FedEx or DHL) or a Google search for the tracking number; Google Calendar from **Add to Google Calendar**, and Google Translate (with the message text in the address) from **Translate**.
 
 ## Google API Services
 

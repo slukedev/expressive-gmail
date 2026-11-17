@@ -90,13 +90,13 @@ Replaces the Gmail web interface on mail.google.com with a Material 3 Expressive
 | `storage` | Keeps the user's settings, notes, templates, reminders and a small inbox cache on their device. |
 | `alarms` | Wakes snoozed conversations and due follow-up reminders once a minute. |
 | `identity` | Optional "Gmail API" connection: signs the user in with Google through the browser's OAuth flow, with a client ID they provide. |
+| `declarativeNetRequestWithHostAccess` | On phones, asks mail.google.com for its desktop site so the redesign can load. Only for that site, only while the new look is on. |
 | `notifications` | Desktop notifications for new mail, which the user turns on in Settings. |
 | Host `mail.google.com` | The extension runs on Gmail and reads the signed-in user's mail through Gmail's own endpoints to draw the new interface. |
 | Host `accounts.google.com` | Lists the Google accounts signed in to the browser for the account switcher. |
 | Hosts `gmail.googleapis.com`, `people.googleapis.com` | The optional Gmail API connection and contact names and photos. |
 | Hosts `lh3.google.com`, `*.googleusercontent.com` | Profile photos and attachment thumbnails that only load with the user's Google session. |
 | Host `*.gstatic.com` | Google's favicon service, for company logos beside their mail. |
-| Host `dns.google` | Reads the verified-logo (BIMI) record a company publishes in DNS, so its logo shows beside its mail as it does in Gmail. |
 
 **Remote code**: No, I am not using remote code. Everything is bundled in the package.
 

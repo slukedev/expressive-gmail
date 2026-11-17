@@ -52,11 +52,11 @@ npm run build:all
 | --- | --- |
 | Chrome, Dia, Arc, Edge, Brave | `chrome://extensions`, turn on Developer mode, **Load unpacked**, choose `.output/chrome-mv3` |
 | Firefox | `about:debugging#/runtime/this-firefox`, **Load Temporary Add-on**, pick `.output/firefox-mv3/manifest.json` |
-| Safari on Mac | `npm run safari:xcode`, run `safari/Expressive Gmail/Expressive Gmail.xcodeproj` once, enable it in Safari > Settings > Extensions (unsigned builds need Develop > Allow Unsigned Extensions). `TEAM_ID=XXXXXXXXXX npm run safari:install` builds a signed copy into `~/Applications`. |
-| Safari on iPhone and iPad | `npm run safari:ios`, pick your team in `safari-ios/Expressive Gmail/Expressive Gmail.xcodeproj`, run it on the device, then turn it on in Settings > Apps > Safari > Extensions. iOS 16.4 or later. |
+| Safari on Mac | `BUNDLE_ID=com.yourname.expressivegmail npm run safari:xcode`, run `safari/Expressive Gmail/Expressive Gmail.xcodeproj` once, enable it in Safari > Settings > Extensions (unsigned builds need Develop > Allow Unsigned Extensions). `TEAM_ID=XXXXXXXXXX BUNDLE_ID=com.yourname.expressivegmail npm run safari:install` builds a signed copy into `~/Applications`. |
+| Safari on iPhone and iPad | `BUNDLE_ID=com.yourname.expressivegmail npm run safari:ios`, pick your team in `safari-ios/Expressive Gmail/Expressive Gmail.xcodeproj`, run it on the device, then turn it on in Settings > Apps > Safari > Extensions. iOS 16.4 or later. |
 | Firefox for Android | The Firefox build runs on 128 or later; `npx web-ext run -t firefox-android` over USB debugging ([Mozilla's guide](https://extensionworkshop.com/documentation/develop/developing-extensions-for-firefox-for-android/)). |
 
-The Safari scripts use the bundle ID `com.example.bettergmail` unless you set `BUNDLE_ID`.
+Every Safari script needs `BUNDLE_ID`, a reverse-DNS id of your own, and stops if it isn't set. The release scripts also check the builds for the demo mailbox, and `release:mac` checks that `BUNDLE_ID` matches the Homebrew cask.
 
 On phones Gmail serves its mobile web app, so the extension asks mail.google.com for desktop Gmail (for that site only, and only while the new look is on) and fits it to the screen, the notch and the keyboard.
 
@@ -94,23 +94,24 @@ Everything Gmail web does day to day is still there: categories, labels, search 
 npm run preview
 ```
 
-Serves the UI at http://localhost:5199 against the demo mailbox (set `PREVIEW_PORT` for another port). `npm run dev` runs the real extension in a fresh Chrome with hot reload.
+Serves the UI at http://localhost:5199 against the demo mailbox (set `PREVIEW_PORT` for another port). `npm run test:e2e` reuses a preview this checkout already has running on that port, and stops with an error if the port belongs to another checkout or another program. `npm run dev` runs the real extension in a fresh Chrome with hot reload.
 
 Query flags for the preview: `?latency=0`, `?empty` (new account), `?onboarding`, `?chaos` (30% of calls fail), `?contacts=fail`, `?accounts=1`, `?delegated=0`, `?accountfail=studio`, `?lag=3000` (writes show up late), `?tabcount=missing` (no stored Updates tab count, as on real accounts), `?nodelete`, `?gemini=plan|smart-features|fail`, `?geminiDelay=1500`, `?schedule=off`. `/preview/frame.html` takes the same flags and hosts the preview in a frame the way Gmail's page does, which Interface size needs.
 
 | Script | What it does |
 | --- | --- |
 | `npm run typecheck`, `npm run lint` | TypeScript and ESLint |
-| `npm test` | Vitest unit and backend suites |
+| `npm test` | Vitest unit and backend suites, in New York time and US English whatever the machine uses (`TEST_TZ` and `TEST_LANG` pick another zone and language) |
 | `npm run test:e2e` | Playwright on Chromium, WebKit, Firefox and a phone profile |
 | `npm run build:all` | Chrome, Firefox and Safari builds into `.output/` |
 | `npm run zip` | Store zips for Chrome and Firefox |
+| `node scripts/smoke-extension.mjs [--phone]` | Loads the Chrome build into Chromium against a stubbed Gmail. Fails if installing, updating or starting the extension opens a tab, if the app doesn't mount, or (with `--phone`) if Gmail isn't asked for its desktop site or the app doesn't fit the screen |
 | `npm run safari:xcode`, `safari:ios`, `safari:install` | The Safari wrapper apps |
 | `npm run release:mac`, `release:appstore` | Notarized Mac app for Homebrew, App Store upload ([store/README.md](store/README.md)) |
 | `npm run store:images` | Store screenshots from the demo mailbox |
 | `npm run fonts` | Rebuilds the icon and text font subsets (Python `fonttools` and `brotli`) |
 
-Optional build settings: `WXT_GOOGLE_CLIENT_ID` (a default OAuth client for the Gmail API source), `BUNDLE_ID` and `TEAM_ID` for the Safari and Mac scripts.
+Build settings: `WXT_GOOGLE_CLIENT_ID` (optional, a default OAuth client for the Gmail API source), `BUNDLE_ID` (required by the Safari and Mac scripts) and `TEAM_ID` (signed Safari and Mac builds).
 
 [CONTRIBUTING.md](CONTRIBUTING.md) covers the checks to run and the rules; [docs/how-it-works.md](docs/how-it-works.md) explains the backends, sync, accounts and known limits; [DESIGN.md](DESIGN.md) is the visual system.
 

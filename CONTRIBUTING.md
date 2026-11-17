@@ -6,7 +6,7 @@ Read [README.md](README.md) for how the extension works, [PRODUCT.md](PRODUCT.md
 
 ## Setup
 
-You need Node 22.22.2+, 24.15+ or 26+ (CI uses Node 24) and npm.
+You need Node 22.22.2+, 24.15+ or 26+ and npm. CI runs on all three.
 
 ```bash
 npm install
@@ -48,7 +48,23 @@ npm test
 npm run test:e2e
 ```
 
-`npm run lint` runs ESLint. CI runs typecheck, lint, Vitest and the Chromium and WebKit Playwright projects on every pull request.
+`npm run lint` runs ESLint; CI allows no warnings.
+
+On every pull request and every push to `main`, CI runs:
+
+- typecheck, lint and Vitest, with Vitest repeated on Node 22 and 26, in Europe/Berlin in German and in Pacific/Chatham;
+- the Chrome, Firefox and Safari builds, the check that no build carries the demo mailbox, and the store zips;
+- `scripts/smoke-extension.mjs` on desktop and phone, which also fails if installing, updating or starting the extension opens a tab;
+- Playwright on Chromium, Firefox, WebKit and the phone profile on Linux, and WebKit and the phone profile on macOS;
+- unsigned builds of the Mac and iPhone apps.
+
+A Playwright test gets one retry in CI, and a test that passes only on its retry still fails the run. Failed runs keep the HTML report, traces and screenshots as artifacts for a week.
+
+Unit tests run in New York time and US English on every machine. Tests that expect US English dates or numbers check `usEnglish` from `tests/locale.ts` and skip in other languages. To reproduce the Berlin job locally: `TEST_TZ=Europe/Berlin TEST_LANG=de_DE.UTF-8 npm test`.
+
+`npm run test:e2e` starts the preview itself, or reuses one already running from this checkout. If something else holds the port (another worktree's preview, another app), it stops with an error instead of testing the wrong code; stop that server or set `PREVIEW_PORT`.
+
+TypeScript stays on 6.x until typescript-eslint supports TypeScript 7.
 
 For visual changes, `node scripts/capture.mjs <dir> [filter]` screenshots the main states of the preview (it expects `npm run preview` to be running). Attach the before and after shots to your pull request.
 
