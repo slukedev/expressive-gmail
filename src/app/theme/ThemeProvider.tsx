@@ -53,6 +53,22 @@ function prefixed(palette: Record<string, string>) {
   return out;
 }
 
+/** The `--md-sys-color-*` roles the app paints with now, for things drawn outside CSS. */
+export function useThemeVars(): Record<string, string> {
+  const dark = useResolvedDark();
+  const source = useSettings((s) => s.themeSource);
+  const seed = useSettings((s) => s.seed);
+  const variant = useSettings((s) => s.variant);
+  const contrast = useSettings((s) => s.contrast);
+  return useMemo(
+    () =>
+      source === 'google'
+        ? prefixed(dark ? GOOGLE_DARK : GOOGLE_LIGHT)
+        : themeToCssVars({ seed, variant, dark, contrast }),
+    [source, seed, variant, dark, contrast],
+  );
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const dark = useResolvedDark();
   const source = useSettings((s) => s.themeSource);
@@ -62,13 +78,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const mode = useSettings((s) => s.themeMode);
   const nextSeed = useSettings((s) => (isRandomTheme(s) ? s.nextRandomSeed : ''));
   const loaded = useSettingsStore((s) => s.loaded);
-  const vars = useMemo(
-    () =>
-      source === 'google'
-        ? prefixed(dark ? GOOGLE_DARK : GOOGLE_LIGHT)
-        : themeToCssVars({ seed, variant, dark, contrast }),
-    [source, seed, variant, dark, contrast],
-  );
+  const vars = useThemeVars();
 
   const latest = useRef({ vars, dark, source });
   latest.current = { vars, dark, source };

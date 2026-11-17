@@ -1,7 +1,8 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useAccount, useLabels, useMailSync } from '../../data/hooks';
 import { useBackendKind } from '../../data/useBackendKind';
-import { setHostFavicon, setHostTitle } from '../../lib/host';
+import { setHostTitle } from '../../lib/host';
+import { useTabIcon } from '../tabicon/useTabIcon';
 import { useAppLaunches } from './useAppLaunches';
 import { getRoute, navigate, useRoute } from '../../router/useRoute';
 import { useSettings, updateSettings } from '../../state/settings';
@@ -162,7 +163,7 @@ export function Shell() {
     const who = scopeTitle ?? account?.email;
     setHostTitle(`${title}${count}${who ? ` - ${who}` : ''} - Gmail`);
   }, [route.view, inboxUnread, account, splits, scopeTitle]);
-  useEffect(() => setHostFavicon(inboxUnread), [inboxUnread]);
+  useTabIcon(inboxUnread);
   useAppLaunches(inboxUnread);
 
   const rail = compact ? 'hidden' : medium || !railExpanded ? 'collapsed' : 'expanded';

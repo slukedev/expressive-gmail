@@ -2,6 +2,7 @@
 // host page provides (Interface size) can be tried and tested without Gmail.
 import { FRAME_STYLE } from '../src/shared/frame';
 import { applyFrameScale, readHostUiScale, serveFrameScale } from '../src/shared/uiScale';
+import { isTabIconHref, startTabIconHost } from '../src/shared/tab-icon-host';
 
 const frame = document.createElement('iframe');
 frame.src = `/${location.search}${location.hash}`;
@@ -14,10 +15,15 @@ host.style.cssText = 'position:fixed;inset:0;overflow:clip';
 host.append(frame);
 document.body.append(host);
 
+// The page's own icon stands in for Gmail's, so the tab icon can be tested the way it runs on Gmail.
+const tabIcon = startTabIconHost();
 window.addEventListener('message', (e) => {
-  const d = e.data as { source?: string; type?: string; scale?: unknown };
+  const d = e.data as { source?: string; type?: string; scale?: unknown; href?: unknown };
   if (e.source !== frame.contentWindow || d?.source !== 'better-gmail/app') return;
   if (d.type === 'scale') serveFrameScale(frame, d.scale);
+  if (d.type === 'favicon' && (d.href === null || isTabIconHref(d.href))) tabIcon.set(d.href);
+  if (d.type === 'gmail-icon')
+    void tabIcon.gmailIcon().then((href) => frame.contentWindow?.postMessage({ source: 'better-gmail/content', type: 'gmail-icon', href }, location.origin));
 });
 
 // The installed app's host side (src/shared/pwa-host.ts), faked: `?app=install` offers to install,

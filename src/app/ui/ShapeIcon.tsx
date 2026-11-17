@@ -33,7 +33,7 @@ const polygon = (name: ShapeName): RoundedPolygon => MaterialShapes[name];
 
 // An outline costs a fraction of a ms, a morph several; both are cached, and warmShapes() builds the likely ones at idle.
 const paths = new Map<ShapeName, string>();
-function shapePath(name: ShapeName): string {
+export function shapePath(name: ShapeName): string {
   let d = paths.get(name);
   if (d === undefined) {
     d = roundedPolygonToPath(polygon(name)).toSvgPathData();

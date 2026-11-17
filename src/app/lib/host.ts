@@ -1,5 +1,6 @@
 /** Talks to the content script hosting this frame on mail.google.com. */
 import { HOST } from './appHost';
+import { startTabIconHost, type TabIconHost } from '../../shared/tab-icon-host';
 
 function post(type: string, payload: Record<string, unknown> = {}) {
   if (window.parent === window) return false;
@@ -31,8 +32,40 @@ export function setHostTitle(title: string) {
   post('title', { title });
 }
 
-export function setHostFavicon(unread: number) {
-  post('favicon', { unread });
+let lastIcon: string | null | undefined;
+// Run on its own (the preview), the app keeps its own tab's icon the same way the host page does.
+let ownIcon: TabIconHost | undefined;
+
+/** A PNG `data:` URL, or null for Gmail's own icon. */
+export function setHostFavicon(href: string | null) {
+  if (href === lastIcon) return;
+  lastIcon = href;
+  if (!post('favicon', { href })) (ownIcon ??= startTabIconHost()).set(href);
+}
+
+let gmailIconAsk: Promise<string | null> | undefined;
+
+/** Gmail's own icon from the host page, as a `data:` URL; null when it can't be read. */
+export function hostGmailIcon(): Promise<string | null> {
+  if (window.parent === window) return Promise.resolve(null);
+  gmailIconAsk ??= new Promise<string | null>((resolve) => {
+    const done = (href: string | null) => {
+      window.removeEventListener('message', onMessage);
+      clearTimeout(timer);
+      // A miss is asked again next time: the page may have been offline.
+      if (href === null) gmailIconAsk = undefined;
+      resolve(href);
+    };
+    const onMessage = (e: MessageEvent) => {
+      const d = e.data as { source?: string; type?: string; href?: unknown };
+      if (e.source !== window.parent || e.origin !== HOST || d?.source !== 'better-gmail/content' || d.type !== 'gmail-icon') return;
+      done(typeof d.href === 'string' && /^data:image\//.test(d.href) ? d.href : null);
+    };
+    const timer = setTimeout(() => done(null), 10_000);
+    window.addEventListener('message', onMessage);
+    post('gmail-icon');
+  });
+  return gmailIconAsk;
 }
 
 /** Asks the host page to scale this frame (`shared/uiScale.ts`). */

@@ -98,11 +98,11 @@ export function AccountsSettings({ intent }: { intent?: string }) {
 
   return (
     <div className="settings-group">
-      <SettingRow title="Open Gmail in" description="Where a new Gmail tab starts. Each tab remembers where you left it when you reload.">
+      <SettingRow title="Open Gmail in" description="For new tabs. A tab you reload stays where it was.">
         <Select<string> align="end" label="Open Gmail in" value={startScope} onChange={(v) => updateSettings({ startScope: v as StartScope })} options={startOptions} />
       </SettingRow>
-      <SettingRow title="Show the account on conversations" description="In All inboxes and circles, so you can tell at a glance which inbox a conversation is in.">
-        <Select<AccountMarker> align="end" label="Show the account on conversations" value={marker} onChange={(accountMarker) => updateSettings({ accountMarker })} options={MARKERS} />
+      <SettingRow title="Account on conversations" description="In All inboxes and circles.">
+        <Select<AccountMarker> align="end" label="Account on conversations" value={marker} onChange={(accountMarker) => updateSettings({ accountMarker })} options={MARKERS} />
       </SettingRow>
 
       <h3 className="md-label-large settings-subhead">Accounts</h3>
@@ -224,7 +224,7 @@ function Swatches({ value, onChange, legend }: { value: string; onChange: (hex: 
   );
 }
 
-const ACCOUNT_COLOR_NAMES: Record<string, string> = {
+export const ACCOUNT_COLOR_NAMES: Record<string, string> = {
   '#4a86e8': 'blue',
   '#16a766': 'green',
   '#e07798': 'pink',

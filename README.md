@@ -82,6 +82,7 @@ Settings > Connection picks the source:
 - **Reply later**, **follow-up reminders**, **pin to top**, **splits** (a saved search as its own inbox tab), **pause inbox**, **private notes**, **templates** with `/shortcut` insert, **next unread** (Shift J / K).
 - **Subscriptions** by sender with one-click unsubscribe, an **attachments** gallery, and **Free up space** for big and old mail.
 - **Material You themes** from any color or your own photo, Google's palette by default, light, dark and system, three contrast levels, dark emails that match the dark theme, and an **interface size** setting for smaller screens.
+- **Tab icons** in your theme's colors or Gmail's own, with or without the unread count, and a different one for each account so their tabs stand apart.
 - **Tracker blocking**: open-tracking pixels are stripped from every message.
 - **Install it as an app** in Chrome, Edge and other Chromium browsers (Settings > App, or the install button in the address bar): its own window colored to your theme, the unread count on its icon, shortcuts to a new message, Inbox, Starred and Drafts, `mailto:` links from other sites and apps, sharing to it from other apps, and opening files with it to attach them to a new message.
 - Date sections, quick filters, a resizable reading pane, swipe actions and pull to refresh on touch, and undo for every action (`z`).
@@ -96,7 +97,7 @@ npm run preview
 
 Serves the UI at http://localhost:5199 against the demo mailbox (set `PREVIEW_PORT` for another port). `npm run test:e2e` reuses a preview this checkout already has running on that port, and stops with an error if the port belongs to another checkout or another program. `npm run dev` runs the real extension in a fresh Chrome with hot reload.
 
-Query flags for the preview: `?latency=0`, `?empty` (new account), `?onboarding`, `?chaos` (30% of calls fail), `?contacts=fail`, `?accounts=1`, `?delegated=0`, `?accountfail=studio`, `?lag=3000` (writes show up late), `?tabcount=missing` (no stored Updates tab count, as on real accounts), `?nodelete`, `?gemini=plan|smart-features|fail`, `?geminiDelay=1500`, `?schedule=off`. `/preview/frame.html` takes the same flags and hosts the preview in a frame the way Gmail's page does, which Interface size needs.
+Query flags for the preview: `?latency=0`, `?empty` (new account), `?onboarding`, `?chaos` (30% of calls fail), `?contacts=fail`, `?accounts=1`, `?delegated=0`, `?accountfail=studio`, `?lag=3000` (writes show up late), `?nodelete`, `?gemini=plan|smart-features|fail`, `?geminiDelay=1500`, `?schedule=off`. `/preview/frame.html` takes the same flags and hosts the preview in a frame the way Gmail's page does, which Interface size needs.
 
 | Script | What it does |
 | --- | --- |

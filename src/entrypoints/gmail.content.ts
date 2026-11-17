@@ -21,6 +21,7 @@ import { discoverDelegated } from '../session/delegated';
 import type { DelegatedMailbox } from '../shared/accounts-rpc';
 import { applyFrameScale, readHostUiScale, serveFrameScale } from '../shared/uiScale';
 import { startAppHost, type AppHost } from '../shared/pwa-host';
+import { isTabIconHref, startTabIconHost } from '../shared/tab-icon-host';
 
 // Gmail keeps running hidden underneath so its session stays alive; the app runs in an
 // extension frame on top and reaches mail through a MessagePort this script hands it.
@@ -183,6 +184,13 @@ function mount(
   let unsentDrafts = 0;
   const accounts = accountsService(backend);
   shareSession();
+  const tabIcon = startTabIconHost();
+  // Updated or removed under an open tab: the tab is Gmail's again, icon too.
+  signal.addEventListener('abort', () => tabIcon.release());
+  // The last icon this account's tab drew, so a reload doesn't flash Gmail's before the app is up.
+  const tabIconKey = `better-gmail:tab-icon:${accountIndexFromPath(location.pathname)}`;
+  const lastTabIcon = readSiteStorage(tabIconKey);
+  if (isTabIconHref(lastTabIcon)) tabIcon.set(lastTabIcon);
   let wantedTitle = '';
   const titleObserver = new MutationObserver(() => {
     if (wantedTitle && document.title !== wantedTitle) document.title = wantedTitle;
@@ -233,7 +241,13 @@ function mount(
         }
         break;
       case 'favicon':
-        setFavicon(Number(data.unread) || 0);
+        if (data.href === null || isTabIconHref(data.href)) {
+          tabIcon.set(data.href);
+          writeSiteStorage(tabIconKey, data.href);
+        }
+        break;
+      case 'gmail-icon':
+        void tabIcon.gmailIcon().then((href) => frame.contentWindow?.postMessage({ source: 'better-gmail/content', type: 'gmail-icon', href }, extOrigin));
         break;
       case 'scale':
         serveFrameScale(frame, data.scale);
@@ -263,6 +277,7 @@ function mount(
         rest.remove();
         viewport.remove();
         app.release();
+        tabIcon.release();
         titleObserver.disconnect();
         if (typeof data.hash === 'string' && /^#[\w/-]+$/.test(data.hash)) {
           // The app's routes reach this URL by replaceState, which Gmail never sees; clear it so Gmail gets a real hashchange.
@@ -563,6 +578,23 @@ function followKeyboard(host: HTMLElement, signal: AbortSignal) {
   });
 }
 
+function readSiteStorage(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeSiteStorage(key: string, value: string | null) {
+  try {
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
+  } catch {
+    // Site data blocked or full: the next load shows Gmail's icon until the app draws its own.
+  }
+}
+
 function frameBackground(systemDark: boolean) {
   let raw: string | null = null;
   try {
@@ -594,48 +626,6 @@ function diag(line: string) {
 // Gmail's #inbox/FMfcg... hashes pass straight through; ours use the same scheme.
 function mapHash(hash: string) {
   return hash && hash !== '#' ? hash : '#inbox';
-}
-
-let faviconLink: HTMLLinkElement | null = null;
-function setFavicon(unread: number) {
-  const size = 64;
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = size;
-  const g = canvas.getContext('2d');
-  if (!g) return;
-  g.fillStyle = '#0b57d0';
-  g.beginPath();
-  g.roundRect(4, 4, 56, 56, 18);
-  g.fill();
-  g.strokeStyle = '#ffffff';
-  g.lineWidth = 5;
-  g.lineJoin = 'round';
-  g.strokeRect(15, 20, 34, 24);
-  g.beginPath();
-  g.moveTo(16, 22);
-  g.lineTo(32, 34);
-  g.lineTo(48, 22);
-  g.stroke();
-  if (unread > 0) {
-    const text = unread > 99 ? '99+' : String(unread);
-    g.font = 'bold 26px system-ui, sans-serif';
-    const w = Math.max(30, g.measureText(text).width + 14);
-    g.fillStyle = '#b3261e';
-    g.beginPath();
-    g.roundRect(size - w, 0, w, 30, 15);
-    g.fill();
-    g.fillStyle = '#ffffff';
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.fillText(text, size - w / 2, 16);
-  }
-  document.querySelectorAll('link[rel~="icon"]').forEach((l) => l !== faviconLink && l.remove());
-  if (!faviconLink) {
-    faviconLink = document.createElement('link');
-    faviconLink.rel = 'icon';
-    document.head?.append(faviconLink);
-  }
-  faviconLink.href = canvas.toDataURL('image/png');
 }
 
 /** "tab": switched to classic for this tab. "off": turned off from the toolbar. Hiding lasts as long as that choice. */

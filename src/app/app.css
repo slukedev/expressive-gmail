@@ -4418,11 +4418,15 @@ button.att-chip:focus-visible {
 .settings-block > .settings-subhead + .setting-row {
   margin-top: 0;
 }
-/* Search shows matches under their section's name; run titles inside would repeat it. */
+/* Search keeps each match's group title, quieter than its section's, so a row like "Color" says whose color it is. */
 .settings-results .settings-block:has(.setting-row) ~ .settings-block:has(.setting-row) {
   margin-top: 12px;
 }
-.settings-results .settings-block__head,
+.settings-results .settings-block__head {
+  margin: 8px 16px 6px;
+  color: var(--md-sys-color-on-surface-variant);
+  font-weight: 500;
+}
 .settings-block:not(:has(.setting-row)) {
   display: none;
 }
@@ -4944,6 +4948,95 @@ button.att-chip:focus-visible {
 }
 .seed-dot[data-light] {
   color: #1f1f1f;
+}
+/* Tab icon: each choice is the icon as the tab will show it. */
+.setting-row:has(.tab-icon-looks) {
+  row-gap: 12px;
+}
+.tab-icon-looks,
+.tab-icon-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.tab-icon-colors {
+  gap: 8px;
+}
+.tab-icon-look {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--md-sys-shape-corner-full);
+  color: var(--md-sys-color-on-surface-variant);
+  cursor: pointer;
+  transition:
+    border-radius var(--md-sys-motion-spatial-fast),
+    background-color var(--md-sys-motion-effects-fast),
+    transform var(--md-sys-motion-effects-fast);
+}
+.tab-icon-look img {
+  display: block;
+  width: 28px;
+  height: 28px;
+  pointer-events: none;
+}
+.tab-icon-look[data-checked] {
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: var(--md-sys-color-secondary-container);
+}
+.tab-icon-look:active,
+.tab-icon-color:active {
+  transform: scale(0.94);
+}
+.tab-icon-color {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--swatch);
+  cursor: pointer;
+  transition:
+    box-shadow var(--md-sys-motion-effects-fast),
+    transform var(--md-sys-motion-effects-fast);
+}
+.tab-icon-color--theme {
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+}
+.tab-icon-color[data-checked] {
+  box-shadow: 0 0 0 2px var(--field-bg), 0 0 0 4px var(--md-sys-color-on-surface);
+}
+@media (hover: hover) and (pointer: fine) {
+  .tab-icon-look:not([data-checked]):hover {
+    background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+  }
+}
+@media (max-width: 420px) {
+  .tab-icon-colors {
+    gap: 12px;
+  }
+  .tab-icon-color {
+    width: 40px;
+    height: 40px;
+  }
+}
+@media (forced-colors: active) {
+  .tab-icon-look[data-checked] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+  .tab-icon-color {
+    forced-color-adjust: none;
+  }
+  .tab-icon-color:not(:focus-visible) {
+    outline: 1px solid ButtonText;
+    outline-offset: 1px;
+  }
+  .tab-icon-color[data-checked]:not(:focus-visible) {
+    outline: 3px solid Highlight;
+  }
 }
 .choice-cards {
   display: flex;
