@@ -112,7 +112,9 @@ test('a message that fails to render is replaced by a notice, and the rest of th
   // Mail as a broken response might deliver it: the oldest message has no sender.
   await page.evaluate(async () => {
     // The exact module the app loaded (a dev server may version it), so this is the cache it reads.
-    const url = performance.getEntriesByType('resource').find((e) => /\/src\/app\/data\/client\.ts(\?|$)/.test(e.name))!.name;
+    // A faked page clock (near midnight, see fixtures.ts) leaves no resource entries; the plain path is the same module then.
+    const url =
+      performance.getEntriesByType('resource').find((e) => /\/src\/app\/data\/client\.ts(\?|$)/.test(e.name))?.name ?? '/src/app/data/client.ts';
     const { queryClient }: typeof import('../../src/app/data/client') = await import(url);
     queryClient.setQueriesData<{ messages: { from: unknown }[] }>(
       { predicate: (q) => q.queryKey[0] === 'thread' && String(q.queryKey[1]).endsWith('t-onboarding-v4') },
