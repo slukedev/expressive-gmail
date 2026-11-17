@@ -87,6 +87,11 @@ function nearMidnightInNewYork(now = new Date()): boolean {
   return hour >= 22 || hour < 2;
 }
 
+/** The time the page sees: seeds dated relative to now must use this, since near midnight the page's clock moves to midday. */
+export function pageNow(): number {
+  return nearMidnightInNewYork() ? middayInNewYork() : Date.now();
+}
+
 /** Today, 12:00 in New York (the suite's timezone), as an epoch time. */
 function middayInNewYork(now = new Date()): number {
   const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(now); // YYYY-MM-DD

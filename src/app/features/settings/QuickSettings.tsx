@@ -92,8 +92,8 @@ export function QuickSettings() {
               <h3 className="md-title-small qs-title">Density</h3>
               {(
                 [
-                  ['default', 'Default'],
                   ['comfortable', 'Comfortable'],
+                  ['default', 'Default'],
                   ['compact', 'Compact'],
                 ] as [Density, string][]
               ).map(([v, l]) => (

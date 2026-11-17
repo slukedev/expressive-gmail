@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures';
+import { DEFAULT_SEED, expect, test } from './fixtures';
 
 test('Dark theme from Quick settings applies at once and survives a reload', async ({ mail, page }) => {
   await mail.open('inbox');
@@ -249,7 +249,8 @@ test('A random theme gives each tab its own color, and a new tab leaves the open
 });
 
 test('a Gmail settings link opens that section of Settings over the inbox', async ({ mail, page }) => {
-  await mail.open('settings/appearance');
+  // Gmail's own name for its theme settings.
+  await mail.open('settings/oldthemes');
   const settings = page.getByRole('dialog', { name: 'Settings' });
   await expect(settings.getByRole('heading', { name: 'Appearance' })).toBeVisible();
   await expect(page).toHaveURL(/#inbox$/);
@@ -262,10 +263,47 @@ test('on a tablet, a setting’s choices move under its name instead of covering
   await page.setViewportSize({ width: 768, height: 1024 });
   await mail.open('settings/appearance');
   const settings = page.getByRole('dialog', { name: 'Settings' });
-  const choices = settings.getByRole('radiogroup', { name: 'Color source' });
+  const choices = settings.getByRole('radiogroup', { name: 'Colors' });
   await expect(choices).toBeVisible();
   const title = settings.getByText('Colors', { exact: true });
   const [t, c, scroller] = await Promise.all([title.boundingBox(), choices.boundingBox(), settings.locator('.settings__scroll').boundingBox()]);
   expect(c!.y).toBeGreaterThanOrEqual(t!.y + t!.height);
   expect(c!.x + c!.width).toBeLessThanOrEqual(scroller!.x + scroller!.width);
+});
+
+test('Skip to unread turns off while archiving goes back to the list, and comes back with any other choice', async ({ mail, page }) => {
+  await mail.open('settings/general');
+  const settings = page.getByRole('dialog', { name: 'Settings' });
+  const skip = settings.getByRole('switch', { name: 'Skip to unread' });
+  await expect(skip).toBeEnabled();
+  const goTo = settings.getByRole('combobox', { name: 'After archiving or deleting, go to' });
+  await goTo.click();
+  await page.getByRole('option', { name: 'Back to the list' }).click();
+  await expect(skip).toBeDisabled();
+  await goTo.click();
+  await page.getByRole('option', { name: 'Older conversation' }).click();
+  await expect(skip).toBeEnabled();
+});
+
+test.describe('with a template', () => {
+  test.use({ seed: { ...DEFAULT_SEED, templates: [{ id: 'tpl1', name: 'Thanks', shortcut: 'thx', html: '<p>Thanks!</p>' }] } });
+
+  test('deleting it can be undone', async ({ mail, page }) => {
+    await mail.open('settings/templates');
+    const settings = page.getByRole('dialog', { name: 'Settings' });
+    await settings.getByRole('button', { name: 'Delete Thanks' }).click();
+    await expect(settings.getByText('Thanks', { exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Undo' }).click();
+    await expect(settings.getByText('Thanks', { exact: true })).toBeVisible();
+  });
+});
+
+test('settings search matches word starts and names the group a match is in', async ({ mail, page }) => {
+  await mail.open('settings/general');
+  const settings = page.getByRole('dialog', { name: 'Settings' });
+  await settings.getByRole('searchbox', { name: 'Search settings' }).fill('tab');
+  await expect(settings.getByText('Promotions tab')).toBeVisible();
+  // "Comfortable" holds "tab" but doesn't start with it.
+  await expect(settings.getByRole('radiogroup', { name: 'Density' })).toHaveCount(0);
+  await expect(settings.getByRole('heading', { name: 'Start and sorting' })).toBeVisible();
 });

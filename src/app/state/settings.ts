@@ -5,6 +5,7 @@ import { PICTURE_SHAPES, type PictureShape } from '../features/wallpaper/shapes'
 import { DEFAULT_SEED, isPresetSeed, normalizeHex, randomSeed, type SchemeVariant } from '../theme/color';
 import { crossfadeTheme } from '../theme/crossfade';
 import { isUiScale } from '../../shared/uiScale';
+import { cleanTabIcon, DEFAULT_TAB_ICON, type TabIcon } from '../features/tabicon/choice';
 import { readKeyStrict, watchKey, writeKey } from './storage';
 
 export type Density = 'comfortable' | 'default' | 'compact';
@@ -45,6 +46,8 @@ interface AccountPrefs {
   color?: string;
   /** Leave this account out of All inboxes. */
   hideFromAll?: boolean;
+  /** Its own tab icon, in place of `Settings.tabIcon`. */
+  tabIcon?: TabIcon;
 }
 
 /** How rows in merged inboxes show their account. */
@@ -111,6 +114,8 @@ export interface Settings {
   notifications: boolean;
   /** The installed app's icon: the inbox's unread count, a plain dot, or nothing. */
   appBadge: 'count' | 'dot' | 'off';
+  /** The browser tab's icon for every account without its own (`AccountPrefs.tabIcon`). */
+  tabIcon: TabIcon;
   /** The empty reading pane shows what wants a look today. */
   glance: boolean;
   /** Like Inbox by Gmail. */
@@ -184,6 +189,7 @@ export const DEFAULT_SETTINGS: Settings = {
   geminiSearch: true,
   notifications: false,
   appBadge: 'count',
+  tabIcon: DEFAULT_TAB_ICON,
   glance: true,
   groupByDate: true,
   onboarded: false,
@@ -259,6 +265,15 @@ export function fromStorage(stored: unknown): Settings {
   if (!('customSeed' in stored) && !isPresetSeed(seed) && !(out.wallpaperColors as string[]).includes(seed)) out.customSeed = normalizeHex(seed) ?? '';
   if (out.startView !== 'inbox' && out.startView !== 'all') out.startView = DEFAULT_SETTINGS.startView;
   if (!['count', 'dot', 'off'].includes(out.appBadge as string)) out.appBadge = DEFAULT_SETTINGS.appBadge;
+  out.tabIcon = cleanTabIcon(out.tabIcon) ?? DEFAULT_SETTINGS.tabIcon;
+  out.accountPrefs = Object.fromEntries(
+    Object.entries(out.accountPrefs as Record<string, AccountPrefs>).map(([email, prefs]) => {
+      if (!prefs || typeof prefs !== 'object' || !('tabIcon' in prefs)) return [email, prefs];
+      const { tabIcon, ...rest } = prefs;
+      const clean = cleanTabIcon(tabIcon);
+      return [email, clean ? { ...rest, tabIcon: clean } : rest];
+    }),
+  );
   out.shortcutKeys = cleanShortcutKeys(out.shortcutKeys);
   if (!isUiScale(out.uiScale)) out.uiScale = 1;
   if (!PICTURE_SHAPES.some((p) => p.shape === out.pictureShape)) out.pictureShape = DEFAULT_SETTINGS.pictureShape;

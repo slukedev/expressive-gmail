@@ -91,7 +91,7 @@ export function SignatureSettings() {
   return (
     <div className="settings-group signature-settings">
       <p className="settings-note md-body-medium">
-        Your signature goes at the end of what you write, above any quoted mail. While writing, the signature button swaps it for another or takes it out. Signatures are kept in this browser, so Gmail on your phone keeps using the one set in Gmail.
+        Signatures are saved in this browser. Gmail on your other devices keeps using the one set in Gmail.
       </p>
 
       {loaded && signatures.length === 0 && (

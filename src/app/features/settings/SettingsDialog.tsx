@@ -8,7 +8,7 @@ import { classicGmail, openUrl } from '../../lib/host';
 import { SEED_PRESETS, labelDotColor, type SchemeVariant } from '../../theme/color';
 import { CustomSeedDot, RandomSeedDot } from './ColorChoices';
 import { useResolvedDark } from '../../theme/ThemeProvider';
-import { updateSettings, useSettings, type Settings, type Split, type Template } from '../../state/settings';
+import { updateSettings, useSettings, useSettingsStore, type Settings, type Split, type Template } from '../../state/settings';
 import { useUi } from '../../state/ui';
 import { Button, IconButton, cx } from '../../ui/Button';
 import { ConnectedButtonGroup } from '../../ui/ButtonGroup';
@@ -33,9 +33,14 @@ import { SidebarSettings } from './SidebarSettings';
 import { UiScaleChoice } from './UiScaleChoice';
 import { uiScaleAvailable } from '../../theme/uiScale';
 import { captureListPlace, restoreListPlace, type ListPlace } from './listPlace';
+import { highlight, matches, searchWords } from './search';
 import { geminiAvailable, geminiOn, type GeminiStatus } from '../../data/gemini';
 import { useGeminiStatus } from '../gemini/useGemini';
 import { appFeatures, installApp, openEmailLinksHere, useAppHost } from '../../lib/appHost';
+import { useAccounts } from '../../data/accounts/store';
+import type { TabIcon } from '../tabicon/choice';
+import { TabIconColorPicker, TabIconLookPicker } from '../tabicon/TabIconPickers';
+import { tabIconsShown, useScopeInitial, useShownAccount } from '../tabicon/useTabIcon';
 
 const SECTIONS: { id: string; label: string; icon: IconName }[] = [
   { id: 'general', label: 'General', icon: 'tune' },
@@ -54,7 +59,7 @@ const SECTIONS: { id: string; label: string; icon: IconName }[] = [
 
 /** Sections built from lists rather than rows: search finds them by what they hold. */
 const SECTION_INDEX: Record<string, { description: string; keywords: string }> = {
-  accounts: { description: 'Signed-in accounts, their colors, circles and All inboxes', keywords: 'account switch profile circle group all inboxes color new tab' },
+  accounts: { description: 'Signed-in accounts, their colors, circles and All inboxes', keywords: 'account switch profile circle group all inboxes color new tab open start marker badge dot chip nickname delegated' },
   sidebar: { description: 'Reorder, hide or fold destinations under More, and choose which sections show', keywords: 'sidebar menu navigation rail folders reorder hide show more customize arrange order drawer' },
   labels: { description: 'Create, rename, recolor and hide labels', keywords: 'label folder tag color nested sublabel menu' },
   splits: { description: 'Searches saved as their own inbox tab', keywords: 'split saved search tab filter' },
@@ -68,33 +73,27 @@ const SECTION_INDEX: Record<string, { description: string; keywords: string }> =
 /** Lowercased; empty when not searching. */
 const SearchWords = createContext<string[]>([]);
 
-function wordsOf(query: string) {
-  return query.toLowerCase().split(/\s+/).filter(Boolean);
-}
-
-function matches(words: string[], ...texts: (string | undefined)[]) {
-  const hay = texts.filter(Boolean).join(' ').toLowerCase();
-  return words.every((w) => hay.includes(w));
-}
+/** Gmail's own names for its settings tabs, for the links Gmail and its emails use. */
+const GMAIL_SECTIONS: Record<string, string> = { oldthemes: 'appearance', themes: 'appearance' };
 
 function Hit({ text }: { text: string }) {
   const words = useContext(SearchWords);
   if (!words.length) return <>{text}</>;
-  const pattern = new RegExp(`(${words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
   return (
     <>
-      {text.split(pattern).map((part, i) => (i % 2 ? <mark key={i} className="settings-hit">{part}</mark> : part))}
+      {highlight(text, words).map((part, i) => (i % 2 ? <mark key={i} className="settings-hit">{part}</mark> : part))}
     </>
   );
 }
 
 export function SettingsDialog() {
   const raw = useUi((s) => s.settingsSection);
-  const [section, extra] = (raw ?? '').split(/:(.*)/s);
+  const [asked, extra] = (raw ?? '').split(/:(.*)/s);
+  const section = GMAIL_SECTIONS[asked] ?? asked;
   const open = raw !== null;
   const close = () => useUi.getState().set({ settingsSection: null });
   const [query, setQuery] = useState('');
-  const words = wordsOf(query);
+  const words = searchWords(query);
   const searching = words.length > 0;
   const searchRef = useRef<HTMLInputElement>(null);
   const caps = useCapabilities();
@@ -202,7 +201,7 @@ export function SettingsDialog() {
             <div className="settings__scroll" key={current}>
               <div className="settings__section">
               {current === 'general' && <General />}
-              {current === 'appearance' && <Appearance />}
+              {current === 'appearance' && <Appearance focus={extra} />}
               {current === 'inbox' && <InboxSettings />}
               {current === 'gemini' && <GeminiSettings />}
               {current === 'accounts' && <AccountsSettings intent={extra} />}
@@ -351,11 +350,11 @@ function Block({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function Toggle({ k, title, description, keywords }: { k: keyof Settings; title: string; description?: string; keywords?: string }) {
+function Toggle({ k, title, description, keywords, disabled }: { k: keyof Settings; title: string; description?: string; keywords?: string; disabled?: boolean }) {
   const value = useSettings((s) => s[k]) as boolean;
   return (
     <Row title={title} description={description} keywords={keywords}>
-      <Switch checked={value} onCheckedChange={(v) => updateSettings({ [k]: v } as Partial<Settings>)} label={title} />
+      <Switch checked={value} disabled={disabled} onCheckedChange={(v) => updateSettings({ [k]: v } as Partial<Settings>)} label={title} />
     </Row>
   );
 }
@@ -399,18 +398,19 @@ function General() {
       <Toggle
         k="attachmentReminder"
         title="Attachment reminder"
+        keywords="forgot attach file"
         description="Asks before sending if your message says “attached” but has no files."
       />
       </Block>
-      <Block title="Reading">
+      <Block title="After archiving or deleting">
       <Row
-        title="After archiving or deleting"
-        keywords="auto-advance next conversation"
+        title="Go to"
+        keywords="after archiving deleting auto-advance next conversation"
         description="Automatic opens the next conversation with a reading pane, or goes back to the list without one."
       >
         <Select
           align="end"
-          label="After archiving or deleting"
+          label="After archiving or deleting, go to"
           value={s.afterAction}
           onChange={(afterAction) => updateSettings({ afterAction })}
           options={[
@@ -426,17 +426,14 @@ function General() {
         title="Skip to unread"
         keywords="auto-advance next unread conversation classic"
         description="Opens the next unread conversation instead of the next one in the list."
+        disabled={s.afterAction === 'list'}
       />
-      <Toggle k="hoverActions" title="Hover actions" keywords="quick buttons" description="Archive, delete, mark read and snooze from the list." />
-      <Row title="Conversations per page" keywords="page size load scroll">
-        <Select align="end" label="Page size" value={s.pageSize} onChange={(pageSize) => updateSettings({ pageSize })} options={[[25, '25'], [50, '50'], [100, '100']]} />
-      </Row>
       </Block>
       <Block title="Privacy">
-      <Row title="Images from senders" keywords="pictures remote load external" description="Remote images can tell senders you opened their email.">
+      <Row title="Images from senders" keywords="pictures remote load external">
         <Select
           align="end"
-          label="Images"
+          label="Images from senders"
           value={s.externalImages}
           onChange={(externalImages) => updateSettings({ externalImages })}
           options={[
@@ -452,13 +449,13 @@ function General() {
         description="Removes the invisible images that tell senders when you open their email."
       />
       </Block>
-      <Block title="Notifications and shortcuts">
+      <Block title="Notifications">
       <Row
         title="New mail notifications"
-        keywords="alerts desktop sound"
+        keywords="alerts desktop sound verification codes"
         description={
           notificationsSupported()
-            ? 'One for each new message in your inbox, with verification codes in it.'
+            ? 'One for each new message in your inbox. Verification codes show in the notification.'
             : "This browser doesn't let extensions show notifications from Gmail yet."
         }
       >
@@ -478,8 +475,10 @@ function General() {
           }}
         />
       </Row>
+      </Block>
+      <Block title="Keyboard">
       <Toggle k="keyboardShortcuts" title="Keyboard shortcuts" keywords="hotkeys keys" description={`Gmail's shortcuts, plus ${keyLabel('Ctrl K')} for the command palette.`} />
-      <Toggle k="arrowKeys" title="Arrow key navigation" keywords="arrows up down keyboard move scroll navigate" description="Up and Down move through mail and scroll an open conversation. Enter opens a conversation or replies to it, Esc goes back." />
+      <Toggle k="arrowKeys" title="Arrow key navigation" keywords="arrows up down keyboard move scroll navigate" description="Up and Down move through mail and scroll a conversation. Enter opens or replies, Esc goes back." />
       <Row title="Custom keys" keywords="keyboard shortcuts hotkeys remap rebind change keys">
         <Button variant="tonal" icon="keyboard" onClick={() => useUi.getState().set({ shortcutsHelp: true })}>
           Change keys
@@ -490,7 +489,7 @@ function General() {
   );
 }
 
-function Appearance() {
+function Appearance({ focus }: { focus?: string }) {
   const s = useSettings((x) => x);
   const picture = usePictureChoice();
   const scalable = uiScaleAvailable();
@@ -515,7 +514,7 @@ function Appearance() {
         keywords="material you dynamic palette accent theme picture photo"
       >
         <ConnectedButtonGroup
-          label="Color source"
+          label="Colors"
           size="xs"
           value={picture?.selected ? 'picture' : s.themeSource}
           onChange={(v) => (v === 'picture' ? void applyPictureColors() : updateSettings({ themeSource: v }))}
@@ -528,8 +527,8 @@ function Appearance() {
       </Row>
       {s.themeSource === 'dynamic' && (
         <>
-          <Row title="Source color" keywords="seed accent theme custom own pick random shuffle surprise">
-            <span className="seed-row">
+          <Row title="Base color" keywords="seed source accent theme custom own pick random shuffle surprise">
+            <span className="seed-row" role="group" aria-label="Base color">
               {SEED_PRESETS.map((p) => (
                 <button
                   key={p.seed}
@@ -551,7 +550,7 @@ function Appearance() {
           <Row title="Style" keywords="palette vibrant expressive tonal neutral">
             <Select
               align="end"
-              label="Palette style"
+              label="Style"
               value={s.variant}
               onChange={(variant: SchemeVariant) => updateSettings({ variant })}
               options={[
@@ -584,31 +583,100 @@ function Appearance() {
         description="Darkens emails that bring their own colors. Any message can switch back from its menu."
       />
       </Block>
-      {scalable && (
-        <Block title="Display">
+      <Block title="Display">
+        {scalable && (
           <Row title="Interface size" keywords="zoom scale bigger smaller larger text size small screen">
             <UiScaleChoice size="xs" />
           </Row>
-        </Block>
-      )}
-      <Block title="Conversation list">
-      <Row title="Density" keywords="compact comfortable spacing">
-        <ConnectedButtonGroup
-          label="Density"
-          size="xs"
-          value={s.density}
-          onChange={(density) => updateSettings({ density })}
-          options={[
-            { value: 'comfortable', label: 'Comfortable' },
-            { value: 'default', label: 'Default' },
-            { value: 'compact', label: 'Compact' },
-          ]}
-        />
-      </Row>
-      <Toggle k="showAvatars" title="Sender images" keywords="avatars photos profile pictures" />
-      <Toggle k="showSnippets" title="Message previews" keywords="snippets line" />
+        )}
+        <Row title="Density" keywords="compact comfortable spacing rows list">
+          <ConnectedButtonGroup
+            label="Density"
+            size="xs"
+            value={s.density}
+            onChange={(density) => updateSettings({ density })}
+            options={[
+              { value: 'comfortable', label: 'Comfortable' },
+              { value: 'default', label: 'Default' },
+              { value: 'compact', label: 'Compact' },
+            ]}
+          />
+        </Row>
       </Block>
+      {tabIconsShown() && <TabIconBlock focus={focus === 'tab-icon'} />}
     </div>
+  );
+}
+
+// Never an address: it has no @.
+const ALL_ACCOUNTS = 'all';
+
+/** One icon for every account, and any account can have its own so its tabs stand out. */
+function TabIconBlock({ focus }: { focus: boolean }) {
+  const accounts = useAccounts((x) => x.accounts);
+  const shown = useShownAccount();
+  const global = useSettings((x) => x.tabIcon);
+  const prefs = useSettings((x) => x.accountPrefs);
+  const emails = accounts.map((a) => a.email.toLowerCase());
+  // Opens on the icon this tab shows. With one account there's nothing to choose between; an icon it kept from before is still the one it shows.
+  const [picked, setPicked] = useState(() => (shown && prefs[shown]?.tabIcon ? shown : null));
+  const editing = emails.length > 1 ? (picked && emails.includes(picked) ? picked : null) : (emails.find((e) => prefs[e]?.tabIcon) ?? null);
+  const own = editing ? prefs[editing]?.tabIcon : undefined;
+  const icon = own ?? global;
+  const initial = useScopeInitial(editing ?? shown);
+  const ref = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (focus) ref.current?.scrollIntoView({ block: 'start' });
+  }, [focus]);
+  const change = (patch: Partial<TabIcon>) =>
+    updateSettings((x) =>
+      editing
+        ? { accountPrefs: { ...x.accountPrefs, [editing]: { ...x.accountPrefs[editing], tabIcon: { ...(x.accountPrefs[editing]?.tabIcon ?? x.tabIcon), ...patch } } } }
+        : { tabIcon: { ...x.tabIcon, ...patch } },
+    );
+  const setOwn = (on: boolean) => {
+    if (!editing) return;
+    updateSettings((x) => {
+      const { tabIcon: _, ...rest } = x.accountPrefs[editing] ?? {};
+      return { accountPrefs: { ...x.accountPrefs, [editing]: on ? { ...rest, tabIcon: x.tabIcon } : rest } };
+    });
+  };
+  const keywords = 'tab icon favicon browser logo gmail original unread count number badge profile account';
+  return (
+    <section ref={ref} className="settings-block" aria-label="Tab icon">
+      <h3 className="md-label-large settings-subhead settings-block__head">Tab icon</h3>
+      {emails.length > 1 && (
+        <Row title="Account" keywords={keywords}>
+          <Select
+            align="end"
+            label="Account"
+            value={editing ?? ALL_ACCOUNTS}
+            onChange={(v) => setPicked(v === ALL_ACCOUNTS ? null : v)}
+            options={[[ALL_ACCOUNTS, 'All accounts'], ...accounts.map((a): [string, string] => [a.email.toLowerCase(), a.email])]}
+          />
+        </Row>
+      )}
+      {emails.length > 1 && editing && (
+        <Row title="Own icon" keywords={keywords}>
+          <Switch checked={!!own} onCheckedChange={setOwn} label="Own icon" />
+        </Row>
+      )}
+      {(!editing || own) && (
+        <>
+          <Row title="Icon" keywords={keywords}>
+            <TabIconLookPicker icon={icon} initial={initial} onChange={(look) => change({ look })} />
+          </Row>
+          {icon.look !== 'gmail' && (
+            <Row title="Color" keywords={`${keywords} color colour`}>
+              <TabIconColorPicker value={icon.color} onChange={(color) => change({ color })} />
+            </Row>
+          )}
+          <Row title="Unread count" keywords={keywords}>
+            <Switch checked={icon.count} onCheckedChange={(count) => change({ count })} label="Unread count" />
+          </Row>
+        </>
+      )}
+    </section>
   );
 }
 
@@ -650,13 +718,15 @@ function BlockedSenders() {
 
 function InboxSettings() {
   const s = useSettings((x) => x);
+  // Touch screens never show them.
+  const hover = useMediaQuery('(hover: hover)');
   return (
     <div className="settings-group">
-      <Block title="Tabs and sorting">
-      <Row title="Start in" keywords="default open home landing all mail everything archive first view" description="Where new tabs and the Gmail logo take you.">
+      <Block title="Start and sorting">
+      <Row title="Start page" keywords="start in default open home landing all mail everything archive first view" description="Where new tabs and the Gmail logo take you.">
         <Select
           align="end"
-          label="Start in"
+          label="Start page"
           value={s.startView}
           onChange={(startView) => updateSettings({ startView })}
           options={[
@@ -692,15 +762,21 @@ function InboxSettings() {
         ))}
       </Block>
       <Block title="Conversation list">
+      <Toggle k="showAvatars" title="Sender images" keywords="avatars photos profile pictures" />
+      <Toggle k="showSnippets" title="Message previews" keywords="snippets line" />
+      <Toggle k="showLabelChips" title="Label tags" keywords="labels chips in the list" />
       <Toggle k="groupByDate" title="Group by date" keywords="sections" description="Today, Yesterday, This week and earlier." />
-      <Toggle k="showLabelChips" title="Label tags in the list" keywords="chips" />
       <Toggle k="smartFeatures" title="Smart chips and cards" keywords="verification code package tracking" description="Codes, packages, invites, bills, trips and deals, read in your browser." />
+      {hover && <Toggle k="hoverActions" title="Hover actions" keywords="quick buttons" description="Archive, delete, mark read and snooze from the list." />}
+      <Row title="Conversations per page" keywords="page size load scroll">
+        <Select align="end" label="Conversations per page" value={s.pageSize} onChange={(pageSize) => updateSettings({ pageSize })} options={[[25, '25'], [50, '50'], [100, '100']]} />
+      </Row>
       </Block>
       <Block title="Reading pane">
-      <Row title="Reading pane" keywords="split preview layout right">
+      <Row title="Position" keywords="reading pane split preview layout right" description="Automatic splits the window when it's wide enough.">
         <Select
           align="end"
-          label="Reading pane"
+          label="Reading pane position"
           value={s.readingPane}
           onChange={(readingPane) => updateSettings({ readingPane })}
           options={[
@@ -725,8 +801,11 @@ function LabelsSettings() {
   const user = labels.filter((l) => l.type === 'user').sort((a, b) => a.name.localeCompare(b.name));
   return (
     <div className="settings-group">
-      <p className="settings-note md-body-medium">Turn a label off to keep it on your mail but out of the menu.</p>
-      {user.length === 0 && <p className="settings-note md-body-medium">No labels yet. Create one to sort mail your own way.</p>}
+      {user.length === 0 ? (
+        <p className="settings-note md-body-medium">No labels yet.</p>
+      ) : (
+        <p className="settings-note md-body-medium">Turn a label off to keep it on your mail but out of the menu.</p>
+      )}
       <div className="settings-list">
         {user.map((l) => {
           const parts = l.name.split('/');
@@ -797,12 +876,30 @@ function LabelsSettings() {
   );
 }
 
+/** Back where it was, on Undo. */
+function restoreAt<T extends { id: string }>(list: T[], item: T, index: number): T[] {
+  if (list.some((x) => x.id === item.id)) return list;
+  return [...list.slice(0, index), item, ...list.slice(index)];
+}
+
+function deleteSplit(split: Split) {
+  const index = useSettingsStore.getState().settings.splits.findIndex((x) => x.id === split.id);
+  updateSettings((s) => ({ splits: s.splits.filter((x) => x.id !== split.id) }));
+  snack(`Split "${split.name}" deleted`, { action: { label: 'Undo', onClick: () => updateSettings((s) => ({ splits: restoreAt(s.splits, split, index) })) } });
+}
+
+function deleteTemplate(template: Template) {
+  const index = useSettingsStore.getState().settings.templates.findIndex((x) => x.id === template.id);
+  updateSettings((s) => ({ templates: s.templates.filter((x) => x.id !== template.id) }));
+  snack(`Template "${template.name}" deleted`, { action: { label: 'Undo', onClick: () => updateSettings((s) => ({ templates: restoreAt(s.templates, template, index) })) } });
+}
+
 function SplitsSettings() {
   const splits = useSettings((s) => s.splits);
   const [editing, setEditing] = useState<Split | null | undefined>(undefined);
   return (
     <div className="settings-group">
-      <p className="settings-note md-body-medium">Each split is a saved search, like “from:@mycompany.com is:unread”.</p>
+      <p className="settings-note md-body-medium">Each split is a saved search, like “from:@example.com is:unread”.</p>
       <div className="settings-list">
         {splits.map((sp) => (
           <div key={sp.id} className="settings-list__item">
@@ -810,7 +907,7 @@ function SplitsSettings() {
             <span className="md-body-large settings-list__name">{sp.name}</span>
             <code className="settings-list__meta">{sp.query}</code>
             <IconButton icon="edit" label={`Edit ${sp.name}`} size="xs" onClick={() => setEditing(sp)} />
-            <IconButton icon="delete" label={`Delete ${sp.name}`} size="xs" onClick={() => updateSettings((s) => ({ splits: s.splits.filter((x) => x.id !== sp.id) }))} />
+            <IconButton icon="delete" label={`Delete ${sp.name}`} size="xs" onClick={() => deleteSplit(sp)} />
           </div>
         ))}
       </div>
@@ -879,7 +976,7 @@ function TemplatesSettings({ fromDraft }: { fromDraft?: string }) {
             <span className="md-body-large settings-list__name">{t.name}</span>
             <kbd className="settings-list__meta">/{t.shortcut}</kbd>
             <IconButton icon="edit" label={`Edit ${t.name}`} size="xs" onClick={() => setEditing(t)} />
-            <IconButton icon="delete" label={`Delete ${t.name}`} size="xs" onClick={() => updateSettings((s) => ({ templates: s.templates.filter((x) => x.id !== t.id) }))} />
+            <IconButton icon="delete" label={`Delete ${t.name}`} size="xs" onClick={() => deleteTemplate(t)} />
           </div>
         ))}
       </div>
@@ -1082,7 +1179,7 @@ function GeminiSettings() {
               ]}
             />
           </Row>
-          <Toggle k="geminiReplies" title="Suggested replies by Gemini" keywords="smart reply quick answers" description="When off, suggestions come from simple rules." />
+          <Toggle k="geminiReplies" title="Suggested replies" keywords="smart reply quick answers" description="When off, suggestions come from simple rules." />
           <Toggle k="geminiSearch" title="Answers in search" keywords="ask gmail ai overview question" description="Searches that read as a question get Gemini’s answer above the results." />
         </Block>
       )}

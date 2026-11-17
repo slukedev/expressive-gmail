@@ -38,6 +38,8 @@ import { geminiAvailable, geminiOn, type GeminiFeature, type GeminiStatus } from
 import { useGeminiPanel } from '../gemini/panel';
 import { geminiKeys } from '../gemini/useGemini';
 import { getAppHost, installApp } from '../../lib/appHost';
+import { tabIconFor } from '../tabicon/choice';
+import { tabIconsShown } from '../tabicon/useTabIcon';
 
 export interface Env {
   dark: boolean;
@@ -283,18 +285,18 @@ interface ChoiceDef {
 }
 
 const CHOICES: ChoiceDef[] = [
-  { key: 'themeMode', title: 'Theme', icon: 'dark_mode', keywords: 'dark light mode appearance night', options: [['system', 'System default', 'brightness_auto'], ['light', 'Light', 'light_mode'], ['dark', 'Dark', 'dark_mode']] },
-  { key: 'density', title: 'Density', icon: 'density_medium', keywords: 'compact comfortable spacing rows', options: [['default', 'Default', 'density_medium'], ['comfortable', 'Comfortable', 'density_large'], ['compact', 'Compact', 'density_small']] },
+  { key: 'themeMode', title: 'Theme', icon: 'dark_mode', keywords: 'dark light mode appearance night', options: [['light', 'Light', 'light_mode'], ['dark', 'Dark', 'dark_mode'], ['system', 'System', 'brightness_auto']] },
+  { key: 'density', title: 'Density', icon: 'density_medium', keywords: 'compact comfortable spacing rows', options: [['comfortable', 'Comfortable', 'density_large'], ['default', 'Default', 'density_medium'], ['compact', 'Compact', 'density_small']] },
   { key: 'uiScale', title: 'Interface size', icon: 'format_size', keywords: 'zoom scale bigger smaller larger text', options: UI_SCALES.map((v) => [v, uiScaleLabel(v)]), available: uiScaleAvailable },
-  { key: 'readingPane', title: 'Reading pane', icon: 'vertical_split', keywords: 'split preview layout right', options: [['auto', 'Automatic', 'vertical_split'], ['right', 'Right of the list', 'splitscreen_right'], ['none', 'No split', 'view_agenda']] },
-  { key: 'inboxType', title: 'Inbox type', icon: 'inbox_customize', keywords: 'categories sort priority unread first', options: [['categories', 'Categories'], ['everything', 'Everything'], ['unread-first', 'Unread first'], ['important-first', 'Important first'], ['starred-first', 'Starred first']] },
+  { key: 'readingPane', title: 'Reading pane', icon: 'vertical_split', keywords: 'split preview layout right', options: [['auto', 'Automatic', 'vertical_split'], ['right', 'Right of inbox', 'splitscreen_right'], ['none', 'No split', 'view_agenda']] },
+  { key: 'inboxType', title: 'Inbox type', icon: 'inbox_customize', keywords: 'categories sort priority unread first', options: [['categories', 'Default, with category tabs'], ['everything', 'Everything in one list'], ['important-first', 'Important first'], ['unread-first', 'Unread first'], ['starred-first', 'Starred first']] },
   { key: 'undoSendSeconds', title: 'Undo send', icon: 'undo', keywords: 'unsend recall cancel seconds', options: [[0, 'Off'], [5, '5 seconds'], [10, '10 seconds'], [20, '20 seconds'], [30, '30 seconds']] },
   { key: 'defaultReply', title: 'Default reply', icon: 'reply_all', keywords: 'reply all', options: [['reply', 'Reply', 'reply'], ['reply-all', 'Reply all', 'reply_all']] },
-  { key: 'afterAction', title: 'After archiving or deleting', icon: 'arrow_forward', keywords: 'advance next older newer', options: [['auto', 'Automatic'], ['older', 'Go to the older conversation'], ['newer', 'Go to the newer conversation'], ['list', 'Go back to the list']] },
+  { key: 'afterAction', title: 'After archiving or deleting', icon: 'arrow_forward', keywords: 'advance next older newer', options: [['auto', 'Automatic'], ['older', 'Older conversation'], ['newer', 'Newer conversation'], ['list', 'Back to the list']] },
   { key: 'externalImages', title: 'Images from senders', icon: 'image', keywords: 'pictures remote external', options: [['always', 'Always show'], ['ask', 'Ask first']] },
   { key: 'pageSize', title: 'Conversations per page', icon: 'view_list', keywords: 'page size load', options: [[25, '25'], [50, '50'], [100, '100']] },
   { key: 'appBadge', title: 'Icon badge', icon: 'notifications_active', keywords: 'app badge unread count dot dock taskbar', options: [['count', 'Unread count'], ['dot', 'Dot'], ['off', 'Off']], available: () => getAppHost().badge },
-  { key: 'accountMarker', title: 'Account marker', icon: 'all_inbox', keywords: 'badge dot chip all inboxes', options: [['badge', 'Badge on the photo'], ['dot', 'Dot'], ['chip', 'Chip'], ['off', 'None']] },
+  { key: 'accountMarker', title: 'Account on conversations', icon: 'all_inbox', keywords: 'marker badge dot chip all inboxes circles', options: [['badge', 'Account photo on the sender'], ['chip', 'Chip with the account name'], ['dot', 'Color dot'], ['off', "Don't show"]], available: () => useAccounts.getState().accounts.length > 1 },
 ];
 
 export function settingItems(s: Settings): Item[] {
@@ -344,6 +346,32 @@ export function settingItems(s: Settings): Item[] {
       return 'stay';
     },
   });
+  if (tabIconsShown()) {
+    // The icon this tab shows: its account's own when it has one.
+    const scope = useAccounts.getState().scope;
+    const email = scope?.startsWith('account:') ? scope.slice('account:'.length) : null;
+    const own = email && s.accountPrefs[email]?.tabIcon ? email : null;
+    const on = tabIconFor(s, email).count;
+    const flip = () =>
+      updateSettings((x) =>
+        own
+          ? { accountPrefs: { ...x.accountPrefs, [own]: { ...x.accountPrefs[own], tabIcon: { ...x.accountPrefs[own]!.tabIcon!, count: !on } } } }
+          : { tabIcon: { ...x.tabIcon, count: !on } },
+      );
+    out.push({
+      id: 'setting:tab-icon-count',
+      title: 'Unread count on tab icon',
+      group: 'Settings',
+      icon: 'tab',
+      keywords: 'setting favicon browser tab badge number',
+      toggle: on,
+      run: (): After => {
+        flip();
+        return 'stay';
+      },
+      alt: { label: on ? 'Turn off and close' : 'Turn on and close', run: flip },
+    });
+  }
   out.push({
     id: 'setting:picture',
     title: hasPicture() ? 'Change picture…' : 'Add a picture…',
@@ -599,6 +627,9 @@ export function actionItems(ctx: Context, s: Settings): Item[] {
     { id: 'quick-settings', title: 'Quick settings', icon: 'tune', keywords: 'appearance theme density', run: () => ui.set({ quickSettings: true }) },
     { id: 'settings', title: 'All settings', icon: 'settings', keywords: 'preferences options', run: () => ui.set({ settingsSection: 'general' }) },
     ...(ctx.caps.labelsEdit ? [{ id: 'settings:labels', title: 'Manage labels', icon: 'label' as const, keywords: 'settings labels edit colors', run: () => ui.set({ settingsSection: 'labels' }) }] : []),
+    ...(tabIconsShown()
+      ? [{ id: 'settings:tab-icon', title: 'Tab icon', icon: 'tab' as const, keywords: 'settings favicon browser tab logo gmail original unread count account profile', run: () => ui.set({ settingsSection: 'appearance:tab-icon' }) }]
+      : []),
     { id: 'settings:sidebar', title: 'Customize sidebar', icon: 'side_navigation', keywords: 'settings sidebar menu rail reorder hide folders more', run: () => ui.set({ settingsSection: 'sidebar' }) },
     { id: 'settings:splits', title: 'Manage splits', icon: 'filter_alt', keywords: 'settings splits', run: () => ui.set({ settingsSection: 'splits' }) },
     { id: 'settings:templates', title: 'Manage templates', icon: 'text_snippet', keywords: 'settings templates canned responses', run: () => ui.set({ settingsSection: 'templates' }) },
