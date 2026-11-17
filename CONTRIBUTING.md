@@ -64,7 +64,7 @@ Unit tests run in New York time and US English on every machine. Tests that expe
 
 `npm run test:e2e` starts the preview itself, or reuses one already running from this checkout. If something else holds the port (another worktree's preview, another app), it stops with an error instead of testing the wrong code; stop that server or set `PREVIEW_PORT`.
 
-TypeScript stays on 6.x until typescript-eslint supports TypeScript 7.
+`tsc` is TypeScript 7 (the `@typescript/native` alias). typescript-eslint still needs TypeScript 6's compiler API, which TypeScript 7 no longer ships, so the `typescript` package is `@typescript/typescript6`, made for running both side by side. Once typescript-eslint supports TypeScript 7, make `typescript` TypeScript 7 again and drop the alias.
 
 For visual changes, `node scripts/capture.mjs <dir> [filter]` screenshots the main states of the preview (it expects `npm run preview` to be running). Attach the before and after shots to your pull request.
 
