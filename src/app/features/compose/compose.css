@@ -143,7 +143,7 @@
   cursor: pointer;
   transition: background-color var(--md-sys-motion-effects-fast);
 }
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .compose-window[data-state='minimized'] .compose-window__bar:hover {
     background: color-mix(in srgb, var(--md-sys-color-on-surface) 6%, transparent);
   }
@@ -270,17 +270,39 @@
   display: flex;
   flex-direction: column;
 }
+.compose-form {
+  --compose-field: var(--md-sys-color-surface-container-low);
+}
+:root[data-theme-mode='dark'] .compose-form {
+  --compose-field: var(--md-sys-color-surface-container-highest);
+}
+/* Segments 2px apart, 16 outside and 4 inside, so no rule has to separate the fields. Text keeps the 20px edge. */
 .compose-fields {
-  padding: 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 12px 0;
   flex: none;
 }
-.compose-from,
-.compose-subject,
-.compose-summary {
-  background-image: linear-gradient(var(--md-sys-color-outline), var(--md-sys-color-outline));
-  background-size: 100% 1px;
-  background-position: bottom;
-  background-repeat: no-repeat;
+.compose-people {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.compose-fields .compose-people > *,
+.compose-fields > .compose-subject:not(.compose-subject--title) {
+  padding-inline: 8px;
+  border-radius: var(--md-sys-shape-corner-extra-small);
+  background: var(--compose-field);
+}
+.compose-fields .compose-people > :first-child {
+  border-start-start-radius: var(--md-sys-shape-corner-large);
+  border-start-end-radius: var(--md-sys-shape-corner-large);
+}
+.compose-fields .compose-people:last-child > :last-child,
+.compose-fields > .compose-subject:last-child {
+  border-end-start-radius: var(--md-sys-shape-corner-large);
+  border-end-end-radius: var(--md-sys-shape-corner-large);
 }
 .compose-from {
   position: relative;
@@ -304,7 +326,7 @@
   flex: 1;
   background: transparent;
 }
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .compose-from .compose-from__select:hover {
     background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
   }
@@ -340,11 +362,12 @@
   align-items: center;
   gap: 8px;
   flex: none;
-  margin: 0 20px;
+  margin: 4px 12px 0;
   min-height: 44px;
-  padding: 0;
+  padding: 0 8px;
   border: none;
-  background-color: transparent;
+  border-radius: var(--md-sys-shape-corner-large);
+  background-color: var(--compose-field);
   color: var(--md-sys-color-on-surface);
   font: 400 16px/24px var(--md-ref-typeface-plain);
   letter-spacing: 0.5px;
@@ -366,7 +389,11 @@
   opacity: 0;
   transition: opacity var(--md-sys-motion-effects-fast);
 }
-.compose-summary:hover .compose-summary__edit,
+@media (hover: hover) and (pointer: fine) {
+  .compose-summary:hover .compose-summary__edit {
+    opacity: 1;
+  }
+}
 .compose-summary:focus-visible .compose-summary__edit {
   opacity: 1;
 }
@@ -400,6 +427,8 @@
   color: var(--md-sys-color-on-surface);
   caret-color: var(--md-sys-color-primary);
   overflow-wrap: anywhere;
+  /* Quoted mail sits in the app's own page: nothing in it can be positioned or painted outside the editor. */
+  contain: layout paint;
 }
 .editor__content:focus-visible {
   outline: none;
@@ -461,7 +490,7 @@
     background-color var(--md-sys-motion-effects-fast),
     border-radius var(--md-sys-motion-spatial-fast);
 }
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .compose-quote__forward:hover {
     background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, var(--md-sys-color-surface-container));
   }
@@ -570,6 +599,9 @@
   transform-origin: left;
   transition: transform 120ms linear;
 }
+.compose-att__progress--waiting > span {
+  animation: sk-pulse 1.6s ease-in-out infinite;
+}
 
 .compose-actions {
   display: flex;
@@ -608,8 +640,15 @@
   gap: 6px;
   padding-left: 12px;
 }
-.split-button .split-button__main:hover,
-.split-button .split-button__main:active {
+@media (hover: hover) and (pointer: fine) {
+  .split-button .split-button__main:hover:not(:disabled) {
+    border-radius: 20px 12px 12px 20px;
+  }
+  .split-button .split-button__menu:hover:not(:disabled) {
+    border-radius: 12px 20px 20px 12px;
+  }
+}
+.split-button .split-button__main:active:not(:disabled) {
   border-radius: 20px 12px 12px 20px;
 }
 .split-button .split-button__menu {
@@ -617,8 +656,7 @@
   padding: 0 13px;
   min-width: 0;
 }
-.split-button .split-button__menu:hover,
-.split-button .split-button__menu:active {
+.split-button .split-button__menu:active:not(:disabled) {
   border-radius: 12px 20px 20px 12px;
 }
 .split-button .split-button__menu[data-popup-open] {
@@ -843,7 +881,12 @@
     background-color var(--md-sys-motion-effects-fast),
     border-radius var(--md-sys-motion-spatial-fast);
 }
-.emoji-picker__item:hover,
+@media (hover: hover) and (pointer: fine) {
+  .emoji-picker__item:hover {
+    border-radius: var(--md-sys-shape-corner-medium);
+    background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+  }
+}
 .emoji-picker__item:focus-visible {
   border-radius: var(--md-sys-shape-corner-medium);
   background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
@@ -970,7 +1013,11 @@
   cursor: pointer;
   transition: background-color var(--md-sys-motion-effects-fast);
 }
-.inline-compose__mode:hover,
+@media (hover: hover) and (pointer: fine) {
+  .inline-compose__mode:hover {
+    background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+  }
+}
 .inline-compose__mode[data-popup-open] {
   background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
 }
@@ -986,6 +1033,8 @@
   position: sticky;
   bottom: 0;
   z-index: 2;
+  /* Covers the pane's bottom padding, so no line of the reply shows below the stuck footer. */
+  box-shadow: 0 40px 0 var(--app-pane);
   border-radius: 0 0 var(--md-sys-shape-corner-extra-large) var(--md-sys-shape-corner-extra-large);
 }
 .app[data-compact] .inline-compose {
@@ -1161,8 +1210,13 @@
 :root[data-theme-mode='dark'] .compose-form--wide .compose-people {
   background: var(--md-sys-color-surface-container-highest);
 }
-.compose-form--wide .compose-people > :last-child {
-  background-image: none;
+.compose-form--wide .compose-people {
+  gap: 0;
+}
+.compose-form--wide .compose-fields .compose-people > * {
+  padding-inline: 0;
+  border-radius: 0;
+  background: none;
 }
 .compose-format-dock {
   position: sticky;
@@ -1282,7 +1336,7 @@
   border-bottom-left-radius: var(--md-sys-shape-corner-medium);
   border-bottom-right-radius: var(--md-sys-shape-corner-medium);
 }
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .compose-recent:not(.compose-recent--loading):hover {
     border-radius: var(--md-sys-shape-corner-medium);
     background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, var(--md-sys-color-surface-container-lowest));
@@ -1409,8 +1463,10 @@
     background-color var(--md-sys-motion-effects-fast),
     border-radius var(--md-sys-motion-spatial-fast);
 }
-.compose-tile__add:hover {
-  background: color-mix(in srgb, var(--md-sys-color-primary) 14%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .compose-tile__add:hover {
+    background: color-mix(in srgb, var(--md-sys-color-primary) 14%, transparent);
+  }
 }
 .compose-tile__add:active {
   border-radius: var(--md-sys-shape-corner-large);
@@ -1453,6 +1509,17 @@
   cursor: pointer;
   transition: background-color var(--md-sys-motion-effects-fast);
 }
-.compose-quote-card__open:hover {
-  background: color-mix(in srgb, var(--md-sys-color-primary) 14%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .compose-quote-card__open:hover {
+    background: color-mix(in srgb, var(--md-sys-color-primary) 14%, transparent);
+  }
+}
+
+@media (forced-colors: active) {
+  .compose-fields .compose-people > *,
+  .compose-fields > .compose-subject:not(.compose-subject--title),
+  .compose-summary {
+    outline: 1px solid CanvasText;
+    outline-offset: -1px;
+  }
 }

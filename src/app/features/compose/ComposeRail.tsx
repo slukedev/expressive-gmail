@@ -6,7 +6,7 @@ import type { Address, OutgoingAttachment } from '../../data/types';
 import { EMAIL_RE, fileSize, firstName, isMe, listDate } from '../../lib/format';
 import { navigate, useRoute } from '../../router/useRoute';
 import { useUi, type ComposeDraft } from '../../state/ui';
-import { IconButton } from '../../ui/Button';
+import { IconButton, cx } from '../../ui/Button';
 import { Icon, type IconName } from '../../ui/Icon';
 import { fileIcon } from '../attachments/fileIcon';
 import { rememberBox } from './handoff';
@@ -15,7 +15,24 @@ export interface PendingFile {
   id: string;
   filename: string;
   size: number;
-  loaded: number;
+  /** Bytes read so far; none for a file coming from Gmail, which reports no progress. */
+  loaded?: number;
+}
+
+export function AttachProgress({ file, className }: { file: PendingFile; className?: string }) {
+  const share = file.loaded === undefined ? undefined : file.size ? file.loaded / file.size : 0;
+  return (
+    <span
+      className={cx('compose-att__progress', share === undefined && 'compose-att__progress--waiting', className)}
+      role="progressbar"
+      aria-label={`Attaching ${file.filename}`}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={share === undefined ? undefined : Math.round(share * 100)}
+    >
+      <span style={share === undefined ? undefined : { transform: `scaleX(${share})` }} />
+    </span>
+  );
 }
 
 /** Line breaks where its blocks and breaks were. */
@@ -159,16 +176,7 @@ export function ComposeRail({
                 <Icon name="attach_file" size={28} />
               </span>
               <span className="compose-tile__name md-label-large">{p.filename}</span>
-              <span
-                className="compose-att__progress compose-tile__progress"
-                role="progressbar"
-                aria-label={`Attaching ${p.filename}`}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={p.size ? Math.round((p.loaded / p.size) * 100) : 0}
-              >
-                <span style={{ transform: `scaleX(${p.size ? p.loaded / p.size : 0})` }} />
-              </span>
+              <AttachProgress file={p} className="compose-tile__progress" />
             </li>
           ))}
           <li className="compose-tile compose-tile--add">

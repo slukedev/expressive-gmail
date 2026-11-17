@@ -47,6 +47,23 @@ test.describe('compose', () => {
     await expect(mail.thread.getByRole('button', { name: 'to Priya Natarajan' })).toBeVisible();
   });
 
+  test('Ctrl/Cmd+Enter sends to an address still being typed', async ({ mail, page }) => {
+    await mail.open('inbox');
+    await expect(mail.rows.first()).toBeVisible();
+    const subject = 'Notes from the offsite';
+    const window = await writeMessage(mail, subject, 'Summary below.');
+    await page.keyboard.press('ControlOrMeta+Shift+C');
+    const cc = window.getByRole('combobox', { name: 'Cc' });
+    await expect(cc).toBeFocused();
+    await cc.pressSequentially('grace.hopper@example.org');
+    await page.keyboard.press('ControlOrMeta+Enter');
+    await expect(window).toBeHidden();
+
+    await mail.nav.getByRole('link', { name: 'Sent' }).click();
+    await mail.row(subject).click();
+    await expect(mail.thread.getByRole('button', { name: 'to Priya Natarajan, cc: grace.hopper' })).toBeVisible();
+  });
+
   test('with undo send off, the "Message sent" snackbar stays on screen', async ({ mail, page }) => {
     await mail.open('sent');
     await expect(mail.rows.first()).toBeVisible();
@@ -333,6 +350,33 @@ test.describe('writing', () => {
     await expect(mail.thread.locator('.recipient-chip')).toHaveCount(0);
     await expect(mail.thread.getByText('Forwarded message')).toBeVisible();
     await expect(body).toContainText('Keeping this line.');
+  });
+
+  test("a forward shows the original's inline pictures in the body and sends them as inline parts, not files", async ({ mail, page }) => {
+    await mail.open('inbox/t-staging-screens');
+    await mail.thread.getByRole('button', { name: 'Forward', exact: true }).first().click();
+    // A forward opens into the body; the empty To stays open beside it.
+    await expect(mail.thread.getByRole('textbox', { name: 'Message body' })).toBeFocused();
+    const to = mail.thread.getByRole('combobox', { name: 'To' });
+    await to.click();
+    await to.pressSequentially('priya');
+    await page.getByRole('option', { name: 'Priya Natarajan priya.natarajan@example.com' }).click();
+    await mail.thread.getByText('Forwarded message').click();
+    const pictures = mail.thread.getByRole('textbox', { name: 'Message body' }).locator('img[data-cid]');
+    await expect(pictures).toHaveCount(2);
+    await expect.poll(() => pictures.evaluateAll((imgs) => imgs.map((i) => (i as HTMLImageElement).naturalWidth > 0))).toEqual([true, true]);
+    // In the body, not the file list.
+    await expect(mail.thread.getByRole('list', { name: 'Attachments' })).toHaveCount(0);
+
+    await mail.thread.getByRole('button', { name: 'Send', exact: true }).click();
+    await expect(mail.snackbar).toContainText('Message sent');
+    await mail.open('sent');
+    await mail.rowBody('Screenshots from today’s staging build').first().click();
+    const sent = mail.thread.locator('.msg').last();
+    await expect(sent.locator('.msg__clip')).toHaveCount(0);
+    const shown = sent.frameLocator('iframe').locator('img');
+    await expect(shown).toHaveCount(2);
+    await expect.poll(() => shown.evaluateAll((imgs) => imgs.map((i) => (i as HTMLImageElement).naturalWidth > 0))).toEqual([true, true]);
   });
 
   test('c straight after Escape opens a new window while the last one is still closing', async ({ mail, page }) => {

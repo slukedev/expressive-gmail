@@ -1,5 +1,5 @@
 import { Dialog as BaseDialog } from '@base-ui/react/dialog';
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { Attachment } from '../../data/types';
 import { fileSize } from '../../lib/format';
 import { IconButton } from '../../ui/Button';
@@ -43,8 +43,13 @@ export function AttachmentViewer({
   const kind = calendar ? null : previewKind(file);
   const previewable = calendar || kind === 'image' || kind === 'pdf' || kind === 'text' || (kind === 'video' && file.size > 0 && file.size <= VIDEO_CAP);
   const stand = kind === 'image' ? thumbs.peek(file) : undefined;
+  // Callers hand over fresh objects on every render; a sync that touches the thread mustn't restart a playing video.
+  const fileKey = `${file.messageId}/${file.id}`;
+  const current = useRef(file);
+  current.current = file;
 
   useEffect(() => {
+    const file = current.current;
     let revoked: string | null = null;
     let cancelled = false;
     setUrl(null);
@@ -58,9 +63,13 @@ export function AttachmentViewer({
         if (cancelled) return;
         if (calendar) {
           const parsed = parseIcs(await blob.text());
+          if (cancelled) return;
           if (parsed) setEvent(parsed);
           else setFailed(true);
-        } else if (kind === 'text') setText(await blob.slice(0, TEXT_CAP).text());
+        } else if (kind === 'text') {
+          const text = await blob.slice(0, TEXT_CAP).text();
+          if (!cancelled) setText(text);
+        }
         else if (kind === 'pdf') setPdf(blob);
         else {
           revoked = URL.createObjectURL(blob);
@@ -72,7 +81,7 @@ export function AttachmentViewer({
       cancelled = true;
       if (revoked) URL.revokeObjectURL(revoked);
     };
-  }, [file, previewable, calendar, kind]);
+  }, [fileKey, previewable, calendar, kind]);
   const download = () => void downloadAttachment(file.messageId, file);
 
   return (

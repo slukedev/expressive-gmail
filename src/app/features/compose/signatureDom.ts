@@ -1,4 +1,4 @@
-import { sanitizeForEditor } from './paste';
+import { sanitizeForEditor, type EditorSanitizeOptions } from './paste';
 import type { Signature } from './signatures';
 
 /** A .gmail_signature block, so Gmail (and the forgotten-attachment check) knows where your words stop. */
@@ -89,9 +89,9 @@ export function withoutQuotes(html: string) {
 }
 
 /** After the signature, where sending would have put it. */
-export function appendQuote(root: HTMLElement, html: string) {
+export function appendQuote(root: HTMLElement, html: string, { quoteImages = 'block' }: Pick<EditorSanitizeOptions, 'quoteImages'> = {}) {
   const t = document.createElement('template');
-  t.innerHTML = `<br>${sanitizeForEditor(html)}`;
+  t.innerHTML = `<br>${sanitizeForEditor(html, { quoteImages, allQuoted: true })}`;
   const sig = findSignature(root);
   const at = sig && sig.parentNode === root ? sig.nextSibling : null;
   root.insertBefore(t.content, at);

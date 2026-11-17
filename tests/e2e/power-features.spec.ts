@@ -64,6 +64,24 @@ test.describe('attachment reminder', () => {
     await expect(window).toBeHidden();
   });
 
+  test('a draft opened again from Drafts keeps its files, so sending it goes without asking', async ({ mail, page }) => {
+    await mail.open('inbox');
+    await expect(mail.rows.first()).toBeVisible();
+    const window = await compose(mail, 'Mietvertrag', 'Hallo Priya, anbei der unterschriebene Vertrag.');
+    await window.locator('input[type=file]').setInputFiles({ name: 'vertrag.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 demo') });
+    await expect(window.getByText('vertrag.pdf')).toBeVisible();
+    await window.getByRole('button', { name: 'Save and close' }).click();
+    await expect(window).toBeHidden();
+
+    await mail.nav.getByRole('link', { name: 'Drafts' }).click();
+    await mail.rowBody('Mietvertrag').click();
+    const reopened = page.getByRole('region', { name: 'Mietvertrag' });
+    await expect(reopened.getByText('vertrag.pdf')).toBeVisible();
+    await reopened.getByRole('button', { name: 'Send', exact: true }).click();
+    await expect(reopened).toBeHidden();
+    await expect(page.getByRole('dialog', { name: 'Did you mean to attach files?' })).toHaveCount(0);
+  });
+
   test('stays quiet about attachments mentioned in the quoted message', async ({ mail, page }) => {
     await mail.open('inbox');
     await expect(mail.rows.first()).toBeVisible();

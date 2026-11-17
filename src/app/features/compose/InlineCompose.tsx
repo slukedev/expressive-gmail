@@ -17,9 +17,20 @@ const MODES = { reply: { icon: 'reply', label: 'Reply' }, 'reply-all': { icon: '
 export function InlineCompose({ draft }: { draft: ComposeDraft }) {
   const { data: account } = useAccount();
   const ref = useRef<HTMLDivElement>(null);
+  // What opened the reply (its Reply button, or the conversation for "r") gets focus back when it closes.
+  const opener = useRef<Element | null>(null);
   useEffect(() => {
+    opener.current = document.activeElement;
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [draft.key]);
+  const close = () => {
+    const back = opener.current;
+    void saveAndClose(draft);
+    requestAnimationFrame(() => {
+      const target = back instanceof HTMLElement && back.isConnected && back !== document.body ? back : document.querySelector<HTMLElement>('.detail-pane .thread-scroll');
+      target?.focus({ preventScroll: true });
+    });
+  };
   const mode = MODES[draft.mode];
   return (
     <div className="inline-compose" ref={ref}>
@@ -46,7 +57,7 @@ export function InlineCompose({ draft }: { draft: ComposeDraft }) {
           <SaveStatus draftKey={draft.key} />
           <IconButton icon="open_in_new" label="Pop out reply" size="xs" onClick={() => useUi.getState().updateCompose(draft.key, { inline: false, window: 'open' })} />
         </div>
-        <ComposeForm draft={draft} variant="inline" onEscape={() => saveAndClose(draft)} />
+        <ComposeForm draft={draft} variant="inline" onEscape={close} />
       </div>
     </div>
   );

@@ -2,7 +2,9 @@ import DOMPurify from 'dompurify';
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { escapeHtml } from '../../lib/format';
 import { appendQuote, applySignature, findSignature, removeQuotes } from './signatureDom';
-import { INSERT_CONFIG, cleanPaste, isSafeLink, pastedUrl, sanitizeForEditor } from './paste';
+import { INSERT_CONFIG, cleanPaste, isSafeLink, outgoingHtml, pastedUrl, sanitizeForEditor } from './paste';
+import { useSettingsStore } from '../../state/settings';
+import { unsettled } from './settle';
 
 export interface EditorHandle {
   /** "start": above everything; "end": after the last thing you wrote (above the signature). */
@@ -51,6 +53,12 @@ export interface EditorProps {
   activeDescendant?: string;
   controls?: string;
 }
+
+/** A long quoted thread makes reading the whole body on every key slow, so typing reaches the draft a moment later. */
+const TYPING_SETTLE_MS = 200;
+
+/** The sender's pictures stay out of the app until sent, unless every image is allowed to load. */
+const quoteImages = () => (useSettingsStore.getState().settings.externalImages === 'always' ? 'load' : 'block');
 
 /** So a menu or dialog that took focus can act on the selection. */
 function useKeptSelection(el: React.RefObject<HTMLDivElement | null>) {
@@ -145,15 +153,43 @@ export function Editor({ initialHtml, onChange, onFiles, onSlash, onLink, placeh
   // Cmd/Ctrl+Shift+V pastes plain text, as in Docs.
   const plainPaste = useRef(false);
 
+  const changed = useRef(onChange);
+  changed.current = onChange;
+  const [settle] = useState(() => {
+    const s: { node?: HTMLElement; timer?: number; flush: () => void } = {
+      flush: () => {
+        window.clearTimeout(s.timer);
+        s.timer = undefined;
+        unsettled.delete(s.flush);
+        if (s.node) changed.current(outgoingHtml(s.node.innerHTML));
+      },
+    };
+    return s;
+  });
+
   useEffect(() => {
-    if (el.current) el.current.innerHTML = sanitizeForEditor(initialHtml);
+    settle.node = el.current ?? undefined;
+    if (settle.node) settle.node.innerHTML = sanitizeForEditor(initialHtml, { quoteImages: quoteImages() });
+    // Closing right after a keystroke keeps it.
+    return () => {
+      if (unsettled.has(settle.flush)) settle.flush();
+    };
     // Only on mount: the editor owns its DOM afterwards.
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const showEmpty = () => setEmpty(!el.current?.textContent?.trim() && !el.current?.querySelector('img'));
+
   const emit = () => {
-    const html = el.current?.innerHTML ?? '';
-    setEmpty(!el.current?.textContent?.trim() && !el.current?.querySelector('img'));
-    onChange(html);
+    showEmpty();
+    settle.flush();
+    if (onSlash) onSlash(slashQuery());
+  };
+
+  const typed = () => {
+    showEmpty();
+    window.clearTimeout(settle.timer);
+    unsettled.add(settle.flush);
+    settle.timer = window.setTimeout(settle.flush, TYPING_SETTLE_MS);
     if (onSlash) onSlash(slashQuery());
   };
 
@@ -347,7 +383,7 @@ export function Editor({ initialHtml, onChange, onFiles, onSlash, onLink, placeh
     appendQuote: (html) => {
       const node = el.current;
       if (!node) return;
-      appendQuote(node, html);
+      appendQuote(node, html, { quoteImages: quoteImages() });
       emit();
     },
     removeQuotes: () => {
@@ -409,7 +445,12 @@ export function Editor({ initialHtml, onChange, onFiles, onSlash, onLink, placeh
         data-empty={empty || undefined}
         suppressContentEditableWarning
         spellCheck
-        onInput={emit}
+        onInput={typed}
+        onBlur={() => {
+          if (unsettled.has(settle.flush)) settle.flush();
+          // The template list follows the caret; left behind, it would take Enter and Tab from other fields.
+          onSlash?.(null);
+        }}
         onKeyDown={(e) => {
           // Letters typed here never reach the app's single-key shortcuts.
           e.stopPropagation();

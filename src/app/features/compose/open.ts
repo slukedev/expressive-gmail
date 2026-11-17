@@ -1,11 +1,13 @@
 import { backend, keys, queryClient } from '../../data/client';
-import type { Account, Address, Message, Thread } from '../../data/types';
+import type { Account, Address, Message, OutgoingAttachment, Thread } from '../../data/types';
 import { myAddresses } from '../../data/hooks';
 import { splitId } from '../../data/accounts/ids';
 import { escapeHtml, fullDate, isMe, parseAddresses } from '../../lib/format';
 import { getRoute } from '../../router/useRoute';
 import { useSettingsStore } from '../../state/settings';
 import { useUi, type ComposeDraft } from '../../state/ui';
+import { snack } from '../../ui/Snackbar';
+import { flushEditors } from './settle';
 import { signatureBlock, withoutQuotes } from './signatureDom';
 import { startingSignature, type SignatureUse } from './signatures';
 
@@ -174,6 +176,7 @@ export function replyToMessage(threadId: string, m: Message, mode: 'reply' | 're
 
 /** As Gmail does: recipients, subject and quoted mail follow the new choice, and what you've written stays. */
 export function switchMode(key: string, mode: 'reply' | 'reply-all' | 'forward') {
+  flushEditors();
   const d = useUi.getState().composes.find((c) => c.key === key);
   if (!d?.threadId || d.mode === mode) return;
   const thread = queryClient.getQueryData<Thread>(keys.thread(d.threadId));
@@ -203,25 +206,80 @@ export function switchMode(key: string, mode: 'reply' | 'reply-all' | 'forward')
   });
 }
 
-async function attachOriginals(key: string, m: Message) {
+function attachOriginals(key: string, m: Message) {
+  // Switched to a reply while the files loaded.
+  void fetchFiles(key, m, (d) => d.mode === 'forward', () => undefined);
+}
+
+interface Fetched {
+  ids: Set<string>;
+  files: OutgoingAttachment[];
+  inline: OutgoingAttachment[];
+  failed: boolean;
+  wanted: (d: ComposeDraft) => boolean;
+}
+
+const fetches = new Map<string, Set<Promise<Fetched>>>();
+
+function withFetched(d: ComposeDraft, f: Fetched): Pick<ComposeDraft, 'fetchingFiles' | 'attachments' | 'inlineImages'> {
+  const fetchingFiles = d.fetchingFiles?.filter((x) => !f.ids.has(x.id));
+  if (f.failed || !f.wanted(d)) return { fetchingFiles, attachments: d.attachments, inlineImages: d.inlineImages };
+  const fresh = (have: OutgoingAttachment[] = [], add: OutgoingAttachment[]) => [...have, ...add.filter((a) => !have.some((x) => x.id === a.id))];
+  return { fetchingFiles, attachments: fresh(d.attachments, f.files), inlineImages: f.inline.length ? fresh(d.inlineImages, f.inline) : d.inlineImages };
+}
+
+/** The pictures its body shows by cid:, which go back out as inline parts. */
+function inlinePictures(m: Message) {
+  return m.attachments.filter((a) => a.inline && a.contentId && m.bodyHtml?.includes(`cid:${a.contentId}`));
+}
+
+/** Its files go into the window as they arrive; until then Send and saves wait, so nothing goes out or gets saved without them. */
+function fetchFiles(key: string, m: Message, wanted: (d: ComposeDraft) => boolean, onFail: () => void) {
   const files = m.attachments.filter((a) => !a.inline);
-  if (!files.length) return;
-  try {
-    const attachments = await Promise.all(
-      files.map(async (a) => {
+  const inline = inlinePictures(m);
+  if (!files.length && !inline.length) return;
+  const ui = () => useUi.getState();
+  const compose = () => ui().composes.find((c) => c.key === key);
+  ui().updateCompose(key, {
+    fetchingFiles: [
+      ...(compose()?.fetchingFiles ?? []),
+      ...files.map((a) => ({ id: a.id, filename: a.filename, size: a.size })),
+      ...inline.map((a) => ({ id: a.id, filename: a.filename, size: a.size, inline: true })),
+    ],
+  });
+  const load = (list: typeof files) =>
+    Promise.all(
+      list.map(async (a): Promise<OutgoingAttachment> => {
         const { data } = await backend().getAttachment(m.id, a.id);
-        return { id: a.id, filename: a.filename, mimeType: a.mimeType, size: a.size, data };
+        return { id: a.id, filename: a.filename, mimeType: a.mimeType, size: a.size, data, ...(a.inline ? { contentId: a.contentId } : {}) };
       }),
     );
-    // Switched to a reply while the files loaded, or already attached.
-    const current = useUi.getState().composes.find((c) => c.key === key);
-    if (!current || current.mode !== 'forward') return;
-    const have = new Set(current.attachments.map((a) => a.id));
-    const fresh = attachments.filter((a) => !have.has(a.id));
-    if (fresh.length) useUi.getState().updateCompose(key, { attachments: [...current.attachments, ...fresh] });
-  } catch {
-    // Forward still works without them.
-  }
+  const ids = new Set([...files, ...inline].map((a) => a.id));
+  const done = Promise.all([load(files), load(inline)]).then(
+    ([f, i]): Fetched => ({ ids, files: f, inline: i, failed: false, wanted }),
+    (): Fetched => {
+      onFail();
+      return { ids, files: [], inline: [], failed: true, wanted };
+    },
+  );
+  const pending = fetches.get(key) ?? new Set();
+  fetches.set(key, pending.add(done));
+  void done.then((f) => {
+    const current = compose();
+    if (current) ui().updateCompose(key, withFetched(current, f));
+    pending.delete(done);
+    if (!pending.size && fetches.get(key) === pending) fetches.delete(key);
+  });
+  return done;
+}
+
+/** With every file still on its way from Gmail in it, for saving after the window has closed. Null when one couldn't load: saving then would drop it from the draft. */
+export async function withFetchedFiles(d: ComposeDraft): Promise<ComposeDraft | null> {
+  const pending = fetches.get(d.key);
+  if (!d.fetchingFiles?.length || !pending?.size) return d;
+  const results = await Promise.all(pending);
+  if (results.some((f) => f.failed)) return null;
+  return results.reduce<ComposeDraft>((acc, f) => ({ ...acc, ...withFetched(acc, f) }), d);
 }
 
 export async function replyToThread(threadId: string, mode: 'reply' | 'reply-all' | 'forward') {
@@ -283,7 +341,7 @@ export async function openDraftOf(threadId: string): Promise<boolean> {
 /** Inline in its open thread, otherwise in a window. */
 export function editDraft(m: Message) {
   const inline = !!m.threadId && getRoute().threadId === m.threadId && !!m.headers.inReplyTo;
-  return useUi.getState().openCompose({
+  const key = useUi.getState().openCompose({
     mode: m.headers.inReplyTo ? 'reply' : 'new',
     inline,
     window: 'open',
@@ -300,4 +358,7 @@ export function editDraft(m: Message) {
     inReplyTo: m.headers.inReplyTo,
     references: m.headers.references,
   });
+  // Gmail replaces a draft whole on every save, so a draft saved without its files would lose them.
+  fetchFiles(key, m, () => true, () => snack("Couldn't load this draft's attachments. Attach them again before you send."));
+  return key;
 }

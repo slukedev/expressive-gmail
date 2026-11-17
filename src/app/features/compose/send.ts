@@ -17,6 +17,7 @@ import { snack, snackbarManager } from '../../ui/Snackbar';
 
 export function toOutgoing(d: ComposeDraft): OutgoingMessage {
   const html = d.quoteHtml ? `${d.html}<br>${d.quoteHtml}` : d.html;
+  const inline = d.inlineImages?.filter((a) => html.includes(`cid:${a.contentId}`)) ?? [];
   return {
     draftId: d.draftId,
     threadId: d.threadId,
@@ -28,12 +29,19 @@ export function toOutgoing(d: ComposeDraft): OutgoingMessage {
     html,
     inReplyTo: d.inReplyTo,
     references: d.references,
-    attachments: d.attachments,
+    attachments: inline.length ? [...d.attachments, ...inline] : d.attachments,
+    sendKey: d.sendKey,
   };
 }
 
 export function isEmptyDraft(d: ComposeDraft) {
   return !d.to.length && !d.cc.length && !d.bcc.length && !d.subject.trim() && !stripHtml(d.html).replace(/^--\s*/, '').trim() && !d.attachments.length;
+}
+
+/** Everything that decides what a send delivers. */
+function sendContent(d: ComposeDraft): string {
+  const { from, to, cc, bcc, subject, html, quoteHtml, attachments, inlineImages = [] } = d;
+  return JSON.stringify([from?.email, to, cc, bcc, subject, html, quoteHtml, [...attachments, ...inlineImages].map((a) => [a.id, a.filename, a.size])]);
 }
 
 /** The moment its draft is sent or thrown away. */
@@ -60,6 +68,8 @@ export function sendDraft(d: ComposeDraft, opts: SendOptions = {}) {
     scheduleDraft(d, opts.sendAt);
     return;
   }
+  const content = sendContent(d);
+  d = { ...d, sendKey: d.sendKey && d.sentContent === content ? d.sendKey : crypto.randomUUID(), sentContent: content };
   const ui = useUi.getState();
   const delay = opts.sendAt ? 0 : useSettingsStore.getState().settings.undoSendSeconds * 1000;
   const message = { ...toOutgoing(d), sendAt: opts.sendAt };
@@ -71,12 +81,15 @@ export function sendDraft(d: ComposeDraft, opts: SendOptions = {}) {
   const reopen = () => ({ ...d, inline: d.inline && getRoute().threadId === d.threadId, window: d.inline ? ('open' as const) : d.window });
 
   let cancelled = false;
+  let started = false;
   const snackId = snack(delay ? 'Sending…' : 'Message sent', {
     timeout: delay ? delay + 400 : 6000,
     action: delay
       ? {
           label: 'Undo',
           onClick: () => {
+            // The snackbar can outlive the undo window while hovered; by then the message is on its way.
+            if (started) return;
             cancelled = true;
             window.clearTimeout(timer);
             putBack?.();
@@ -89,6 +102,8 @@ export function sendDraft(d: ComposeDraft, opts: SendOptions = {}) {
 
   const timer = window.setTimeout(async () => {
     if (cancelled) return;
+    started = true;
+    if (delay) snackbarManager.update(snackId, { actionProps: undefined, timeout: 0 });
     try {
       // Send the draft an autosave in flight is creating, rather than leave it in Drafts.
       const { draftId } = await settleDraftSave(d);
@@ -132,7 +147,12 @@ export function sendDraft(d: ComposeDraft, opts: SendOptions = {}) {
           action: { label: 'Send in Gmail', onClick: () => openUrl(composeFallbackUrl(message, account?.index ?? 0)) },
         });
       } else if (err instanceof BackendError && err.code === 'unknown') {
-        snack("Gmail didn't confirm the send. Check Sent before trying again.", { state: 'error', timeout: 0 });
+        // The window keeps its send key, so sending again first looks for this try in Sent.
+        snack(err.message || "Gmail didn't confirm the send. Check Sent before trying again.", {
+          state: 'error',
+          timeout: 0,
+          action: { label: 'Open Sent', onClick: () => navigate({ view: { kind: 'folder', folder: 'sent' } }) },
+        });
       } else {
         snack(err instanceof Error && err.message ? `Couldn't send: ${err.message}` : "Couldn't send. Your message is back in the compose window.", { state: 'error' });
       }
@@ -230,11 +250,11 @@ function scheduleDraft(d: ComposeDraft, sendAt: number) {
     );
 }
 
-let draftTimers = new Map<string, number>();
+const draftTimers = new Map<string, number>();
 /** One save at a time per window, so a draft is never created twice. */
-let inflight = new Map<string, Promise<void>>();
+const inflight = new Map<string, Promise<void>>();
 /** Kept past the window closing. */
-let savedIds = new Map<string, { draftId: string; draftMessageId: string }>();
+const savedIds = new Map<string, { draftId: string; draftMessageId: string }>();
 
 /** Its own, or what its last save made. */
 function withSavedIds(d: ComposeDraft): ComposeDraft {
@@ -252,17 +272,19 @@ async function settleDraftSave(d: ComposeDraft): Promise<ComposeDraft> {
 
 /** A moment after typing stops. */
 export function scheduleDraftSave(d: ComposeDraft, onStatus: (s: 'saving' | 'saved' | 'error') => void, delay = 1500) {
-  if (!backend().capabilities.drafts) return;
+  // The account it was typed in, even if the view switches accounts before the save runs.
+  const b = backend();
+  if (!b.capabilities.drafts) return;
   window.clearTimeout(draftTimers.get(d.key));
   draftTimers.set(
     d.key,
     window.setTimeout(() => {
       draftTimers.delete(d.key);
-      if (isEmptyDraft(d)) return;
+      if (isEmptyDraft(d) || d.fetchingFiles?.length) return;
       const save = async () => {
         onStatus('saving');
         try {
-          const draft = await backend().saveDraft(toOutgoing(withSavedIds(d)));
+          const draft = await b.saveDraft(toOutgoing(withSavedIds(d)));
           savedIds.set(d.key, { draftId: draft.id, draftMessageId: draft.message.id });
           const current = useUi.getState().composes.find((c) => c.key === d.key);
           if (current && (current.draftId !== draft.id || current.draftMessageId !== draft.message.id)) {
@@ -313,9 +335,3 @@ export async function discardDraft(d: ComposeDraft) {
   });
 }
 
-export function resetDraftTimers() {
-  draftTimers.forEach((t) => window.clearTimeout(t));
-  draftTimers = new Map();
-  inflight = new Map();
-  savedIds = new Map();
-}

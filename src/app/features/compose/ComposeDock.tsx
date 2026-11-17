@@ -19,6 +19,8 @@ const OPEN_W = 560;
 const MIN_W = 280;
 const GAP = 16;
 const BAR_H = 56;
+/** Reduced motion keeps a short cross-fade and drops the movement. */
+const REDUCED_FADE: KeyframeAnimationOptions = { duration: 150, easing: 'linear' };
 
 /** So the dock keeps the window you're on open. */
 const touched = new Map<string, number>();
@@ -75,7 +77,10 @@ function useHandoff(key: string) {
       if (!el || !from || done.current) return;
       done.current = true;
       handoff.delete(key);
-      if (reducedMotion()) return;
+      if (reducedMotion()) {
+        el.animate([{ opacity: 0 }, { opacity: 1 }], REDUCED_FADE);
+        return;
+      }
       const to = el.getBoundingClientRect();
       if (!to.width || !to.height) return;
       const { duration, easing } = motionToken('--md-sys-motion-spatial-default');
@@ -144,7 +149,7 @@ function useHandoff(key: string) {
 }
 
 function close(d: ComposeDraft) {
-  saveAndClose(d);
+  void saveAndClose(d);
   if (lastOutside?.isConnected && !document.activeElement?.closest('.compose-window, .compose-full, .inline-compose')) lastOutside.focus({ preventScroll: true });
 }
 
@@ -177,8 +182,12 @@ function useFold(el: React.RefObject<HTMLElement | null>, state: ComposeDraft['w
     const was = prev.current;
     prev.current = state;
     const node = el.current;
-    if (!node || was !== 'minimized' || state !== 'open' || reducedMotion()) return;
+    if (!node || was !== 'minimized' || state !== 'open') return;
     stop();
+    if (reducedMotion()) {
+      running.current = [node.animate([{ opacity: 0 }, { opacity: 1 }], REDUCED_FADE)];
+      return;
+    }
     const { width, height } = node.getBoundingClientRect();
     const { duration, easing } = motionToken('--md-sys-motion-spatial-default');
     const fade = motionToken('--md-sys-motion-effects-default');
@@ -202,9 +211,20 @@ function useFold(el: React.RefObject<HTMLElement | null>, state: ComposeDraft['w
       const node = el.current;
       // Asked again before the state caught up.
       if (node?.hasAttribute('data-folding')) return;
-      if (!node || reducedMotion()) return done();
+      if (!node) return done();
       stop();
       node.setAttribute('data-folding', '');
+      if (reducedMotion()) {
+        const out = node.animate([{ opacity: 1 }, { opacity: 0 }], { ...REDUCED_FADE, fill: 'forwards' });
+        running.current = [out];
+        out.onfinish = () => {
+          node.removeAttribute('data-folding');
+          flushSync(done);
+          stop();
+          node.animate([{ opacity: 0 }, { opacity: 1 }], REDUCED_FADE);
+        };
+        return;
+      }
       const { width, height } = node.getBoundingClientRect();
       // The same spring as the windows sliding beside it, so everything lands together.
       const { duration, easing } = motionToken('--md-sys-motion-spatial-default');

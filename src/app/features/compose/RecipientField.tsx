@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { fold, knownName, useContactSuggestions } from '../../data/contacts';
 import type { Address, Contact } from '../../data/types';
 import { EMAIL_RE, parseAddresses } from '../../lib/format';
@@ -7,6 +7,7 @@ import { Icon } from '../../ui/Icon';
 import { Tooltip } from '../../ui/Tooltip';
 import { cx } from '../../ui/Button';
 import { isComposing } from '../../lib/ime';
+import { unsettled } from './settle';
 
 /** The part `query` matched (the start, or of a later word) in bold, as Gmail shows it. */
 function Matched({ text, query }: { text: string; query: string }) {
@@ -75,6 +76,21 @@ export function RecipientField({
     if (add.length) onChange([...value, ...add]);
     setText('');
   };
+
+  // An address still being typed goes out with a send from the keyboard, as it does when the field loses focus.
+  const commitRef = useRef(commit);
+  commitRef.current = commit;
+  const pendingText = text.trim() !== '';
+  useEffect(() => {
+    if (!pendingText) return;
+    const flush = () => {
+      commitRef.current();
+      // Once until the next render: the field's value is stale until then.
+      commitRef.current = () => {};
+    };
+    unsettled.add(flush);
+    return () => void unsettled.delete(flush);
+  }, [pendingText]);
 
   const pick = (c: Contact) => {
     onChange([...value, { name: c.name, email: c.email }]);

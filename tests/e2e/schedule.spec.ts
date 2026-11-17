@@ -60,6 +60,24 @@ test.describe('schedule send', () => {
     await expect(mail.row(subject)).toBeVisible();
   });
 
+  test('a message with no subject or text still goes at its scheduled time after Send anyway', async ({ mail, page }) => {
+    await mail.open('inbox');
+    await expect(mail.rows.first()).toBeVisible();
+    await page.keyboard.press('c');
+    const window = page.getByRole('region').filter({ has: page.getByRole('combobox', { name: 'To' }) });
+    const to = window.getByRole('combobox', { name: 'To' });
+    await to.pressSequentially('priya');
+    await window.getByRole('option', { name: 'Priya Natarajan priya.natarajan@example.com' }).click();
+    await window.getByRole('button', { name: 'More send options' }).click();
+    await page.getByRole('menuitem', { name: /^Tomorrow morning/ }).click();
+    await window.getByRole('button', { name: /^Schedule send for / }).click();
+
+    const confirm = page.getByRole('dialog', { name: 'Send without a subject?' });
+    await confirm.getByRole('button', { name: 'Send anyway' }).click();
+    await expect(window).toBeHidden();
+    await expect(mail.snackbar).toContainText(/Send scheduled for \w{3}, \w{3} \d+, 8:00\sAM/);
+  });
+
   test('pick a date and time, then undo from the snackbar to get the draft back', async ({ mail, page }) => {
     await mail.open('inbox');
     await expect(mail.rows.first()).toBeVisible();

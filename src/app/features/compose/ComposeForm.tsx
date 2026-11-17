@@ -23,6 +23,7 @@ import { DateTimeDialog } from '../snooze/DateTimeDialog';
 import { attachmentMention } from '../attachreminder/mentions';
 import { AttachmentReminder } from '../attachreminder/AttachmentReminder';
 import { Editor, type EditorHandle } from './Editor';
+import { flushEditors } from './settle';
 import { EmojiPicker } from './EmojiPicker';
 import { FormatToolbar, ariaKeys } from './FormatToolbar';
 import { LinkDialog } from './LinkDialog';
@@ -34,7 +35,7 @@ import { defaultSignature, importSignatures, useComposeData, type SignatureUse }
 import { saveReporter } from './status';
 import { TemplatePicker } from './TemplatePicker';
 import { HelpMeWrite } from '../gemini/HelpMeWrite';
-import { ComposeRail } from './ComposeRail';
+import { AttachProgress, ComposeRail, type PendingFile } from './ComposeRail';
 import { isComposing } from '../../lib/ime';
 import './compose.css';
 
@@ -54,14 +55,9 @@ interface SendOptions {
   remindInDays?: number;
   /** Already asked about a missing attachment for this send. */
   attachmentChecked?: boolean;
+  emptyChecked?: boolean;
 }
 
-interface Pending {
-  id: string;
-  filename: string;
-  size: number;
-  loaded: number;
-}
 
 function readFile(file: File, onProgress: (loaded: number) => void): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -114,14 +110,15 @@ export function ComposeForm({ draft, variant, onEscape, compact }: { draft: Comp
   const fieldsOpen = expanded || noneTo(draft) || !!account?.members;
   const [formatting, setFormatting] = useState(false);
   const [formatUsed, setFormatUsed] = useState(false);
-  const [confirmEmpty, setConfirmEmpty] = useState(false);
+  const [confirmEmpty, setConfirmEmpty] = useState<SendOptions | null>(null);
   const [picking, setPicking] = useState(false);
   const [sendMenu, setSendMenu] = useState(false);
   const [link, setLink] = useState<{ text: string; href: string; editing: boolean } | null>(null);
   const [emoji, setEmoji] = useState(false);
   const [slash, setSlash] = useState<string | null>(null);
   const [drag, setDrag] = useState<number | null>(null);
-  const [pending, setPending] = useState<Pending[]>([]);
+  const [pending, setPending] = useState<PendingFile[]>([]);
+  const loading: PendingFile[] = draft.fetchingFiles?.length ? [...pending, ...draft.fetchingFiles.filter((f) => !f.inline)] : pending;
   const [moreSig, setMoreSig] = useState('none');
   const fileInput = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -142,6 +139,11 @@ export function ComposeForm({ draft, variant, onEscape, compact }: { draft: Comp
   const focusSendAfterAttach = useRef(false);
   const latest = useRef(draft);
   latest.current = draft;
+  /** With what was just typed. */
+  const fresh = () => {
+    flushEditors();
+    return useUi.getState().composes.find((c) => c.key === draft.key) ?? latest.current;
+  };
   const report = useRef(saveReporter(draft.key)).current;
 
   useEffect(() => importSignatures(account), [account]);
@@ -153,7 +155,7 @@ export function ComposeForm({ draft, variant, onEscape, compact }: { draft: Comp
       return;
     }
     scheduleDraftSave(latest.current, report);
-  }, [draft.to, draft.cc, draft.bcc, draft.subject, draft.html, draft.attachments, report]);
+  }, [draft.to, draft.cc, draft.bcc, draft.subject, draft.html, draft.attachments, draft.fetchingFiles, report]);
 
   useEffect(() => {
     // Picking a draft back up puts the caret after what you wrote; a fresh one starts at the top.
@@ -168,8 +170,17 @@ export function ComposeForm({ draft, variant, onEscape, compact }: { draft: Comp
     editor.current?.removeQuotes();
   }, [draft.mode]);
 
-  const invalid = [...draft.to, ...draft.cc, ...draft.bcc].filter((a) => !EMAIL_RE.test(a.email));
-  const noRecipients = !draft.to.length && !draft.cc.length && !draft.bcc.length;
+  // The editor keeps a cid: picture's address aside (sanitizeForEditor); it shows from the draft's own copy.
+  useEffect(() => {
+    const images = draft.inlineImages;
+    if (!images?.length) return;
+    for (const img of editor.current?.root()?.querySelectorAll<HTMLImageElement>('img[data-cid]:not([src])') ?? []) {
+      const part = images.find((a) => a.contentId === img.dataset.cid);
+      if (part?.mimeType.startsWith('image/')) img.src = `data:${part.mimeType};base64,${part.data}`;
+    }
+  }, [draft.inlineImages, draft.html]);
+
+  const invalidAddresses = (d: ComposeDraft) => [...d.to, ...d.cc, ...d.bcc].filter((a) => !EMAIL_RE.test(a.email));
 
   useEffect(() => {
     if (!focusSendAfterAttach.current || !draft.attachments.length) return;
@@ -178,26 +189,28 @@ export function ComposeForm({ draft, variant, onEscape, compact }: { draft: Comp
   }, [draft.attachments.length]);
 
   const trySend = (opts: SendOptions = {}) => {
-    if (pending.length) {
+    const now = fresh();
+    if (pending.length || now.fetchingFiles?.length) {
       snack('Wait for the attachments to finish loading, then send.');
       return;
     }
-    if (noRecipients) {
+    if (!now.to.length && !now.cc.length && !now.bcc.length) {
       snack('Add at least one recipient.');
       setFieldsOpen(true);
       return;
     }
+    const invalid = invalidAddresses(now);
     if (invalid.length) {
-      snack(`The address "${invalid[0].email}" isn't valid. Check it and try again.`);
+      snack(`The address "${invalid[0]!.email}" isn't valid. Check it and try again.`);
       setFieldsOpen(true);
       return;
     }
-    if (!draft.subject.trim() && !hasOwnWords(draft.html) && !confirmEmpty) {
-      setConfirmEmpty(true);
+    if (!now.subject.trim() && !hasOwnWords(now.html) && !opts.emptyChecked) {
+      setConfirmEmpty(opts);
       return;
     }
-    if (attachmentReminder && !opts.attachmentChecked && !latest.current.attachments.length) {
-      const phrase = attachmentMention({ subject: draft.subject, html: latest.current.html, checkSubject: draft.mode === 'new' });
+    if (attachmentReminder && !opts.attachmentChecked && !now.attachments.length) {
+      const phrase = attachmentMention({ subject: now.subject, html: now.html, checkSubject: now.mode === 'new' });
       if (phrase) {
         setForgotten({ phrase, opts });
         return;
@@ -211,7 +224,7 @@ export function ComposeForm({ draft, variant, onEscape, compact }: { draft: Comp
       return;
     }
     cancelDraftSave(draft.key);
-    sendDraft(latest.current, { ...opts, sendAt });
+    sendDraft(now, { ...opts, sendAt });
   };
   /** Only sets it: the Send button shows it, and pressing Send schedules. */
   const pickSendAt = (at: number) => {
@@ -508,7 +521,7 @@ export function ComposeForm({ draft, variant, onEscape, compact }: { draft: Comp
       {wide && (
         <ComposeRail
           draft={draft}
-          pending={pending}
+          pending={loading}
           onAddFiles={() => fileInput.current?.click()}
           onRemove={(a) => update({ attachments: draft.attachments.filter((x) => x.id !== a.id) })}
           onExpandQuote={() => {
@@ -525,7 +538,7 @@ export function ComposeForm({ draft, variant, onEscape, compact }: { draft: Comp
             <FormatToolbar editor={editor} open={formatting} />
           </div>
         )}
-        {!wide && (draft.attachments.length > 0 || pending.length > 0) && (
+        {!wide && (draft.attachments.length > 0 || loading.length > 0) && (
           <ul className="compose-attachments" aria-label="Attachments">
             {draft.attachments.map((a) => (
               <li key={a.id} className="compose-att">
@@ -541,21 +554,12 @@ export function ComposeForm({ draft, variant, onEscape, compact }: { draft: Comp
                 <IconButton icon="close" size="xs" label={`Remove ${a.filename}`} onClick={() => update({ attachments: draft.attachments.filter((x) => x.id !== a.id) })} />
               </li>
             ))}
-            {pending.map((p) => (
+            {loading.map((p) => (
               <li key={p.id} className="compose-att compose-att--loading" aria-busy="true">
                 <Icon name="attach_file" size={20} className="compose-att__icon" />
                 <span className="compose-att__name">{p.filename}</span>
-                <span className="compose-att__size">{p.size ? `${Math.round((p.loaded / p.size) * 100)}%` : ''}</span>
-                <span
-                  className="compose-att__progress"
-                  role="progressbar"
-                  aria-label={`Attaching ${p.filename}`}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={p.size ? Math.round((p.loaded / p.size) * 100) : 0}
-                >
-                  <span style={{ transform: `scaleX(${p.size ? p.loaded / p.size : 0})` }} />
-                </span>
+                <span className="compose-att__size">{p.size && p.loaded !== undefined ? `${Math.round((p.loaded / p.size) * 100)}%` : ''}</span>
+                <AttachProgress file={p} />
               </li>
             ))}
           </ul>
@@ -707,21 +711,21 @@ export function ComposeForm({ draft, variant, onEscape, compact }: { draft: Comp
       )}
 
       <Dialog
-        open={confirmEmpty}
-        onOpenChange={setConfirmEmpty}
+        open={!!confirmEmpty}
+        onOpenChange={(open) => !open && setConfirmEmpty(null)}
         title="Send without a subject?"
         description="This message has no subject or text in the body."
         actions={
           <>
-            <Button variant="text" onClick={() => setConfirmEmpty(false)}>
+            <Button variant="text" onClick={() => setConfirmEmpty(null)}>
               Cancel
             </Button>
             <Button
               variant="text"
               onClick={() => {
-                setConfirmEmpty(false);
-                cancelDraftSave(draft.key);
-                sendDraft(latest.current);
+                const opts = confirmEmpty ?? {};
+                setConfirmEmpty(null);
+                trySend({ ...opts, emptyChecked: true });
               }}
             >
               Send anyway
