@@ -1,5 +1,6 @@
 /** Transactional HTML (receipts, notices), with table layouts and inline styles the way real mail is built. */
 import { escapeHtml, svgDataUri } from '../util';
+import { stripTags } from '../../../../shared/strip-tags';
 
 export interface Brand {
   name: string;
@@ -21,7 +22,7 @@ export function preheader(text: string): string {
 }
 
 function plain(html: string): string {
-  return html.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
+  return stripTags(html).replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 }
 
 function shell(b: Brand, inner: string, pre: string, footerExtra = ''): string {

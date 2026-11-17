@@ -90,7 +90,8 @@ export function startTabIconHost(doc: Document = document, fetchIcon: typeof fet
 
   return {
     set(href) {
-      if (released || href === wanted) return;
+      // Only a PNG data: URL drawn by the app, whatever the caller checked.
+      if (released || href === wanted || (href !== null && !isTabIconHref(href))) return;
       wanted = href;
       if (href === null) {
         giveBack();

@@ -59,7 +59,7 @@ if (typeof window !== 'undefined' && window.parent !== window) {
       else launches.push(d.launch);
     } else {
       const done = waiting.get(d.type);
-      if (done) {
+      if (typeof done === 'function') {
         waiting.delete(d.type);
         done(d);
       }

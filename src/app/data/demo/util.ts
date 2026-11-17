@@ -1,3 +1,5 @@
+import { stripCodeBlocks, stripTags } from '../../../shared/strip-tags';
+
 /** Tiny, fast, good enough for fixture jitter. Returns [0, 1). */
 export function createRng(seed: number): () => number {
   let a = seed >>> 0 || 0x9e3779b9;
@@ -84,13 +86,12 @@ export function escapeHtml(s: string): string {
 
 /** For snippets and search of HTML-only mail. */
 export function htmlToText(html: string): string {
-  return html
-    .replace(/<(style|script|head|title)[\s\S]*?<\/\1>/gi, ' ')
+  const blocks = stripCodeBlocks(html, ' ', true)
     .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/(p|div|tr|h[1-6]|li|table)>/gi, '\n')
-    .replace(/<[^>]+>/g, ' ')
+    .replace(/<\/(p|div|tr|h[1-6]|li|table)>/gi, '\n');
+  // &amp; last, so "&amp;lt;" reads "&lt;" and not "<".
+  return stripTags(blocks, ' ')
     .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
@@ -99,6 +100,7 @@ export function htmlToText(html: string): string {
     .replace(/&middot;/g, '·')
     .replace(/&rsquo;/g, '’')
     .replace(/&#(\d+);/g, (_, n: string) => String.fromCodePoint(Number(n)))
+    .replace(/&amp;/g, '&')
     .replace(/[ \t\f\r]+/g, ' ')
     .replace(/ ([,.;:!?)])/g, '$1')
     .replace(/\( /g, '(')

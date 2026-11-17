@@ -1,6 +1,7 @@
 import { BackendError } from '../app/data/backend';
 import type { Message } from '../app/data/types';
 import { fromLegacyHexId } from './ids';
+import { stripTags } from '../shared/strip-tags';
 
 /** Gmail's thread data leaves out List-Unsubscribe, so it's read from "Show original" (view=om), served as raw RFC 822 or as HTML with the source in a <pre>. */
 export function originalSourceUrl(origin: string, index: number, ik: string, messageId: string): string {
@@ -16,7 +17,7 @@ function decodeEntities(s: string): string {
   return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e: string) => {
     if (e[0] === '#') {
       const code = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
-      return Number.isFinite(code) ? String.fromCodePoint(code) : m;
+      return Number.isFinite(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : m;
     }
     return ENTITIES[e.toLowerCase()] ?? m;
   });
@@ -31,7 +32,7 @@ const MESSAGE_HEADERS = ['from', 'received', 'message-id', 'delivered-to', 'retu
 export function rawSourceFrom(body: string): string | null {
   // The page may be cut short after the headers (see headSource), so the <pre> may not close.
   const pres = [...body.matchAll(/<pre\b([^>]*)>([\s\S]*?)(?:<\/pre>|$)/gi)];
-  const decoded = (m: RegExpMatchArray) => decodeEntities(m[2]!.replace(/<[^>]+>/g, '')).replace(/^\s+/, '');
+  const decoded = (m: RegExpMatchArray) => decodeEntities(stripTags(m[2]!)).replace(/^\s+/, '');
   const byId = pres.find((m) => /\bid=["']?raw_message_text\b/i.test(m[1]!));
   if (byId) return decoded(byId);
   const looksLikeSource = pres.map(decoded).find((t) => HEADER_LINE.test(t));

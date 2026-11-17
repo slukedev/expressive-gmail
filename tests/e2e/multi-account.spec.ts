@@ -68,7 +68,7 @@ test('an action in All inboxes lands in the account that owns the conversation',
   await expect(mail.snackbar).toContainText('Conversation archived');
   await expect(mail.row(STUDIO_THREAD)).toHaveCount(0);
 
-  await pick(page, new RegExp(STUDIO.replace(/\./g, '\\.')));
+  await pick(page, new RegExp(STUDIO.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   await expect(mail.list).toBeVisible();
   await expect(mail.row('Harbor Bikes website')).toBeVisible();
   await expect(mail.row(STUDIO_THREAD)).toHaveCount(0);
@@ -97,7 +97,7 @@ test('switching saves an unsent message to Drafts in its own account', async ({ 
   await page.keyboard.press('c');
   const window = page.getByRole('region').filter({ has: page.getByRole('combobox', { name: 'To' }) });
   await window.getByRole('textbox', { name: 'Subject' }).fill('Quarterly numbers, rough draft');
-  await pick(page, new RegExp(STUDIO.replace(/\./g, '\\.')));
+  await pick(page, new RegExp(STUDIO.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   await expect(mail.snackbar).toContainText('Your unsent message was saved to Drafts.');
   await expect(window).toHaveCount(0);
   await expect(mail.row('Harbor Bikes website')).toBeVisible();

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Account, Address } from '../../data/types';
 import { readKey, watchKey, writeKey } from '../../state/storage';
+import { decodeBasicEntities, stripTags } from '../../../shared/strip-tags';
 
 /** Gmail's model: named signatures, and per send-as address one default for new mail and one for replies. Kept in this browser; Gmail's own signature is imported once. */
 export interface Signature {
@@ -55,13 +56,7 @@ const clean = (html: string) => html.replace(/\s+/g, ' ').trim();
 
 /** One line of text, for lists and menus. */
 export function signaturePreview(html: string) {
-  return html
-    .replace(/<(br|\/div|\/p|\/li|\/h\d)[^>]*>/gi, ' ')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
+  return decodeBasicEntities(stripTags(html.replace(/<(br|\/div|\/p|\/li|\/h\d)[^>]*>/gi, ' ')))
     .replace(/\s+/g, ' ')
     .trim();
 }

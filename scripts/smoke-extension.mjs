@@ -86,7 +86,7 @@ if (frame) console.log('     frame', frame.url());
 // Playwright sees requests before the extension rewrites their headers, so the rule is read from the extension instead.
 const rules = await worker.evaluate(() => chrome.declarativeNetRequest.getDynamicRules());
 if (phone) {
-  const ua = rules.find((r) => r.condition.requestDomains?.includes('mail.google.com'))?.action.requestHeaders?.find((h) => h.header === 'user-agent')?.value;
+  const ua = rules.find((r) => r.condition.requestDomains?.some((d) => d === 'mail.google.com'))?.action.requestHeaders?.find((h) => h.header === 'user-agent')?.value;
   check(!!ua && !/Mobile|Android/.test(ua), `Gmail is asked for its desktop client (user agent: ${ua ?? 'not set'})`);
   const layout = await page.evaluate(() => ({
     innerWidth,

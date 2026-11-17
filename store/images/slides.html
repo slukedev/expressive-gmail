@@ -241,7 +241,8 @@
     },
   };
 
-  const id = location.hash.slice(1) || '1-expressive';
+  const asked = location.hash.slice(1);
+  const id = Object.hasOwn(slides, asked) && typeof slides[asked] === 'function' ? asked : '1-expressive';
   document.body.innerHTML = slides[id]();
   Promise.all([document.fonts.load('440 20px GSF'), document.fonts.load('24px Symbols'), ...[...document.images].map((i) => i.decode())])
     .then(() => document.fonts.ready)

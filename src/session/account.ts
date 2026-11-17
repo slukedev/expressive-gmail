@@ -1,4 +1,5 @@
 import type { Account, Address, OutgoingMessage } from '../app/data/types';
+import { stripCodeBlocks, stripTags } from '../shared/strip-tags';
 
 /** "/sync/u/2" or "/mail/u/2/#inbox" → 2. */
 export function accountIndexFromPath(path: string): number {
@@ -134,11 +135,10 @@ const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"'
 
 /** String based on purpose: Gmail's page enforces Trusted Types, so DOMParser/innerHTML are off limits. */
 export function htmlToPlainText(html: string): string {
-  return html
-    .replace(/<(style|script)[^>]*>[\s\S]*?<\/\1>/gi, '')
+  const blocks = stripCodeBlocks(html)
     .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/(p|div|li|h[1-6]|blockquote|tr)>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
+    .replace(/<\/(p|div|li|h[1-6]|blockquote|tr)>/gi, '\n');
+  return stripTags(blocks)
     .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (whole, code: string) => {
       if (code[0] === '#') {
         const n = code[1] === 'x' || code[1] === 'X' ? parseInt(code.slice(2), 16) : parseInt(code.slice(1), 10);

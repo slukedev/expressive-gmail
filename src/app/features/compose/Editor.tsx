@@ -5,6 +5,7 @@ import { appendQuote, applySignature, findSignature, removeQuotes } from './sign
 import { INSERT_CONFIG, cleanPaste, isSafeLink, outgoingHtml, pastedUrl, sanitizeForEditor } from './paste';
 import { useSettingsStore } from '../../state/settings';
 import { unsettled } from './settle';
+import { stripTags } from '../../../shared/strip-tags';
 
 export interface EditorHandle {
   /** "start": above everything; "end": after the last thing you wrote (above the signature). */
@@ -148,7 +149,7 @@ function isBlankNode(n: Node) {
 
 export function Editor({ initialHtml, onChange, onFiles, onSlash, onLink, placeholder, label, ref, minHeight, activeDescendant, controls }: EditorProps) {
   const el = useRef<HTMLDivElement>(null);
-  const [empty, setEmpty] = useState(!initialHtml.replace(/<[^>]+>/g, '').trim());
+  const [empty, setEmpty] = useState(!stripTags(initialHtml).trim());
   const kept = useKeptSelection(el);
   // Cmd/Ctrl+Shift+V pastes plain text, as in Docs.
   const plainPaste = useRef(false);

@@ -412,7 +412,7 @@ describe('contacts', () => {
       .on('POST', /\/batch\/gmail\/v1$/, batchHandler(() => ['200 OK', sentThread]));
 
     expect(await backend.searchContacts('smi')).toEqual([{ name: 'Smith, Anna', email: 'anna.smith@corp.com' }]);
-    const peopleCalls = net.calls.filter((c) => c.url.includes('people.googleapis.com'));
+    const peopleCalls = net.calls.filter((c) => new URL(c.url).hostname === 'people.googleapis.com');
     // Each endpoint got one warmup (empty query) and was then disabled.
     expect(peopleCalls.map((c) => new URL(c.url).searchParams.get('query'))).toEqual(['', '']);
     expect(new URL(net.calls.find((c) => c.url.includes('/threads?'))!.url).searchParams.get('q')).toBe('in:sent');

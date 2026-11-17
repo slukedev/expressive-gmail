@@ -68,13 +68,17 @@ function blockRemote(el: Element) {
   }
 }
 
+const CONTENT_ID = /^[^\s"'<>\\]+$/;
+
 /** What the editor holds, as it goes out: pictures held back from quoted mail go back in, and inline pictures by their cid: again. */
 export function outgoingHtml(html: string): string {
   if (!html.includes('data-blocked-') && !html.includes('data-cid')) return html;
   const t = document.createElement('template');
   t.innerHTML = html;
   for (const img of t.content.querySelectorAll('img[data-cid]')) {
-    img.setAttribute('src', `cid:${img.getAttribute('data-cid')}`);
+    const cid = img.getAttribute('data-cid') ?? '';
+    // No spaces, quotes or angle brackets: a Content-ID never has them, and they could close the attribute.
+    if (CONTENT_ID.test(cid)) img.setAttribute('src', `cid:${cid}`);
     img.removeAttribute('data-cid');
   }
   for (const name of BLOCKABLE) {

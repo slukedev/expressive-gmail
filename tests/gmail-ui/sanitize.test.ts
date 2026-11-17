@@ -88,7 +88,7 @@ describe('sanitizeEmail', () => {
       }),
     );
     const srcs = [...d.querySelectorAll('img')].map((i) => i.getAttribute('src') ?? '');
-    expect(srcs.some((s) => s.startsWith('https://img.example.com'))).toBe(false);
+    expect(srcs.some((s) => URL.canParse(s) && new URL(s).hostname === 'img.example.com')).toBe(false);
     expect(srcs).toContain('blob:https://mail.example/1234');
   });
 

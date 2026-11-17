@@ -4,16 +4,17 @@
  * or "&lt;b&gt;" would turn into a tag and be stripped.
  */
 import { decodeSnippet } from './payload';
+import { stripCodeBlocks, stripComments, stripTags } from '../../../shared/strip-tags';
 
 export function htmlToText(html: string): string {
   let s = html.replace(/\r\n?/g, '\n');
-  s = s.replace(/<!--[\s\S]*?-->/g, '');
-  s = s.replace(/<(script|style|head|title)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '');
+  s = stripComments(s);
+  s = stripCodeBlocks(s, '', true);
   // Source newlines are just whitespace in HTML.
   s = s.replace(/\s+/g, ' ');
   s = s.replace(/<a\b[^>]*?href\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))[^>]*>([\s\S]*?)<\/a\s*>/gi, (_m, _q, d, sq, bare, inner: string) => {
     const href: string = (d ?? sq ?? bare ?? '').trim();
-    const text = inner.replace(/<[^>]+>/g, '').trim();
+    const text = stripTags(inner).trim();
     if (!href || href.startsWith('#') || /^javascript:/i.test(href)) return inner;
     const target = href.replace(/^mailto:/i, '');
     if (!text || text === href || text === target) return target;
@@ -26,7 +27,7 @@ export function htmlToText(html: string): string {
   s = s.replace(/<\/tr\s*>/gi, '\n');
   s = s.replace(/<\/t[dh]\s*>/gi, '\t');
   s = s.replace(/<hr\b[^>]*>/gi, '\n---\n');
-  s = s.replace(/<[^>]+>/g, '');
+  s = stripTags(s);
   s = decodeSnippet(s);
   s = s.replace(/\u00a0/g, ' ');
   s = s

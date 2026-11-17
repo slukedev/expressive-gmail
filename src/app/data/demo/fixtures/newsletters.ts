@@ -3,6 +3,7 @@ import { escapeHtml, formatLongDate, formatShortDate, svgDataUri } from '../util
 import { PROMOS, type Ctx, type MessageSpec, type Person, type ThreadSpec } from './model';
 import { P } from './people';
 import { button, preheader } from './templates';
+import { stripTags } from '../../../../shared/strip-tags';
 
 const img = (svg: string, w: number, h: number, alt: string, style = '') =>
   `<img src="${svgDataUri(svg)}" width="${w}" height="${h}" alt="${escapeHtml(alt)}" style="display:block;width:100%;max-width:${w}px;height:auto;border:0;${style}">`;
@@ -113,7 +114,7 @@ ${i.code ? `<tr><td style="padding:0 8px 20px"><table role="presentation" cellpa
 <tr><td><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${cards}</table></td></tr>
 <tr><td style="padding:24px 8px 0;font-family:Helvetica,Arial,sans-serif;font-size:14px;line-height:21px;color:#444;text-align:center">Free gait analysis in store, every Saturday. Free returns on unworn shoes for 60 days.</td></tr>
 ${footer({ name: 'Stride & Co. Running', domain: 'strideandco.example', address: '1480 College Ave, Berkeley, CA', why: 'You’re getting this because you bought shoes from us and said yes to emails.' })}`;
-  return page('#f2f2ef', inner, 600, `${i.headline} ${i.sub}`.replace(/<[^>]+>/g, ''));
+  return page('#f2f2ef', inner, 600, stripTags(`${i.headline} ${i.sub}`));
 }
 
 // Low Tide Coffee
