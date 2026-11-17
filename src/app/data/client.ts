@@ -102,12 +102,11 @@ export function forgetChange(ids: string[]) {
   const gone = new Set(ids);
   const shift = new Map<string, number>();
   pendingUnread = pendingUnread.flatMap((p) => {
-    const key = `${p.field} ${p.label}`;
     if (p.ids.some((id) => gone.has(id))) {
-      shift.set(key, (shift.get(key) ?? 0) + p.delta);
+      shift.set(p.label, (shift.get(p.label) ?? 0) + p.delta);
       return [];
     }
-    return [{ ...p, from: p.from - (shift.get(key) ?? 0) }];
+    return [{ ...p, from: p.from - (shift.get(p.label) ?? 0) }];
   });
 }
 
@@ -254,21 +253,19 @@ export function findThread(id: string): ThreadSummary | undefined {
 
 /** Unread counts this tab changed ahead of the server. Gmail answers with the old count for a few seconds after a write, so without these the nav count flicks back (28, 29, 28). Each entry goes once the server's count moves off the one it was made against. */
 const UNREAD_SETTLE_MS = 15_000;
-type UnreadField = 'unreadCount' | 'inboxUnreadCount';
-let pendingUnread: { label: LabelId; field: UnreadField; from: number; delta: number; until: number; source: MailBackend | null; ids: string[] }[] = [];
+let pendingUnread: { label: LabelId; from: number; delta: number; until: number; source: MailBackend | null; ids: string[] }[] = [];
 
-/** `ids` made the change. `field` picks the label's own count or its category's inbox tab. */
-export function adjustUnread(deltas: Map<LabelId, number>, ids: string[], field: UnreadField = 'unreadCount') {
+/** `ids` made the change. */
+export function adjustUnread(deltas: Map<LabelId, number>, ids: string[]) {
   if (![...deltas.values()].some(Boolean)) return;
   const until = Date.now() + UNREAD_SETTLE_MS;
   queryClient.setQueryData<Label[]>(keys.labels, (labels) =>
     labels?.map((l) => {
       const delta = deltas.get(l.id);
-      const from = l[field];
-      // A count the backend doesn't keep stays unknown rather than starting from 0.
-      if (!delta || (field === 'inboxUnreadCount' && from === undefined)) return l;
-      pendingUnread.push({ label: l.id, field, from: from ?? 0, delta, until, source: backendRef, ids });
-      return { ...l, [field]: Math.max(0, (from ?? 0) + delta) };
+      if (!delta) return l;
+      const from = l.unreadCount ?? 0;
+      pendingUnread.push({ label: l.id, from, delta, until, source: backendRef, ids });
+      return { ...l, unreadCount: Math.max(0, from + delta) };
     }),
   );
 }
@@ -279,20 +276,15 @@ export function withPendingUnread(labels: Label[], now = Date.now()): Label[] {
   if (!pendingUnread.length) return labels;
   const keep: typeof pendingUnread = [];
   const out = labels.map((l) => {
-    let next = l;
-    for (const field of ['unreadCount', 'inboxUnreadCount'] as const) {
-      if (field === 'inboxUnreadCount' && l.inboxUnreadCount === undefined) continue;
-      let count = l[field] ?? 0;
-      for (const p of pendingUnread) {
-        if (p.label !== l.id || p.field !== field) continue;
-        // Still the count the change was made against: the server hasn't caught up.
-        if (count !== p.from) continue;
-        count = Math.max(0, count + p.delta);
-        keep.push(p);
-      }
-      if (count !== (l[field] ?? 0)) next = { ...next, [field]: count };
+    let count = l.unreadCount ?? 0;
+    for (const p of pendingUnread) {
+      if (p.label !== l.id) continue;
+      // Still the count the change was made against: the server hasn't caught up.
+      if (count !== p.from) continue;
+      count = Math.max(0, count + p.delta);
+      keep.push(p);
     }
-    return next;
+    return count === (l.unreadCount ?? 0) ? l : { ...l, unreadCount: count };
   });
   pendingUnread = keep;
   return out;

@@ -18,7 +18,8 @@ import { useLocal } from '../../state/local';
 import { useSettings } from '../../state/settings';
 import { useUi } from '../../state/ui';
 import { LinearProgress } from '../../ui/Progress';
-import { CategoryTabs, useCategoryUnread } from './CategoryTabs';
+import { CategoryTabs } from './CategoryTabs';
+import { useCategoryUnread } from './categoryCount';
 import { ListEmpty, ListError } from './ListStates';
 import { ListSkeleton } from './ListSkeleton';
 import { ListToolbar } from './ListToolbar';
@@ -190,7 +191,8 @@ export function ListPane({ split }: { split: boolean }) {
 
   const showTabs = (isInbox && inboxType === 'categories') || view.kind === 'category';
   const heroCategory = view.kind === 'category' && view.category !== 'primary' ? view.category : null;
-  const categoryUnread = useCategoryUnread(heroCategory ?? '', labels, !!heroCategory, { senders: false });
+  // Counting waits for the list, so opening a category shows its mail first.
+  const categoryUnread = useCategoryUnread(heroCategory ?? '', labels, !!heroCategory && list.isSuccess);
   const heroMeta = useHeroMeta(view, labels, list.data?.pages[0]?.resultSizeEstimate, list.data?.pages[0]?.resultSizeAtLeast, categoryUnread);
   const ptrRef = useRef<HTMLDivElement>(null);
   const ptrArrowRef = useRef<HTMLSpanElement>(null);
@@ -405,7 +407,7 @@ export function ListPane({ split }: { split: boolean }) {
         )}
         {merged && <AccountFilter missing={unavailable?.map((m) => m.email)} />}
         {unavailable?.length ? <UnavailableNotice missing={unavailable} onRetry={() => void list.refetch()} /> : null}
-        {showTabs && <CategoryTabs bundles={narrow} />}
+        {showTabs && <CategoryTabs bundles={narrow} counting={list.isSuccess} />}
         {view.kind === 'search' && <SearchChips query={view.query} />}
         {view.kind === 'search' && <SearchAnswer query={view.query} />}
         {body}

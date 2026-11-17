@@ -141,8 +141,7 @@ export function parseLabels(defsNode: unknown, countsNode: unknown): Label[] {
       name: api,
       type: 'system',
       ...countFields(c),
-      ...(section?.unread === undefined ? {} : { inboxUnreadCount: section.unread }),
-      // Gmail sometimes sends the tab's total without its unread count (Updates, on real accounts); the total still says when to count again.
+      // Only says when to count the tab again. Its unread count follows Gmail's own tabs, not the category's search.
       ...(section?.total === undefined ? {} : { inboxTotalCount: section.total }),
     });
   }
