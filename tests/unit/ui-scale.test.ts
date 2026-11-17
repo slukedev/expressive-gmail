@@ -26,9 +26,9 @@ describe('interface size', () => {
     it('lays the frame out larger and scales it down from its corner to fill the host, and back', () => {
       const frame = document.createElement('iframe');
       applyFrameScale(frame, 0.8);
-      expect(style(frame)).toEqual(['scale(0.8)', '0 0', '125%', '125%', '0.8']);
+      expect(style(frame)).toEqual(['scale(0.8)', '0px 0px', '125%', '125%', '0.8']);
       applyFrameScale(frame, 1.25);
-      expect(style(frame)).toEqual(['scale(1.25)', '0 0', '80%', '80%', '1.25']);
+      expect(style(frame)).toEqual(['scale(1.25)', '0px 0px', '80%', '80%', '1.25']);
       // A new tab opens at the last size before the app has loaded.
       expect(readHostUiScale()).toBe(1.25);
       applyFrameScale(frame, 1);
