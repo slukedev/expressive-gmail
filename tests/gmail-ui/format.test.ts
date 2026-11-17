@@ -18,6 +18,7 @@ import {
   plural,
   relative,
 } from '../../src/app/lib/format';
+import { usEnglish } from '../locale';
 
 // Intl puts a narrow no-break space before AM/PM; Gmail shows a plain space.
 const norm = (s: string) => s.replace(/\s+/g, ' ').trim();
@@ -30,7 +31,7 @@ const sam = { name: 'Sam Reyes', email: 'sam@example.org' };
 const kim = { name: 'Kim Park', email: 'kim@example.org' };
 const me = { name: 'Luke Example', email: ME };
 
-describe('listDate (Gmail list column)', () => {
+describe.skipIf(!usEnglish)('listDate (Gmail list column)', () => {
   const now = at(2026, 10, 13, 15, 30); // Tue Oct 13 2026, 3:30 PM
 
   it.each([
@@ -58,7 +59,7 @@ describe('listDate (Gmail list column)', () => {
   });
 });
 
-describe('fullDate (tooltip)', () => {
+describe.skipIf(!usEnglish)('fullDate (tooltip)', () => {
   it.each([
     [at(2026, 10, 7, 9, 41), 'Wed, Oct 7, 2026, 9:41 AM'],
     [at(2025, 12, 31, 23, 59), 'Wed, Dec 31, 2025, 11:59 PM'],
@@ -68,7 +69,7 @@ describe('fullDate (tooltip)', () => {
   });
 });
 
-describe('relative', () => {
+describe.skipIf(!usEnglish)('relative', () => {
   const now = at(2026, 10, 13, 15, 0);
   it.each([
     [now - 60_000, '1 minute ago'],
@@ -77,12 +78,22 @@ describe('relative', () => {
     [now - 2 * 3600_000 - 10 * 60_000, '2 hours ago'],
     [now - 24 * 3600_000 * 1, '1 day ago'],
     [now - 24 * 3600_000 * 5, '5 days ago'],
+    [now - 30_000, 'just now'],
+    [now + 30_000, 'just now'],
+    [now - 50_000, '1 minute ago'],
+    [now + 3 * 3600_000, 'in 3 hours'],
+    [now - 61 * 24 * 3600_000, '2 months ago'],
+    [now - 400 * 24 * 3600_000, 'last year'],
   ])('%i -> %s', (t, expected) => {
     expect(relative(t, now)).toBe(expected);
   });
+
+  it('59 minutes 40 seconds ago reads as an hour, not "60 minutes ago"', () => {
+    expect(relative(now - (59 * 60_000 + 40_000), now)).toBe('1 hour ago');
+  });
 });
 
-describe('messageDate (message header)', () => {
+describe.skipIf(!usEnglish)('messageDate (message header)', () => {
   const now = at(2026, 10, 13, 15, 0);
 
   it('shows only the time for today, plus how long ago', () => {
@@ -90,23 +101,31 @@ describe('messageDate (message header)', () => {
   });
 
   it('shows date, time and days ago for older mail', () => {
-    const s = norm(messageDate(at(2026, 10, 7, 15, 1), now));
-    expect(s).toMatch(/Oct 7/);
-    expect(s).toMatch(/3:01 PM/);
-    expect(s).toMatch(/\(6 days ago\)$/);
+    expect(norm(messageDate(at(2026, 10, 7, 15, 1), now))).toBe('Oct 7, 2026, 3:01 PM (6 days ago)');
   });
 });
 
 describe('fileSize', () => {
-  it('shows bytes, whole KB and one decimal MB like Gmail attachment chips', () => {
-    expect(fileSize(512)).toMatch(/^512 ?(B|bytes)$/);
-    expect(fileSize(24 * 1024)).toBe('24 KB');
-    expect(fileSize(Math.round(1.2 * 1024 * 1024))).toBe('1.2 MB');
-  });
-
-  it('never shows fractional KB or a leading zero MB', () => {
-    expect(fileSize(1536 * 10 + 300)).toMatch(/^\d+ KB$/);
-    expect(fileSize(900 * 1024)).not.toMatch(/^0\./);
+  const KB = 1024;
+  const MB = 1024 * KB;
+  // Bytes, whole KB, one decimal MB under 10 MB, whole MB above, like Gmail's attachment chips.
+  it.each([
+    [0, '0 B'],
+    [512, '512 B'],
+    [1023, '1023 B'],
+    [1024, '1 KB'],
+    [1536, '2 KB'],
+    [24 * KB, '24 KB'],
+    [900 * KB, '900 KB'],
+    [MB - 1, '1.0 MB'],
+    [MB, '1.0 MB'],
+    [Math.round(1.2 * MB), '1.2 MB'],
+    [Math.round(9.9 * MB), '9.9 MB'],
+    [10 * MB - 1, '10 MB'],
+    [10 * MB, '10 MB'],
+    [Math.round(12.6 * MB), '13 MB'],
+  ])('%d bytes is %s', (bytes, expected) => {
+    expect(fileSize(bytes)).toBe(expected);
   });
 });
 
@@ -129,9 +148,18 @@ describe('isMe / displayName / firstName', () => {
     expect(firstName(ana, ME)).toBe('Ana');
   });
 
-  it('falls back to the address when there is no name', () => {
-    expect(displayName({ email: 'billing@example.com' }, ME)).toContain('billing');
-    expect(firstName({ email: 'billing@example.com' }, ME)).toContain('billing');
+  it('falls back to the local part of the address when there is no name', () => {
+    expect(displayName({ email: 'bo.chen@example.com' }, ME)).toBe('bo.chen');
+    expect(firstName({ email: 'bo.chen@example.com' }, ME)).toBe('bo.chen');
+  });
+
+  it('takes the first word as the first name, however the name is spaced', () => {
+    expect(displayName({ name: 'Mary   Ann Smith', email: 'm@example.com' }, ME)).toBe('Mary   Ann Smith');
+    expect(firstName({ name: 'Mary   Ann Smith', email: 'm@example.com' }, ME)).toBe('Mary');
+  });
+
+  it('calls nobody "me" without my address', () => {
+    expect(displayName(me)).toBe('Luke Example');
   });
 });
 
@@ -146,6 +174,17 @@ describe('participantsLine (thread senders)', () => {
 
   it('uses first names and "me" when several people wrote', () => {
     expect(participantsLine([ana, me, jordan], ME)).toBe('Ana, me, Jordan');
+  });
+
+  it('says so when there is no sender', () => {
+    expect(participantsLine([], ME)).toBe('(no sender)');
+  });
+
+  it.each([
+    ['four', [ana, sam, me, jordan], 'Ana .. me, Jordan'],
+    ['five', [ana, sam, jordan, kim, me], 'Ana .. Kim, me'],
+  ])('keeps the first and the last two of %s senders', (_n, list, expected) => {
+    expect(participantsLine(list, ME)).toBe(expected);
   });
 
   it('elides the middle of a long thread, keeping first and last', () => {
@@ -195,9 +234,8 @@ describe('parseAddresses (compose fields)', () => {
     expect(list[0]).toMatchObject({ name: 'Team; Ops', email: 'ops@example.com' });
   });
 
-  it('returns nothing for empty input', () => {
-    expect(parseAddresses('')).toEqual([]);
-    expect(parseAddresses(' , ; ')).toEqual([]);
+  it.each(['', ' , ; ', 'hello world', 'not an email, <>, @@', 'ana@, @x.com'])('finds nothing in %j', (input) => {
+    expect(parseAddresses(input)).toEqual([]);
   });
 });
 
@@ -212,7 +250,7 @@ describe('plural', () => {
   });
 });
 
-describe('dateGroup (Inbox by Gmail sections)', () => {
+describe.skipIf(!usEnglish)('dateGroup (Inbox by Gmail sections)', () => {
   const SUN = 0;
   const MON = 1;
   const wed = at(2026, 10, 14, 10); // Wed Oct 14 2026
@@ -227,6 +265,18 @@ describe('dateGroup (Inbox by Gmail sections)', () => {
     ['last year', at(2025, 10, 20, 9), 'October 2025'],
   ])('%s', (_label, t, expected) => {
     expect(dateGroup(t, wed, MON)).toBe(expected);
+  });
+
+  it('counts a future date (a scheduled send) as today, and the 1st as this month', () => {
+    expect(dateGroup(at(2026, 10, 15, 9), wed, MON)).toBe('Today');
+    expect(dateGroup(at(2026, 10, 1, 9), wed, MON)).toBe('This month');
+  });
+
+  it('lets a week run across a month boundary, then names the old month', () => {
+    const sundayNov1 = at(2026, 11, 1, 9);
+    expect(dateGroup(at(2026, 10, 31, 22), sundayNov1, MON)).toBe('Yesterday');
+    expect(dateGroup(at(2026, 10, 26, 8), sundayNov1, MON)).toBe('This week');
+    expect(dateGroup(at(2026, 10, 25, 22), sundayNov1, MON)).toBe('October');
   });
 
   it('puts Sunday in this week only when weeks start on Sunday', () => {

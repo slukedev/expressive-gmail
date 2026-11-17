@@ -1,18 +1,21 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # Builds the Safari app signed with your Apple Development certificate,
 # installs it to ~/Applications and launches it once so Safari registers the
 # extension. Then enable it in Safari > Settings > Extensions.
-# Usage: TEAM_ID=XXXXXXXXXX [BUNDLE_ID=com.yourname.bettergmail] npm run safari:install
-set -e
+# Usage: TEAM_ID=XXXXXXXXXX BUNDLE_ID=com.yourname.bettergmail npm run safari:install
+[ -n "${BASH_VERSION:-}" ] || exec bash "$0" "$@"
+set -euo pipefail
 TEAM_ID="${TEAM_ID:?Set TEAM_ID to your Apple developer team id}"
+export BUNDLE_ID="${BUNDLE_ID:?Set BUNDLE_ID to your own reverse-DNS id, for example com.yourname.expressivegmail}"
 npx wxt build -b chrome --mv3 >/dev/null
+node scripts/check-no-demo.mjs .output/chrome-mv3
 sh scripts/package-safari.sh
 DD="${TMPDIR:-/tmp}/better-gmail-safari-build"
 xcodebuild -project "safari/Expressive Gmail/Expressive Gmail.xcodeproj" -scheme "Expressive Gmail" -configuration Release \
   -destination 'platform=macOS' -derivedDataPath "$DD" \
   DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGN_STYLE=Automatic -allowProvisioningUpdates build >/dev/null
 BUILT="$DD/Build/Products/Release/Expressive Gmail.app"
-IDENTITY=$(codesign -dvv "$BUILT" 2>&1 | sed -n 's/^Authority=//p' | head -1)
+IDENTITY=$(codesign -dvv "$BUILT" 2>&1 | sed -n 's/^Authority=//p' | awk 'NR == 1')
 sh scripts/embed-chromium.sh "$BUILT" "$IDENTITY"
 mkdir -p "$HOME/Applications"
 rm -rf "$HOME/Applications/Expressive Gmail.app"

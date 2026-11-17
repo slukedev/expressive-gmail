@@ -1,16 +1,18 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # Builds the Safari extension and wraps it in a macOS app with Apple's packager.
 # The packager derives inconsistent bundle ids, so they're pinned afterwards.
-# Set BUNDLE_ID to your own reverse-DNS id (the extension gets BUNDLE_ID.Extension).
-set -e
-APP_ID="${BUNDLE_ID:-com.example.bettergmail}"
+# BUNDLE_ID (required) is your own reverse-DNS id; the extension gets BUNDLE_ID.Extension.
+[ -n "${BASH_VERSION:-}" ] || exec bash "$0" "$@"
+set -euo pipefail
+APP_ID="${BUNDLE_ID:?Set BUNDLE_ID to your own reverse-DNS id, for example com.yourname.expressivegmail}"
 npx wxt build -b safari --mv3
+node scripts/check-no-demo.mjs .output/safari-mv3
 xcrun safari-web-extension-packager .output/safari-mv3 \
   --project-location safari --app-name "Expressive Gmail" --bundle-identifier "$APP_ID" \
   --swift --macos-only --copy-resources --no-open --no-prompt --force >/dev/null
 PROJ="safari/Expressive Gmail/Expressive Gmail.xcodeproj"
 VERSION=$(node -p "require('./package.json').version")
-grep -rl "extensionBundleIdentifier\|\.Extension\"" "safari/Expressive Gmail/Expressive Gmail" 2>/dev/null | while read -r f; do
+{ grep -rl "extensionBundleIdentifier\|\.Extension\"" "safari/Expressive Gmail/Expressive Gmail" 2>/dev/null || true; } | while read -r f; do
   sed -i '' -E "s/\"[A-Za-z0-9.-]+\.Extension\"/\"$APP_ID.Extension\"/" "$f"
 done
 # Xcode 27's packager writes project.xcproj; patch-xcproj.mjs makes the same edits as the pbxproj steps below.

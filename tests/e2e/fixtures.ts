@@ -19,8 +19,9 @@ export class Mail {
     await this.page.goto(`/?${q}#${hash}`);
   }
 
+  /** Every conversation on screen: the list splits into one list per section (Pinned, Today, ...). */
   get list(): Locator {
-    return this.page.getByRole('list', { name: 'Conversations' });
+    return this.page.locator('.list-pane .thread-list');
   }
 
   get rows(): Locator {

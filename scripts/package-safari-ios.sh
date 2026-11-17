@@ -1,10 +1,12 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # Builds the Safari extension and wraps it in an iPhone and iPad app with Apple's packager,
 # next to the Mac project (scripts/package-safari.sh). Same bundle ids as the Mac app, so the
-# App Store can sell both as one. Set BUNDLE_ID to your own reverse-DNS id.
-set -e
-APP_ID="${BUNDLE_ID:-com.example.bettergmail}"
+# App Store can sell both as one. BUNDLE_ID (required) is your own reverse-DNS id.
+[ -n "${BASH_VERSION:-}" ] || exec bash "$0" "$@"
+set -euo pipefail
+APP_ID="${BUNDLE_ID:?Set BUNDLE_ID to your own reverse-DNS id, for example com.yourname.expressivegmail}"
 npx wxt build -b safari --mv3
+node scripts/check-no-demo.mjs .output/safari-mv3
 xcrun safari-web-extension-packager .output/safari-mv3 \
   --project-location safari-ios --app-name "Expressive Gmail" --bundle-identifier "$APP_ID" \
   --swift --ios-only --copy-resources --no-open --no-prompt --force >/dev/null

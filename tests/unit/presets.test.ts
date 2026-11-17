@@ -1,3 +1,4 @@
+import { usEnglish } from '../locale';
 import { describeTime, fullTime, reminderPresets, schedulePresets, scheduleTime, snoozePresets, workweekStart, type TimePreset } from '../../src/app/lib/presets';
 
 // Week of Monday, October 5 2026 (local time, clear of DST changes in either hemisphere).
@@ -182,7 +183,7 @@ describe('workweekStart', () => {
   });
 });
 
-describe('scheduleTime and fullTime', () => {
+describe.skipIf(!usEnglish)('scheduleTime and fullTime', () => {
   it('format like Gmail', () => {
     expect(norm(scheduleTime(local(10, 14, 8)))).toBe('Oct 14, 8:00 AM');
     expect(norm(fullTime(local(10, 13, 8)))).toBe('Tue, Oct 13, 8:00 AM');
@@ -204,7 +205,7 @@ describe('reminderPresets', () => {
   });
 });
 
-describe('describeTime', () => {
+describe.skipIf(!usEnglish)('describeTime', () => {
   it.each([
     ['later today', local(10, 7, 18), 'today, 6:00 PM'],
     ['tomorrow morning', local(10, 8, 8), 'tomorrow, 8:00 AM'],

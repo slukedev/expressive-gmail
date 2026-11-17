@@ -9,7 +9,7 @@ describe('countLabel', () => {
   });
 
   it('trusts an estimate above the loaded pages', () => {
-    expect(countLabel(50, 1234, true)).toBe('1,234');
+    expect(countLabel(50, 1234, true)).toBe((1234).toLocaleString());
   });
 
   it('shows a floor when Gmail stopped counting', () => {

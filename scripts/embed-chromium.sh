@@ -1,10 +1,11 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # Puts the Chrome build inside the Mac app (Contents/Resources/Chromium Extension), where the app's
 # "Add to <browser>" button points people, then re-seals the app with the given identity.
 # Usage: sh scripts/embed-chromium.sh "<path to .app>" "<signing identity>"
-set -e
-APP="$1"
-IDENTITY="$2"
+[ -n "${BASH_VERSION:-}" ] || exec bash "$0" "$@"
+set -euo pipefail
+APP="${1:?Usage: embed-chromium.sh <app> <signing identity>}"
+IDENTITY="${2:?Usage: embed-chromium.sh <app> <signing identity>}"
 DEST="$APP/Contents/Resources/Chromium Extension"
 rm -rf "$DEST"
 ditto .output/chrome-mv3 "$DEST"

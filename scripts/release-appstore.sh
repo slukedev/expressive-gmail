@@ -1,12 +1,15 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # Archives the Safari app for the Mac App Store and uploads it to App Store Connect (or, with
 # EXPORT_ONLY=1, writes a signed .pkg to .output/appstore/ for Transporter). Unlike release:mac it
 # carries no Chromium extension: the App Store build is the Safari extension and its window.
 # Create the app record in App Store Connect first, with the same bundle id.
 # Usage: TEAM_ID=XXXXXXXXXX BUNDLE_ID=com.yourname.bettergmail [BUILD_NUMBER=7] [EXPORT_ONLY=1] npm run release:appstore
 # Uploading signs in with the Apple ID Xcode has under Settings > Accounts.
-set -e
+[ -n "${BASH_VERSION:-}" ] || exec bash "$0" "$@"
+set -euo pipefail
 TEAM_ID="${TEAM_ID:?Set TEAM_ID to your Apple developer team id}"
+export BUNDLE_ID="${BUNDLE_ID:?Set BUNDLE_ID to the bundle id of the app record in App Store Connect}"
+EXPORT_ONLY="${EXPORT_ONLY:-}"
 VERSION=$(node -p "require('./package.json').version")
 # App Store Connect wants a build number that only goes up; a timestamp always does.
 BUILD_NUMBER="${BUILD_NUMBER:-$(date +%Y%m%d%H%M)}"

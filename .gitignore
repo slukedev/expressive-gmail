@@ -35,3 +35,6 @@ coverage/
 
 # Local before/after review screenshots
 after/
+
+# Agent worktrees and local settings
+.claude/

@@ -3,7 +3,7 @@ import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
 
 export default tseslint.config(
-  { ignores: ['.output/**', '.wxt/**', 'safari/**', 'node_modules/**', 'playwright-report/**', 'test-results/**'] },
+  { ignores: ['.claude/**', '.output/**', '.wxt/**', 'safari/**', 'safari-ios/**', 'build/**', 'node_modules/**', 'playwright-report/**', 'test-results/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -17,6 +17,11 @@ export default tseslint.config(
       eqeqeq: ['error', 'smart'],
       'prefer-const': 'error',
     },
+  },
+  {
+    // Node tools and the preview page: they report to the console, and TypeScript checks names in the .ts ones.
+    files: ['scripts/**', 'preview/**', '*.config.{js,ts}'],
+    rules: { 'no-console': 'off', 'no-undef': 'off' },
   },
   {
     // Gmail's sync payloads are deeply nested untyped arrays; fixtures poke at them directly.

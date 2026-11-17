@@ -1,9 +1,14 @@
 // Fails when a release build still carries the demo mailbox: node scripts/check-no-demo.mjs [.output/chrome-mv3 ...]
-// Run it after `npm run build:chrome` (or any build). The demo is for the preview and dev builds only.
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+// With no arguments it checks every build in .output. The demo is for the preview and dev builds only.
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-const dirs = process.argv.slice(2).length ? process.argv.slice(2) : ['.output/chrome-mv3'];
+const builds = ['.output/chrome-mv3', '.output/firefox-mv3', '.output/safari-mv3'].filter((dir) => existsSync(dir));
+const dirs = process.argv.slice(2).length ? process.argv.slice(2) : builds;
+if (!dirs.length) {
+  console.error('No build found in .output. Run npm run build:all first.');
+  process.exit(1);
+}
 // Strings only the demo's code and fixtures contain.
 const MARKERS = ['createDemoBackend', 'createDemoDirectory', 'riverastudio.example.net', 'alexr.makes@example.org', 'Thimble & Oak', 'Showing the demo mailbox', 'Explore the demo'];
 

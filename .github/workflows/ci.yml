@@ -1,26 +1,31 @@
 name: CI
 
-# Every push builds the extension for Chrome, Firefox and Safari, and the Safari apps for Mac,
-# iPhone and iPad. The builds are kept as downloadable artifacts on the run.
+# Builds the extension for Chrome, Firefox and Safari, and the Safari apps for Mac, iPhone and iPad,
+# and keeps the builds as downloadable artifacts on the run.
 on:
   push:
+    branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  # Every commit on main gets a verdict; a newer push to a pull request replaces the older run.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
@@ -31,10 +36,13 @@ jobs:
         run: npm run typecheck
 
       - name: Lint
-        run: npm run lint
+        run: npm run lint -- --max-warnings 0
 
       - name: Unit tests
         run: npm test
+
+      - name: Known vulnerabilities in shipped dependencies
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Build Chrome, Firefox and Safari
         run: npm run build:all
@@ -42,11 +50,29 @@ jobs:
       - name: No demo mailbox in release builds
         run: npm run check:no-demo -- .output/chrome-mv3 .output/firefox-mv3 .output/safari-mv3
 
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Extension smoke test (desktop)
+        run: node scripts/smoke-extension.mjs smoke-desktop.png
+
+      - name: Extension smoke test (phone)
+        run: node scripts/smoke-extension.mjs --phone smoke-phone.png
+
+      - name: Upload smoke screenshots
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: smoke-screenshots
+          path: smoke-*.png
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Store zips for Chrome and Firefox
         run: npm run zip
 
       - name: Upload Chrome and Firefox builds
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: extensions
           path: |
@@ -56,53 +82,134 @@ jobs:
           include-hidden-files: true
           retention-days: 30
 
+  unit:
+    # The other Node versions package.json supports, and zones east of UTC (Chatham is UTC+12:45 or
+    # +13:45), one in another language: date bugs there never show in New York.
+    name: unit (Node ${{ matrix.node }}${{ matrix.tz && format(', {0}, {1}', matrix.tz, matrix.lang) || '' }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { node: 22 }
+          - { node: 26 }
+          - { node: 24, tz: Europe/Berlin, lang: de_DE.UTF-8 }
+          - { node: 24, tz: Pacific/Chatham, lang: en_US.UTF-8 }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        if: ${{ !matrix.tz }}
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+        env:
+          TEST_TZ: ${{ matrix.tz }}
+          TEST_LANG: ${{ matrix.lang }}
+
   e2e:
     name: e2e (${{ matrix.project }} ${{ matrix.shard }})
     # One job per browser, side by side: the whole suite on one runner takes longer than its time limit.
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # WebKit on Linux is too slow for two workers on a 2-core runner (tests time out under load),
-    # so it runs one worker in two shards.
+    # WebKit and Firefox on Linux are too slow for two workers on a 2-core runner (tests time out under
+    # load), so they run one worker in two shards.
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { project: chromium, workers: 2, shard: 1/1 }
-          - { project: phone, workers: 2, shard: 1/1 }
-          - { project: webkit, workers: 1, shard: 1/2 }
-          - { project: webkit, workers: 1, shard: 2/2 }
+          - { project: chromium, browser: chromium, workers: 2, shard: 1/1 }
+          - { project: phone, browser: webkit, workers: 2, shard: 1/1 }
+          - { project: webkit, browser: webkit, workers: 1, shard: 1/2 }
+          - { project: webkit, browser: webkit, workers: 1, shard: 2/2 }
+          - { project: firefox, browser: firefox, workers: 1, shard: 1/2 }
+          - { project: firefox, browser: firefox, workers: 1, shard: 2/2 }
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
 
       - run: npm ci
 
-      - name: Install Playwright browser
-        run: npx playwright install --with-deps ${{ matrix.project == 'chromium' && 'chromium' || 'webkit' }}
+      - name: Install ${{ matrix.browser }}
+        run: npx playwright install --with-deps ${{ matrix.browser }}
 
       - name: End-to-end tests (${{ matrix.project }} ${{ matrix.shard }})
         run: npx playwright test --project=${{ matrix.project }} --workers=${{ matrix.workers }} --shard=${{ matrix.shard }}
 
-      - name: Upload Playwright report
+      - name: Upload Playwright report, traces and screenshots
         if: failure()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: playwright-report-${{ matrix.project }}-${{ strategy.job-index }}
-          path: playwright-report/
+          name: playwright-${{ matrix.project }}-${{ strategy.job-index }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  e2e-webkit-mac:
+    # Safari's WebKit on macOS handles focus and keyboard differently from WebKitGTK on Linux.
+    name: e2e (webkit on macOS)
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install WebKit
+        run: npx playwright install webkit
+
+      - name: End-to-end tests (webkit and phone)
+        run: npx playwright test --project=webkit --project=phone --workers=2
+
+      - name: Upload Playwright report, traces and screenshots
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-webkit-macos
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
           retention-days: 7
 
   safari-apps:
     # Unsigned builds, to prove the Xcode projects build; signed ones come from npm run release:mac and release:appstore.
     runs-on: macos-latest
     timeout-minutes: 30
+    env:
+      BUNDLE_ID: com.example.expressivegmail.ci
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
@@ -133,7 +240,7 @@ jobs:
           ditto -c -k --keepParent "build/ios/Build/Products/Release-iphonesimulator/Expressive Gmail.app" expressive-gmail-ios-simulator.zip
 
       - name: Upload Safari apps
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: safari-apps
           path: expressive-gmail-*.zip

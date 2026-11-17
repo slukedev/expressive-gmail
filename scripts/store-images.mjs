@@ -1,6 +1,6 @@
 // Renders the store screenshots and promo tiles into store/images/ from the demo mailbox:
 //   node scripts/store-images.mjs [filter]
-// Captures real UI from the preview (started here if it isn't running on 5199), then composes each
+// Captures real UI from the preview (started here if this checkout's isn't running on PREVIEW_PORT, default 5199), then composes each
 // slide from store/images/slides.html with Material shapes and Google Sans Flex.
 //   store/images/web/        1280 x 800 PNG: Chrome Web Store (first five) and Firefox Add-ons
 //   store/images/app-store/  2560 x 1600 PNG: Mac App Store
@@ -12,24 +12,19 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { MaterialShapes, roundedPolygonToPath } from 'material-shapes-ts';
+import { ownPreview } from './preview-checkout.mjs';
 
 const only = process.argv[2];
 const root = path.resolve(import.meta.dirname, '..');
 const outDir = path.join(root, 'store/images');
 const work = fs.mkdtempSync(path.join(os.tmpdir(), 'store-images-'));
-const BASE = 'http://localhost:5199/';
+const PORT = Number(process.env.PREVIEW_PORT) || 5199;
+const BASE = `http://localhost:${PORT}/`;
 
-async function up() {
-  try {
-    return (await fetch(BASE)).ok;
-  } catch {
-    return false;
-  }
-}
 let server;
-if (!(await up())) {
-  server = spawn('npx', ['vite', '--config', 'vite.preview.config.ts', '--port', '5199', '--strictPort'], { cwd: root, stdio: 'ignore' });
-  for (let i = 0; i < 60 && !(await up()); i++) await new Promise((r) => setTimeout(r, 500));
+if (!(await ownPreview(BASE, root))) {
+  server = spawn('npx', ['vite', '--config', 'vite.preview.config.ts', '--port', String(PORT), '--strictPort'], { cwd: root, stdio: 'ignore' });
+  for (let i = 0; i < 60 && !(await ownPreview(BASE, root)); i++) await new Promise((r) => setTimeout(r, 500));
 }
 
 const browser = await chromium.launch();
