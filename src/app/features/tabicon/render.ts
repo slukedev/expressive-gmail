@@ -1,4 +1,5 @@
 import { shapePath, type ShapeName } from '../../ui/ShapeIcon';
+import { paintClassicGmail } from './classic';
 import { badgeText, TAB_ICON_LOOKS, type TabIconLook } from './choice';
 import { TAB_ICON_GLYPHS, type TabIconGlyph } from './glyphs';
 
@@ -30,6 +31,7 @@ export interface TabIconSpec {
 type Mark =
   | { kind: 'shape'; shape: ShapeName; glyph?: TabIconGlyph; glyphSize: number }
   | { kind: 'letter'; text: string }
+  | { kind: 'classic' }
   | { kind: 'image' };
 
 export interface TabIconLayout {
@@ -48,9 +50,11 @@ export function tabIconLayout(spec: TabIconSpec, measure: (text: string) => numb
   const mark: Mark =
     spec.look === 'image'
       ? { kind: 'image' }
-      : spec.look === 'letter'
-        ? { kind: 'letter', text: spec.initial || '@' }
-        : { kind: 'shape', shape, glyph: design?.glyph ?? 'mail', glyphSize: GLYPH_SIZE[shape] ?? 36 };
+      : spec.look === 'classic'
+        ? { kind: 'classic' }
+        : spec.look === 'letter'
+          ? { kind: 'letter', text: spec.initial || '@' }
+          : { kind: 'shape', shape, glyph: design?.glyph ?? 'mail', glyphSize: GLYPH_SIZE[shape] ?? 36 };
   const text = spec.unread === null ? null : badgeText(spec.unread);
   const width = text ? Math.min(SIZE, Math.max(BADGE_HEIGHT, Math.ceil(measure(text)) + BADGE_PAD * 2)) : 0;
   return { mark, colors: spec.colors, badge: text ? { text, x: SIZE - width, width, height: BADGE_HEIGHT } : null };
@@ -75,6 +79,8 @@ export function paintTabIcon(g: CanvasRenderingContext2D, layout: TabIconLayout,
   }
   if (mark.kind === 'image') {
     if (image) g.drawImage(image, 0, 0, SIZE, SIZE);
+  } else if (mark.kind === 'classic') {
+    paintClassicGmail(g);
   } else if (mark.kind === 'letter') {
     g.fillStyle = colors.tile;
     g.beginPath();

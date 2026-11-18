@@ -38,7 +38,7 @@ import { geminiAvailable, geminiOn, type GeminiStatus } from '../../data/gemini'
 import { useGeminiStatus } from '../gemini/useGemini';
 import { appFeatures, installApp, openEmailLinksHere, useAppHost } from '../../lib/appHost';
 import { useAccounts } from '../../data/accounts/store';
-import type { TabIcon } from '../tabicon/choice';
+import { hasOwnColors, type TabIcon } from '../tabicon/choice';
 import { TabIconColorPicker, TabIconLookPicker } from '../tabicon/TabIconPickers';
 import { tabIconsShown, useScopeInitial, useShownAccount } from '../tabicon/useTabIcon';
 
@@ -641,7 +641,7 @@ function TabIconBlock({ focus }: { focus: boolean }) {
       return { accountPrefs: { ...x.accountPrefs, [editing]: on ? { ...rest, tabIcon: x.tabIcon } : rest } };
     });
   };
-  const keywords = 'tab icon favicon browser logo gmail original unread count number badge profile account';
+  const keywords = 'tab icon favicon browser logo gmail original classic old envelope unread count number badge profile account';
   return (
     <section ref={ref} className="settings-block" aria-label="Tab icon">
       <h3 className="md-label-large settings-subhead settings-block__head">Tab icon</h3>
@@ -666,7 +666,7 @@ function TabIconBlock({ focus }: { focus: boolean }) {
           <Row title="Icon" keywords={keywords}>
             <TabIconLookPicker icon={icon} initial={initial} onChange={(look) => change({ look })} />
           </Row>
-          {icon.look !== 'gmail' && (
+          {!hasOwnColors(icon.look) && (
             <Row title="Color" keywords={`${keywords} color colour`}>
               <TabIconColorPicker value={icon.color} onChange={(color) => change({ color })} />
             </Row>

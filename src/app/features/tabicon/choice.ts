@@ -11,10 +11,14 @@ export const TAB_ICON_LOOKS = [
   { look: 'favorite', label: 'Heart', shape: 'Cookie12Sided', glyph: 'favorite' },
   { look: 'bolt', label: 'Bolt', shape: 'PuffyDiamond', glyph: 'bolt' },
   { look: 'eco', label: 'Leaf', shape: 'Clover4Leaf', glyph: 'eco' },
+  { look: 'classic', label: 'Classic Gmail' },
   { look: 'gmail', label: 'Gmail' },
 ] as const satisfies readonly { look: string; label: string; shape?: ShapeName; glyph?: TabIconGlyph }[];
 
 export type TabIconLook = (typeof TAB_ICON_LOOKS)[number]['look'];
+
+/** Looks drawn in their own colors, so the color choice doesn't apply. */
+export const hasOwnColors = (look: TabIconLook) => look === 'gmail' || look === 'classic';
 
 export interface TabIcon {
   look: TabIconLook;
